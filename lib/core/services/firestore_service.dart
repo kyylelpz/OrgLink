@@ -6,6 +6,9 @@ class FirestoreService {
 
   final FirebaseFirestore _firestore;
 
+  Future<T> runTransaction<T>(TransactionHandler<T> handler) =>
+      _firestore.runTransaction(handler);
+
   CollectionReference<T> collection<T extends Object>(
     String path, {
     required FromFirestore<T> fromFirestore,

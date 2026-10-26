@@ -18,8 +18,18 @@ class FirebaseAuthRepository implements AuthRepository {
                 id: user.uid,
                 email: user.email,
                 displayName: user.displayName,
+                photoURL: user.photoURL,
               );
       }
+    } catch (error) {
+      throw AppFailure.from(error);
+    }
+  }
+
+  @override
+  Future<bool> signInWithGoogle() async {
+    try {
+      return await _service.signInWithGoogle();
     } catch (error) {
       throw AppFailure.from(error);
     }

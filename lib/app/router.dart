@@ -11,7 +11,12 @@ import '../features/profile/presentation/screens/complete_profile_screen.dart';
 GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
   initialLocation: AppRoutes.splash,
   refreshListenable: auth,
-  redirect: (_, state) => authRedirect(auth.status, state.uri.path),
+  redirect: (_, state) => authRedirect(
+    auth.status,
+    state.uri.path,
+    profileStatus: auth.profileStatus,
+    eligible: auth.profile?.isEligible == true,
+  ),
   routes: [
     GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),
     GoRoute(
@@ -39,16 +44,32 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
   ),
 );
 
-String? authRedirect(AuthStatus status, String path) {
+String? authRedirect(
+  AuthStatus status,
+  String path, {
+  ProfileStatus profileStatus = ProfileStatus.loading,
+  bool eligible = false,
+}) {
   if (status == AuthStatus.loading || status == AuthStatus.error) {
     return path == AppRoutes.splash ? null : AppRoutes.splash;
   }
-  final isPublic = path == AppRoutes.onboarding || path == AppRoutes.signIn;
   if (status == AuthStatus.signedOut) {
-    if (path == AppRoutes.splash) return AppRoutes.onboarding;
-    return isPublic ? null : AppRoutes.signIn;
+    return path == AppRoutes.signIn || path == AppRoutes.onboarding
+        ? null
+        : AppRoutes.signIn;
   }
-  // Fail closed until a defined profile schema and trusted eligibility checks
-  // can distinguish profile completion, account status and authorized roles.
-  return path == AppRoutes.accountStatus ? null : AppRoutes.accountStatus;
+  if (profileStatus == ProfileStatus.loading ||
+      profileStatus == ProfileStatus.error) {
+    return path == AppRoutes.splash ? null : AppRoutes.splash;
+  }
+  if (profileStatus == ProfileStatus.incomplete) {
+    return path == AppRoutes.completeProfile ? null : AppRoutes.completeProfile;
+  }
+  if (!eligible) {
+    return path == AppRoutes.accountStatus || path == AppRoutes.completeProfile
+        ? null
+        : AppRoutes.accountStatus;
+  }
+  if (path == AppRoutes.completeProfile || path == AppRoutes.home) return null;
+  return AppRoutes.home;
 }
