@@ -29,6 +29,70 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
       // Listing, deletion, privileged fields and other users' data are denied.
     }
+    function eligible() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accountStatus == 'active'
+        && validStudent(get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+    function organization(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)).data; }
+    function manager(orgId) { return eligible() && organization(orgId).managerUid == request.auth.uid; }
+    function activeMember(orgId) {
+      return exists(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid))
+        && get(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)).data.membershipStatus == 'active';
+    }
+    function rosterReader(orgId) {
+      return manager(orgId) || (eligible() && activeMember(orgId)
+        && get(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)).data.permissions.viewRoster == true);
+    }
+    function accessibleOrganization(orgId) {
+      return eligible() && ((organization(orgId).visibility == 'public' && organization(orgId).status == 'active')
+        || organization(orgId).managerUid == request.auth.uid || activeMember(orgId));
+    }
+    match /organizations/{orgId} {
+      allow get: if accessibleOrganization(orgId);
+      allow list: if eligible() && ((resource.data.visibility == 'public' && resource.data.status == 'active')
+        || resource.data.managerUid == request.auth.uid);
+      // Organization creation, configuration, manager assignment and role grants
+      // are administrative operations; no client writes are permitted.
+      match /memberships/{uid} {
+        allow get: if eligible() && (owner(uid) || manager(orgId)
+          || (rosterReader(orgId) && resource.data.membershipStatus == 'active'));
+        allow list: if manager(orgId) || (rosterReader(orgId) && resource.data.membershipStatus == 'active');
+        allow create: if eligible() && owner(uid)
+          && organization(orgId).visibility == 'public' && organization(orgId).status == 'active'
+          && organization(orgId).managerUid != request.auth.uid
+          && organization(orgId).approvalSettings.acceptsRequests == true
+          && request.resource.data.keys().hasAll(['uid','organizationId','membershipRole','membershipStatus','positionTitle','permissions','applicantName','requestedAt','joinedAt','updatedAt','reviewedAt','reviewedBy'])
+          && request.resource.data.keys().hasOnly(['uid','organizationId','membershipRole','membershipStatus','positionTitle','permissions','applicantName','requestedAt','joinedAt','updatedAt','reviewedAt','reviewedBy'])
+          && request.resource.data.uid == uid && request.resource.data.organizationId == orgId
+          && request.resource.data.membershipRole == 'member' && request.resource.data.membershipStatus == 'pending'
+          && request.resource.data.positionTitle == null
+          && request.resource.data.permissions is map && request.resource.data.permissions.size() == 0
+          && request.resource.data.applicantName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fullName
+          && request.resource.data.joinedAt == null && request.resource.data.reviewedAt == null && request.resource.data.reviewedBy == null
+          && request.resource.data.requestedAt == request.time && request.resource.data.updatedAt == request.time;
+        allow update: if manager(orgId) && uid != request.auth.uid && organization(orgId).status == 'active'
+          && resource.data.uid == uid && resource.data.organizationId == orgId
+          && resource.data.membershipStatus == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['membershipStatus','joinedAt','updatedAt','reviewedAt','reviewedBy'])
+          && request.resource.data.membershipStatus in ['active','rejected']
+          && request.resource.data.reviewedBy == request.auth.uid
+          && request.resource.data.reviewedAt == request.time && request.resource.data.updatedAt == request.time
+          && ((request.resource.data.membershipStatus == 'active' && request.resource.data.joinedAt == request.time)
+            || (request.resource.data.membershipStatus == 'rejected' && request.resource.data.joinedAt == null));
+      }
+      match /events/{eventId} {
+        // Read-only summaries of published, approved events. No event writes or
+        // registration subcollection permissions are introduced in this module.
+        allow read: if accessibleOrganization(orgId) && resource.data.eventStatus == 'published'
+          && resource.data.approvalStatus == 'approved';
+      }
+    }
+    // Collection-group queries must filter uid == the authenticated UID.
+    match /{path=**}/memberships/{uid} {
+      allow list: if eligible() && resource.data.uid == request.auth.uid;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }

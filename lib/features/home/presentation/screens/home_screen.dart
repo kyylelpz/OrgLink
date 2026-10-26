@@ -25,6 +25,18 @@ class HomeScreen extends StatelessWidget {
                 : () => context.go(AppRoutes.completeProfile),
             child: const Text('Edit student profile'),
           ),
+          FilledButton.tonal(
+            onPressed: () => context.go(AppRoutes.organizations),
+            child: const Text('Discover organizations'),
+          ),
+          TextButton(
+            onPressed: () => context.go(AppRoutes.myOrganizations),
+            child: const Text('My organizations'),
+          ),
+          TextButton(
+            onPressed: () => context.go(AppRoutes.membershipRequests),
+            child: const Text('Membership requests'),
+          ),
           const SignOutButton(),
         ],
       ),

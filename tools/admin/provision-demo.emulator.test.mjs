@@ -1,0 +1,25 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {initializeApp,deleteApp} from 'firebase-admin/app';
+import {getFirestore,FieldValue} from 'firebase-admin/firestore';
+import {main} from './provision-demo.mjs';
+const enabled=/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST??'');
+let app;
+after(async()=>{if(app)await deleteApp(app);});
+test('emulator: provisioning is idempotent and does not grant platform roles',{skip:!enabled},async()=>{
+  app=initializeApp({projectId:'orglink-dev'},'provision-tests');const store=getFirestore(app);
+  const uid='synthetic-provision-manager';
+  await store.doc(`users/${uid}`).set({uid,fullName:'Demo Manager',studentNumber:'DEMO-001',yearLevel:1,section:'A',platformRole:'user',accountStatus:'active'});
+  const args=['--project','orglink-dev','--manager-uid',uid,'--confirm-demo-manager','--emulator','--apply'];
+  await main(args);
+  const org=store.doc('organizations/demo-robotics');const membership=org.collection('memberships').doc(uid);
+  const first=(await membership.get()).data();assert.equal(first.membershipRole,'manager');
+  assert.equal((await store.doc(`users/${uid}`).get()).data().platformRole,'user');
+  await org.update({description:'Keep this edited description',updatedAt:FieldValue.serverTimestamp()});
+  await main(args);
+  assert.equal((await org.get()).data().description,'Keep this edited description');
+  assert.ok((await membership.get()).data().joinedAt.isEqual(first.joinedAt));
+  await org.update({managerUid:'another-manager'});
+  await assert.rejects(main(args),/another manager/);
+  assert.equal((await org.get()).data().managerUid,'another-manager');
+});
