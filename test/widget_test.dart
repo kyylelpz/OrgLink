@@ -1,30 +1,91 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:orglink/main.dart';
+import 'package:go_router/go_router.dart';
+import 'package:orglink/app/app.dart';
+import 'package:orglink/app/router.dart';
+import 'package:orglink/core/constants/app_routes.dart';
+import 'package:orglink/features/auth/presentation/viewmodels/auth_view_model.dart';
+import 'package:provider/provider.dart';
+import 'support/test_auth_repository.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
-  });
+  testWidgets(
+    'Google sign-in, validation, profile saving, status changes and sign-out',
+    (tester) async {
+      final repository = TestAuthRepository();
+      final profiles = TestProfileRepository();
+      final auth = AuthViewModel(repository, profiles);
+      final router = createAppRouter(auth);
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: auth),
+            Provider<GoRouter>.value(value: router),
+          ],
+          child: const OrgLinkApp(),
+        ),
+      );
+      expect(find.text('Loading OrgLink...'), findsOneWidget);
+      repository.controller.add(null);
+      await tester.pumpAndSettle();
+      expect(find.text('Google Sign-In'), findsOneWidget);
+      repository.cancelSignIn = true;
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Sign-in cancelled'), findsOneWidget);
+      repository.cancelSignIn = false;
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pump();
+      profiles.controller.add(null);
+      await tester.pumpAndSettle();
+      expect(find.text('Student Profile'), findsOneWidget);
+      await tester.ensureVisible(find.text('Save student profile'));
+      await tester.tap(find.text('Save student profile'));
+      await tester.pumpAndSettle();
+      expect(find.text('Use 3?30 letters, digits or hyphens.'), findsOneWidget);
+      expect(find.text('Select a year level.'), findsOneWidget);
+      final fields = find.byType(TextFormField);
+      expect(
+        tester.widget<TextFormField>(fields.at(0)).initialValue,
+        student.email,
+      );
+      await tester.enterText(fields.at(2), '2026-001');
+      await tester.ensureVisible(find.byType(DropdownButtonFormField<int>));
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Year 1').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(fields.at(3), 'A');
+      await tester.ensureVisible(find.text('Save student profile'));
+      await tester.tap(find.text('Save student profile'));
+      await tester.pumpAndSettle();
+      expect(find.text('Home Dashboard'), findsOneWidget);
+      expect(profiles.saveCalls, 1);
+      await tester.tap(find.text('Edit student profile'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).at(2))
+            .controller
+            ?.text,
+        '2026-001',
+      );
+      router.go(AppRoutes.home);
+      await tester.pumpAndSettle();
+      profiles.controller.add(profile(status: 'suspended'));
+      await tester.pumpAndSettle();
+      expect(find.text('Account Status'), findsOneWidget);
+      router.go(AppRoutes.home);
+      await tester.pumpAndSettle();
+      expect(find.text('Home Dashboard'), findsNothing);
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+      expect(find.text('Google Sign-In'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      router.dispose();
+      auth.dispose();
+      await repository.controller.close();
+      await profiles.controller.close();
+    },
+  );
 }
