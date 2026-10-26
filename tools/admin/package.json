@@ -1,0 +1,1 @@
+{"name":"orglink-demo-provisioning","private":true,"type":"module","scripts":{"test":"node --test provision-demo.test.mjs"},"dependencies":{"firebase-admin":"^13.0.0"}}

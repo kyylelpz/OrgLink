@@ -11,6 +11,11 @@ void main() {
     AppRoutes.completeProfile,
     AppRoutes.accountStatus,
     AppRoutes.home,
+    AppRoutes.organizations,
+    AppRoutes.myOrganizations,
+    AppRoutes.membershipRequests,
+    '/organizations/example/requests',
+    '/organizations/example/members',
     '/unknown',
   ];
   test('unresolved auth cannot access protected routes', () {

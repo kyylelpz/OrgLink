@@ -16,4 +16,11 @@ class FirestoreService {
   }) => _firestore
       .collection(path)
       .withConverter<T>(fromFirestore: fromFirestore, toFirestore: toFirestore);
+  Query<T> collectionGroup<T extends Object>(
+    String name, {
+    required FromFirestore<T> fromFirestore,
+    required ToFirestore<T> toFirestore,
+  }) => _firestore
+      .collectionGroup(name)
+      .withConverter<T>(fromFirestore: fromFirestore, toFirestore: toFirestore);
 }

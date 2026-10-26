@@ -1,3 +1,6 @@
+import '../features/organizations/data/repositories/organization_repository.dart';
+import '../features/organizations/data/repositories/firestore_organization_repository.dart';
+import '../features/organizations/data/services/organization_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../features/profile/data/repositories/profile_repository.dart';
 import '../features/profile/data/repositories/firestore_profile_repository.dart';
@@ -28,6 +31,15 @@ class AppDependencies extends StatelessWidget {
               FirebaseAuthService(FirebaseAuth.instance, GoogleSignIn.instance),
         ),
         Provider(create: (_) => FirestoreService(FirebaseFirestore.instance)),
+        Provider(
+          create: (context) =>
+              OrganizationService(context.read<FirestoreService>()),
+        ),
+        Provider<OrganizationRepository>(
+          create: (context) => FirestoreOrganizationRepository(
+            context.read<OrganizationService>(),
+          ),
+        ),
         Provider<AuthRepository>(
           create: (context) =>
               FirebaseAuthRepository(context.read<FirebaseAuthService>()),

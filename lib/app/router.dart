@@ -1,3 +1,8 @@
+import '../features/organizations/presentation/organization_scope.dart';
+import '../features/organizations/presentation/screens/organization_discovery_screen.dart';
+import '../features/organizations/presentation/screens/organization_details_screen.dart';
+import '../features/organizations/presentation/screens/my_organizations_screen.dart';
+import '../features/memberships/presentation/screens/member_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -33,6 +38,44 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
       builder: (_, _) => const AccountStatusScreen(),
     ),
     GoRoute(path: AppRoutes.home, builder: (_, _) => const HomeScreen()),
+    ShellRoute(
+      builder: (_, _, child) => OrganizationScope(child: child),
+      routes: [
+        GoRoute(
+          path: AppRoutes.organizations,
+          builder: (_, _) => const OrganizationDiscoveryScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.myOrganizations,
+          builder: (_, _) => const MyOrganizationsScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.membershipRequests,
+          builder: (_, _) => const MyOrganizationsScreen(requestsOnly: true),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId',
+          builder: (_, state) => OrganizationDetailsScope(
+            id: state.pathParameters['organizationId']!,
+            child: const OrganizationDetailsScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/requests',
+          builder: (_, state) => OrganizationDetailsScope(
+            id: state.pathParameters['organizationId']!,
+            child: const MemberListScreen(pending: true),
+          ),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/members',
+          builder: (_, state) => OrganizationDetailsScope(
+            id: state.pathParameters['organizationId']!,
+            child: const MemberListScreen(pending: false),
+          ),
+        ),
+      ],
+    ),
   ],
   errorBuilder: (context, _) => PlaceholderScreen(
     title: 'Page unavailable',
@@ -70,6 +113,13 @@ String? authRedirect(
         ? null
         : AppRoutes.accountStatus;
   }
-  if (path == AppRoutes.completeProfile || path == AppRoutes.home) return null;
+  if (path == AppRoutes.completeProfile ||
+      path == AppRoutes.home ||
+      path == AppRoutes.organizations ||
+      path == AppRoutes.myOrganizations ||
+      path == AppRoutes.membershipRequests ||
+      path.startsWith('${AppRoutes.organizations}/')) {
+    return null;
+  }
   return AppRoutes.home;
 }

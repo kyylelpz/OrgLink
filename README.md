@@ -1,5 +1,9 @@
 # OrgLink
 
+Module 2 organization discovery and membership is implemented. See
+[the Module 2 guide](docs/module2.md) for schemas, routes, security rules,
+manager provisioning, deployment steps and validation.
+
 Flutter Android student organization application. Development, testing and the
 final demonstration use the existing Firebase project **orglink-dev**.
 
