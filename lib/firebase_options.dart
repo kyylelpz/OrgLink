@@ -57,7 +57,6 @@ class DefaultFirebaseOptions {
     projectId: 'orglink-dev',
     storageBucket: 'orglink-dev.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCv0fE7QNHm5wes9youb__U4maDym2lnug',
     appId: '1:250705466224:ios:4c28fa55eb5b29df7eb5b5',
@@ -68,7 +67,6 @@ class DefaultFirebaseOptions {
     iosClientId: '250705466224-hu4i3ov0ociv8ciiorf5u6ojtcr4f3or.apps.googleusercontent.com',
     iosBundleId: 'com.example.orglink',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyCv0fE7QNHm5wes9youb__U4maDym2lnug',
     appId: '1:250705466224:ios:4c28fa55eb5b29df7eb5b5',
