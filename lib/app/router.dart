@@ -143,7 +143,7 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     ),
   ],
   errorBuilder: (context, _) => PlaceholderScreen(
-    title: 'Page unavailable',
+    title: 'Page Unavailable',
     message: 'This page could not be found.',
     action: FilledButton(
       onPressed: () => context.go(AppRoutes.splash),

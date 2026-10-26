@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/utils/display_labels.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/utils/live_query.dart';
 import '../../../../core/constants/app_routes.dart';
@@ -54,7 +55,7 @@ class OrganizationCard extends StatelessWidget {
       leading: OrganizationLogo(organization.logoURL),
       title: Text(organization.name),
       subtitle: Text(
-        '${organization.description.isEmpty ? 'No description available.' : organization.description}\n${organization.visibility} | ${organization.status}${subtitle == null ? '' : '\n$subtitle'}',
+        '${organization.description.isEmpty ? 'No description available.' : organization.description}\n${displayIdentifier(organization.visibility)} | ${displayIdentifier(organization.status)}${subtitle == null ? '' : '\n$subtitle'}',
       ),
       isThreeLine: true,
       trailing: const Icon(Icons.chevron_right),
@@ -80,7 +81,7 @@ class OrganizationNavigation extends StatelessWidget {
       NavigationDestination(icon: Icon(Icons.search), label: 'Discover'),
       NavigationDestination(
         icon: Icon(Icons.groups),
-        label: 'My organizations',
+        label: 'My Organizations',
       ),
       NavigationDestination(
         icon: Icon(Icons.pending_actions),

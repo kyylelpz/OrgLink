@@ -127,7 +127,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                         : () async {
                                             if (!await confirmEventAction(
                                                   context,
-                                                  'Withdraw registration?',
+                                                  'Withdraw Registration?',
                                                   'Withdrawal is subject to the event cutoff. Your private event access will not be changed.',
                                                 ) ||
                                                 !context.mounted) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../viewmodels/organization_hub_view_model.dart';
 import '../widgets/organization_widgets.dart';
@@ -26,7 +27,7 @@ class OrganizationDiscoveryScreen extends StatelessWidget {
             child: TextField(
               onChanged: model.searchFor,
               decoration: const InputDecoration(
-                labelText: 'Search organizations by name',
+                labelText: 'Search Organizations by Name',
                 prefixIcon: Icon(Icons.search),
               ),
             ),
@@ -54,7 +55,7 @@ class OrganizationDiscoveryScreen extends StatelessWidget {
                       organization: org,
                       subtitle: membership == null
                           ? null
-                          : 'Membership: ${membership.statusLabel}',
+                          : 'Membership: ${displayMembershipStatus(membership.status)}',
                     );
                   },
                 );

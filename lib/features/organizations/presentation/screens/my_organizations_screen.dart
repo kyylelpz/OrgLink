@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../viewmodels/organization_hub_view_model.dart';
 import '../widgets/organization_widgets.dart';
@@ -41,16 +42,14 @@ class MyOrganizationsScreen extends StatelessWidget {
                 if (model.managed.failure != null)
                   TextButton(
                     onPressed: model.managed.retry,
-                    child: const Text(
-                      'Could not load managed organizations. Retry',
-                    ),
+                    child: const Text('Retry Managed Organizations'),
                   ),
                 if (assignedOnly.isNotEmpty)
-                  const Text('Organizations you manage'),
+                  const Text('Organizations You Manage'),
                 for (final org in assignedOnly)
                   OrganizationCard(
                     organization: org,
-                    subtitle: 'Assigned organization manager',
+                    subtitle: 'Assigned Organization Manager',
                   ),
               ],
               if (memberships.isEmpty)
@@ -65,7 +64,7 @@ class MyOrganizationsScreen extends StatelessWidget {
                     final query = model.associated[member.organizationId];
                     final org = query?.value;
                     final summary =
-                        'Role: ${member.role} | Status: ${member.statusLabel}\nPosition: ${member.positionTitle ?? 'Not assigned'}\nRequested: ${displayDate(member.requestedAt)}';
+                        'Role: ${displayIdentifier(member.role)} | Status: ${displayMembershipStatus(member.status)}\nPosition: ${member.positionTitle ?? 'Not Assigned'}\nRequested: ${displayDate(member.requestedAt)}';
                     if (org != null) {
                       return OrganizationCard(
                         organization: org,
@@ -77,7 +76,7 @@ class MyOrganizationsScreen extends StatelessWidget {
                         title: Text(
                           query?.loading == true
                               ? 'Loading organization...'
-                              : 'Organization unavailable',
+                              : 'Organization Unavailable',
                         ),
                         subtitle: Text(
                           '$summary\n${query?.failure?.message ?? 'Details may no longer be available to your account.'}',

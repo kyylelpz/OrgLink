@@ -1,7 +1,7 @@
-import '../../../../core/utils/display_labels.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../organizations/presentation/widgets/organization_widgets.dart';
 import '../viewmodels/event_context_view_model.dart';
@@ -14,7 +14,7 @@ class EventDetailsScreen extends StatelessWidget {
     final model = context.read<EventContextViewModel>();
     if (!await confirmEventAction(
           context,
-          'Confirm $action',
+          'Confirm ${displayIdentifier(action)}',
           'Apply "$action" to this event?',
         ) ||
         !context.mounted) {
@@ -74,13 +74,13 @@ class EventDetailsScreen extends StatelessWidget {
                 'Capacity: ${event.capacity} | Registered: ${event.registrationCount} | Available: ${event.availableSlots}',
               ),
               Text(
-                'Registration deadline: ${schedule(event.registrationDeadline)}',
+                'Registration Deadline: ${schedule(event.registrationDeadline)}',
               ),
               Text(
                 'Visibility: ${event.visibility == 'private' ? 'Members Only' : 'Public'}',
               ),
               Text(
-                'Status: ${displayIdentifier(event.eventStatus)} / ${displayIdentifier(event.approvalStatus)}${event.archivedAt == null ? '' : ' (archived)'}',
+                'Status: ${displayIdentifier(event.eventStatus)} / ${displayIdentifier(event.approvalStatus)}${event.archivedAt == null ? '' : ' (Archived)'}',
               ),
               const Divider(),
               if (model.registration!.loading)
@@ -88,11 +88,11 @@ class EventDetailsScreen extends StatelessWidget {
               else if (model.registration!.failure != null)
                 TextButton(
                   onPressed: model.registration!.retry,
-                  child: const Text('Registration status unavailable. Retry'),
+                  child: const Text('Retry Registration Status'),
                 )
               else
                 Text(
-                  'Your registration: ${model.registration!.value == null ? 'Not Registered' : displayIdentifier(model.registration!.value!.status)}',
+                  'Your Registration: ${model.registration!.value == null ? 'Not Registered' : displayIdentifier(model.registration!.value!.status)}',
                 ),
               if (model.canRegister)
                 FilledButton(
@@ -113,7 +113,7 @@ class EventDetailsScreen extends StatelessWidget {
                       : () async {
                           if (!await confirmEventAction(
                                 context,
-                                'Withdraw registration?',
+                                'Withdraw Registration?',
                                 'Your registration record will be retained and your slot released.',
                               ) ||
                               !context.mounted) {

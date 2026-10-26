@@ -1,7 +1,7 @@
-import '../../../../core/utils/display_labels.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/utils/live_query.dart';
 import '../../../organizations/presentation/widgets/organization_widgets.dart';
@@ -80,7 +80,7 @@ class _ManagementListState extends State<_ManagementList> {
               TextField(
                 onChanged: (value) => setState(() => search = value),
                 decoration: const InputDecoration(
-                  labelText: 'Search organization events',
+                  labelText: 'Search Organization Events',
                 ),
               ),
               const SizedBox(height: 12),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/widgets/capitalization_suggestion.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../data/models/event.dart';
 import '../viewmodels/event_context_view_model.dart';
@@ -154,11 +155,13 @@ class _EventFormState extends State<_EventForm> {
             const SizedBox(height: 16),
             TextFormField(
               controller: title,
+              textCapitalization: TextCapitalization.words,
               enabled: !model.busy,
               maxLength: 200,
               decoration: const InputDecoration(labelText: 'Event Title'),
               validator: (value) => EventDraft.requiredText(value),
             ),
+            CapitalizationSuggestion(controller: title, enabled: !model.busy),
             const SizedBox(height: 16),
             TextFormField(
               controller: description,
@@ -244,7 +247,7 @@ class _EventFormState extends State<_EventForm> {
               controller: poster,
               enabled: !model.busy,
               decoration: const InputDecoration(
-                labelText: 'Poster HTTPS URL (optional)',
+                labelText: 'Poster HTTPS URL (Optional)',
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return null;

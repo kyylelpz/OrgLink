@@ -46,7 +46,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Create Event'), findsOneWidget);
       final fields = find.byType(TextFormField);
-      await tester.enterText(fields.at(0), 'Created Demo Event');
+      await tester.enterText(fields.at(0), 'annual general assembly');
+      await tester.pump();
+      expect(
+        find.text('Suggested capitalization: Annual General Assembly'),
+        findsOneWidget,
+      );
       await tester.enterText(
         fields.at(1),
         'A complete synthetic demonstration event.',
@@ -57,7 +62,8 @@ void main() {
       await tester.tap(find.text('Save Draft'));
       await tester.pumpAndSettle();
       expect(events.creates, 1);
-      expect(find.text('Created Demo Event'), findsOneWidget);
+      expect(events.event.value?.title, 'annual general assembly');
+      expect(find.text('annual general assembly'), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
       Future<void> action(String label) async {
         await tester.scrollUntilVisible(
@@ -87,8 +93,8 @@ void main() {
       await tester.pumpAndSettle();
       router.go(AppRoutes.events);
       await tester.pumpAndSettle();
-      expect(find.text('Created Demo Event'), findsOneWidget);
-      await tester.tap(find.text('Created Demo Event'));
+      expect(find.text('annual general assembly'), findsOneWidget);
+      await tester.tap(find.text('annual general assembly'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Register'),
@@ -106,7 +112,7 @@ void main() {
       router.go(AppRoutes.myEvents);
       await tester.pumpAndSettle();
       expect(find.textContaining('Registration: Registered'), findsOneWidget);
-      await tester.tap(find.text('Created Demo Event'));
+      await tester.tap(find.text('annual general assembly'));
       await tester.pumpAndSettle();
       await action('Withdraw Registration');
       expect(events.registrations.value.single.status, 'cancelled');

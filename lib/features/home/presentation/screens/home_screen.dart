@@ -23,23 +23,23 @@ class HomeScreen extends StatelessWidget {
             onPressed: auth.isBusy
                 ? null
                 : () => context.go(AppRoutes.completeProfile),
-            child: const Text('Edit student profile'),
+            child: const Text('Edit Student Profile'),
           ),
           FilledButton.tonal(
             onPressed: () => context.go(AppRoutes.organizations),
-            child: const Text('Discover organizations'),
+            child: const Text('Discover Organizations'),
           ),
           TextButton(
             onPressed: () => context.go(AppRoutes.myOrganizations),
-            child: const Text('My organizations'),
+            child: const Text('My Organizations'),
           ),
           TextButton(
             onPressed: () => context.go(AppRoutes.membershipRequests),
-            child: const Text('Membership requests'),
+            child: const Text('Membership Requests'),
           ),
           FilledButton.tonal(
             onPressed: () => context.go(AppRoutes.events),
-            child: const Text('Discover events'),
+            child: const Text('Discover Events'),
           ),
           TextButton(
             onPressed: () => context.go(AppRoutes.myEvents),

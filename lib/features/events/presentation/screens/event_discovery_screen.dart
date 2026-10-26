@@ -63,7 +63,7 @@ class EventDiscoveryScreen extends StatelessWidget {
                 TextField(
                   onChanged: (value) => model.filter(text: value),
                   decoration: const InputDecoration(
-                    labelText: 'Search events by title',
+                    labelText: 'Search Events by Title',
                     prefixIcon: Icon(Icons.search),
                   ),
                 ),
@@ -122,23 +122,28 @@ class EventDiscoveryScreen extends StatelessWidget {
           if (model.organizations.discovery.failure != null)
             TextButton(
               onPressed: model.organizations.discovery.retry,
-              child: const Text('Organization lookup failed. Retry'),
+              child: const Text('Retry Organizations'),
             ),
           if (model.organizations.mine.failure != null)
             TextButton(
               onPressed: model.organizations.mine.retry,
-              child: const Text('Membership lookup failed. Retry'),
+              child: const Text('Retry Memberships'),
             ),
           if (model.organizations.managed.failure != null)
             TextButton(
               onPressed: model.organizations.managed.retry,
-              child: const Text('Managed organization lookup failed. Retry'),
+              child: const Text('Retry Managed Organizations'),
             ),
           for (final query in model.catalog.values)
             if (query.failure != null)
-              TextButton(
-                onPressed: query.retry,
-                child: Text('${query.failure!.message} Retry'),
+              Column(
+                children: [
+                  Text(query.failure!.message),
+                  TextButton(
+                    onPressed: query.retry,
+                    child: const Text('Retry Events'),
+                  ),
+                ],
               ),
           Expanded(
             child: model.results.isEmpty
