@@ -244,3 +244,10 @@ Debugging validation: Flutter analysis passed and all 24 Flutter tests passed,
 including original Google/Firebase diagnostic logging, initialization failures,
 error mapping and token/detail omission. Real account selection still requires
 a manual sign-in attempt.
+
+## Module 4: Attendance
+
+Manual attendance, attendance reports, personal history and the global QR Hub are
+implemented. Secure QR check-in uses callable Functions that require a separate
+manual deployment. See [Module 4 setup, security and testing](docs/module4.md).
+No billing changes or Firebase deployments are performed by the application.

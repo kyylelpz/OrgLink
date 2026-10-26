@@ -45,6 +45,14 @@ class HomeScreen extends StatelessWidget {
             onPressed: () => context.go(AppRoutes.myEvents),
             child: const Text('My Events'),
           ),
+          TextButton(
+            onPressed: () => context.go(AppRoutes.myAttendance),
+            child: const Text('My Attendance'),
+          ),
+          TextButton(
+            onPressed: () => context.go(AppRoutes.attendanceHub),
+            child: const Text('Attendance Management'),
+          ),
           const SignOutButton(),
         ],
       ),

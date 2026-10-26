@@ -45,6 +45,12 @@ service cloud.firestore {
       return manager(orgId) || (eligible() && activeMember(orgId)
         && get(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)).data.permissions.viewRoster == true);
     }
+    function attendanceOperator(orgId) {
+      return eligible() && (organization(orgId).managerUid == request.auth.uid
+        || (activeMember(orgId)
+          && get(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)).data.membershipRole == 'officer'
+          && get(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)).data.permissions.get('manageAttendance',false) == true));
+    }
     function accessibleOrganization(orgId) {
       return eligible() && ((organization(orgId).visibility == 'public' && organization(orgId).status == 'active')
         || organization(orgId).managerUid == request.auth.uid || activeMember(orgId));
@@ -170,7 +176,7 @@ service cloud.firestore {
                 && changed.hasOnly(['eventStatus','completedAt','updatedAt']) && request.resource.data.eventStatus == 'completed' && request.resource.data.completedAt == request.time)
               || (resource.data.eventStatus in ['completed','cancelled'] && changed.hasOnly(['archivedAt','updatedAt']) && request.resource.data.archivedAt == request.time));
         }
-        allow read: if eligible() && (eventEditor(resource.data)
+        allow read: if eligible() && (attendanceOperator(orgId) || eventEditor(resource.data)
           || (visibleEvent(resource.data) && ((resource.data.eventStatus in ['published','completed'] && resource.data.approvalStatus == 'approved')
             || (resource.data.eventStatus == 'cancelled' && exists(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(request.auth.uid))))));
         allow create: if eligible() && organization(orgId).status == 'active' && (assignedManager() || eventOfficer())
@@ -184,9 +190,30 @@ service cloud.firestore {
         allow update: if eligible() && request.resource.data.updatedAt == request.time
           && ((request.resource.data.registrationCount != resource.data.registrationCount && counterChange())
             || (request.resource.data.registrationCount == resource.data.registrationCount && (editDraft() || submitDraft() || reviewDraft() || managerTransition())));
+        match /attendance/{uid} {
+          function eventData() { return get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data; }
+          function registrationData() { return get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(uid)).data; }
+          allow get: if eligible() && (owner(uid) || attendanceOperator(orgId));
+          allow list: if attendanceOperator(orgId);
+          allow create: if attendanceOperator(orgId) && organization(orgId).status == 'active'
+            && uid != request.auth.uid
+            && request.resource.data.keys().hasAll(['uid','eventId','organizationId','attendanceStatus','verifiedAt','verifiedBy','verificationMethod'])
+            && request.resource.data.keys().hasOnly(['uid','eventId','organizationId','attendanceStatus','verifiedAt','verifiedBy','verificationMethod'])
+            && request.resource.data.uid == uid && request.resource.data.eventId == eventId && request.resource.data.organizationId == orgId
+            && request.resource.data.attendanceStatus in ['present','absent']
+            && request.resource.data.verificationMethod == 'manual'
+            && request.resource.data.verifiedBy == request.auth.uid && request.resource.data.verifiedAt == request.time
+            && registrationData().uid == uid && registrationData().eventId == eventId && registrationData().organizationId == orgId
+            && registrationData().registrationStatus == 'registered'
+            && eventData().eventId == eventId && eventData().organizationId == orgId
+            && eventData().eventStatus == 'published' && eventData().approvalStatus == 'approved'
+            && eventData().get('publishedAt',null) is timestamp && eventData().get('archivedAt',null) == null
+            && request.time >= eventData().startAt && request.time < eventData().endAt;
+          // First result is final; QR writes are trusted backend operations only.
+        }
         match /participantIdentities/{uid} {
           function registrationAfter() { return getAfter(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(uid)).data; }
-          allow read: if eligible() && eventEditor(get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data);
+          allow read: if eligible() && (attendanceOperator(orgId) || eventEditor(get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data));
           allow create, update: if eligible() && owner(uid)
             && request.resource.data.keys().hasAll(['uid','fullName','updatedAt'])
             && request.resource.data.keys().hasOnly(['uid','fullName','updatedAt'])
@@ -204,8 +231,8 @@ service cloud.firestore {
             return identity.uid == uid && identity.fullName == get(/databases/$(database)/documents/users/$(uid)).data.fullName && identity.updatedAt == request.time;
           }
           function paired(delta) { return eventAfter().registrationCount == eventBefore().registrationCount + delta && eventAfter().updatedAt == request.time; }
-          allow get: if eligible() && (owner(uid) || eventEditor(eventBefore()));
-          allow list: if eligible() && eventEditor(eventBefore());
+          allow get: if eligible() && (owner(uid) || attendanceOperator(orgId) || eventEditor(eventBefore()));
+          allow list: if eligible() && (attendanceOperator(orgId) || eventEditor(eventBefore()));
           allow create: if eligible() && owner(uid) && joinEligible(eventBefore()) && eventBefore().registrationCount < eventBefore().capacity
             && request.resource.data.keys().hasAll(['uid','eventId','organizationId','registrationStatus','registeredAt','updatedAt'])
             && request.resource.data.keys().hasOnly(['uid','eventId','organizationId','registrationStatus','registeredAt','updatedAt'])

@@ -1,3 +1,4 @@
+import '../../../attendance/data/models/attendance.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -82,6 +83,22 @@ class EventDetailsScreen extends StatelessWidget {
               Text(
                 'Status: ${displayIdentifier(event.eventStatus)} / ${displayIdentifier(event.approvalStatus)}${event.archivedAt == null ? '' : ' (Archived)'}',
               ),
+              if (canManageAttendance(
+                model.organization.value,
+                model.membership.value,
+                model.uid,
+              ))
+                TextButton(
+                  onPressed: () => context.go(
+                    AppRoutes.attendance(event.organizationId, event.id),
+                  ),
+                  child: const Text('Attendance Verification'),
+                ),
+              if (model.registration?.value?.status == 'registered')
+                TextButton(
+                  onPressed: () => context.go(AppRoutes.myQRCode),
+                  child: const Text('My QR Code'),
+                ),
               const Divider(),
               if (model.registration!.loading)
                 const LinearProgressIndicator()

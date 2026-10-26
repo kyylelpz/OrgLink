@@ -68,26 +68,25 @@ class OrganizationNavigation extends StatelessWidget {
   const OrganizationNavigation(this.index, {super.key});
   final int index;
   @override
-  Widget build(BuildContext context) => NavigationBar(
-    selectedIndex: index,
-    onDestinationSelected: (value) => context.go(
-      [
-        AppRoutes.organizations,
-        AppRoutes.myOrganizations,
-        AppRoutes.membershipRequests,
-      ][value],
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Wrap(
+      alignment: WrapAlignment.center,
+      children: [
+        TextButton(
+          onPressed: () => context.go(AppRoutes.organizations),
+          child: const Text('Discover'),
+        ),
+        TextButton(
+          onPressed: () => context.go(AppRoutes.myOrganizations),
+          child: const Text('My Organizations'),
+        ),
+        TextButton(
+          onPressed: () => context.go(AppRoutes.membershipRequests),
+          child: const Text('Requests'),
+        ),
+      ],
     ),
-    destinations: const [
-      NavigationDestination(icon: Icon(Icons.search), label: 'Discover'),
-      NavigationDestination(
-        icon: Icon(Icons.groups),
-        label: 'My Organizations',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.pending_actions),
-        label: 'Requests',
-      ),
-    ],
   );
 }
 

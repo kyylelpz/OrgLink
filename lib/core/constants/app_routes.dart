@@ -1,4 +1,15 @@
 abstract final class AppRoutes {
+  static const qr = '/qr',
+      myQRCode = '/qr/my-code',
+      qrScan = '/qr/scan',
+      myAttendance = '/my-attendance',
+      attendanceHub = '/attendance';
+  static String attendanceManagement(String org) =>
+      '${organization(org)}/attendance';
+  static String attendance(String org, String eventId) =>
+      '${event(org, eventId)}/attendance';
+  static String attendanceReport(String org, String eventId) =>
+      '${attendance(org, eventId)}/report';
   static const splash = '/';
   static const onboarding = '/onboarding';
   static const signIn = '/sign-in';
