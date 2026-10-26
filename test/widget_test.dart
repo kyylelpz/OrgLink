@@ -30,17 +30,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Google Sign-In'), findsOneWidget);
       repository.cancelSignIn = true;
-      await tester.tap(find.text('Continue with Google'));
+      await tester.tap(find.text('Continue With Google'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Sign-in cancelled'), findsOneWidget);
       repository.cancelSignIn = false;
-      await tester.tap(find.text('Continue with Google'));
+      await tester.tap(find.text('Continue With Google'));
       await tester.pump();
       profiles.controller.add(null);
       await tester.pumpAndSettle();
       expect(find.text('Student Profile'), findsOneWidget);
-      await tester.ensureVisible(find.text('Save student profile'));
-      await tester.tap(find.text('Save student profile'));
+      await tester.ensureVisible(find.text('Save Student Profile'));
+      await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
       expect(find.text('Use 3?30 letters, digits or hyphens.'), findsOneWidget);
       expect(find.text('Select a year level.'), findsOneWidget);
@@ -56,12 +56,12 @@ void main() {
       await tester.tap(find.text('Year 1').last);
       await tester.pumpAndSettle();
       await tester.enterText(fields.at(3), 'A');
-      await tester.ensureVisible(find.text('Save student profile'));
-      await tester.tap(find.text('Save student profile'));
+      await tester.ensureVisible(find.text('Save Student Profile'));
+      await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
       expect(find.text('Home Dashboard'), findsOneWidget);
       expect(profiles.saveCalls, 1);
-      await tester.tap(find.text('Edit student profile'));
+      await tester.tap(find.text('Edit Student Profile'));
       await tester.pumpAndSettle();
       expect(
         tester
@@ -78,7 +78,7 @@ void main() {
       router.go(AppRoutes.home);
       await tester.pumpAndSettle();
       expect(find.text('Home Dashboard'), findsNothing);
-      await tester.tap(find.text('Sign out'));
+      await tester.tap(find.text('Sign Out'));
       await tester.pumpAndSettle();
       expect(find.text('Google Sign-In'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());

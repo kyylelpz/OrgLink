@@ -23,4 +23,9 @@ class FirestoreService {
   }) => _firestore
       .collectionGroup(name)
       .withConverter<T>(fromFirestore: fromFirestore, toFirestore: toFirestore);
+  Future<void> commitBatch(void Function(WriteBatch batch) configure) {
+    final batch = _firestore.batch();
+    configure(batch);
+    return batch.commit();
+  }
 }

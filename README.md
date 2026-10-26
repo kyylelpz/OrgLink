@@ -1,5 +1,9 @@
 # OrgLink
 
+Module 3 event management and registration is implemented. See
+[the Module 3 guide](docs/module3.md) for the selected approval policy, atomic
+registration rules, routes, indexes, deployment and testing instructions.
+
 Module 2 organization discovery and membership is implemented. See
 [the Module 2 guide](docs/module2.md) for schemas, routes, security rules,
 manager provisioning, deployment steps and validation.

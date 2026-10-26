@@ -38,8 +38,8 @@ void main() {
       await tester.pump();
       profileRepository.controller.add(profile());
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Discover organizations'));
-      await tester.tap(find.text('Discover organizations'));
+      await tester.ensureVisible(find.text('Discover Organizations'));
+      await tester.tap(find.text('Discover Organizations'));
       await tester.pumpAndSettle();
       expect(find.text('Organization Discovery'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsOneWidget);
@@ -57,12 +57,12 @@ void main() {
       );
       await tester.tap(find.text('Request to Join'));
       await tester.pumpAndSettle();
-      expect(find.text('Membership: pending'), findsOneWidget);
+      expect(find.text('Membership: Pending'), findsOneWidget);
       expect(organizations.requestCalls, 1);
       await tester.pump(const Duration(seconds: 5));
       router.go(AppRoutes.myOrganizations);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Status: pending'), findsOneWidget);
+      expect(find.textContaining('Status: Pending'), findsOneWidget);
       authRepository.controller.add(const AuthUser(id: 'manager'));
       await tester.pump();
       profileRepository.controller.add(profile());
@@ -70,21 +70,21 @@ void main() {
       router.go(AppRoutes.organization('robotics'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Manage membership requests'),
+        find.text('Manage Membership Requests'),
         300,
         scrollable: find.byType(Scrollable).last,
       );
       await Scrollable.ensureVisible(
-        tester.element(find.text('Manage membership requests')),
+        tester.element(find.text('Manage Membership Requests')),
         alignment: 0.5,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Manage membership requests'));
+      await tester.tap(find.text('Manage Membership Requests'));
       await tester.pumpAndSettle();
       expect(find.text('Demo Student'), findsOneWidget);
       await tester.tap(find.text('Approve'));
       await tester.pumpAndSettle();
-      expect(find.text('Approve membership request?'), findsOneWidget);
+      expect(find.text('Approve Membership Request?'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(organizations.reviewCalls, 0);
@@ -97,7 +97,7 @@ void main() {
       router.go(AppRoutes.memberRoster('robotics'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Role: member | Status: Approved (active)'),
+        find.text('Role: Member | Status: Approved (Active)'),
         findsOneWidget,
       );
       authRepository.controller.add(student);
@@ -106,7 +106,7 @@ void main() {
       await tester.pumpAndSettle();
       router.go(AppRoutes.myOrganizations);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Status: Approved (active)'), findsOneWidget);
+      expect(find.textContaining('Status: Approved (Active)'), findsOneWidget);
       router.go(AppRoutes.manageMembers('robotics'));
       await tester.pumpAndSettle();
       expect(

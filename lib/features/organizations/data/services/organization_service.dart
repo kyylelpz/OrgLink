@@ -80,6 +80,7 @@ class OrganizationService {
       _memberships(_members(id).where('membershipStatus', isEqualTo: status));
   Stream<List<PublishedEvent>> upcomingEvents(String id) =>
       _collection('organizations/$id/events')
+          .where('visibility', isEqualTo: 'public')
           .where('eventStatus', isEqualTo: 'published')
           .where('approvalStatus', isEqualTo: 'approved')
           .where('startAt', isGreaterThanOrEqualTo: Timestamp.now())

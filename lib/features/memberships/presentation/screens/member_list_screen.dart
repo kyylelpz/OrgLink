@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../organizations/presentation/viewmodels/organization_details_view_model.dart';
 import '../../../organizations/presentation/widgets/organization_widgets.dart';
@@ -65,7 +66,7 @@ class _MemberList extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('$decision membership request?'),
+        title: Text('$decision Membership Request?'),
         content: Text(
           '$decision the request from ${member.applicantName.isEmpty ? member.uid : member.applicantName}?',
         ),
@@ -127,10 +128,10 @@ class _MemberList extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        'Role: ${member.role} | Status: ${member.statusLabel}',
+                        'Role: ${displayIdentifier(member.role)} | Status: ${displayMembershipStatus(member.status)}',
                       ),
                       Text(
-                        'Position: ${member.positionTitle ?? 'Not assigned'}',
+                        'Position: ${member.positionTitle ?? 'Not Assigned'}',
                       ),
                       Text(
                         pending

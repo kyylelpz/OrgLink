@@ -1,3 +1,6 @@
+import '../features/events/data/repositories/event_repository.dart';
+import '../features/events/data/repositories/firestore_event_repository.dart';
+import '../features/events/data/services/event_service.dart';
 import '../features/organizations/data/repositories/organization_repository.dart';
 import '../features/organizations/data/repositories/firestore_organization_repository.dart';
 import '../features/organizations/data/services/organization_service.dart';
@@ -39,6 +42,13 @@ class AppDependencies extends StatelessWidget {
           create: (context) => FirestoreOrganizationRepository(
             context.read<OrganizationService>(),
           ),
+        ),
+        Provider(
+          create: (context) => EventService(context.read<FirestoreService>()),
+        ),
+        Provider<EventRepository>(
+          create: (context) =>
+              FirestoreEventRepository(context.read<EventService>()),
         ),
         Provider<AuthRepository>(
           create: (context) =>

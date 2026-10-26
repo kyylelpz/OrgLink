@@ -12,4 +12,16 @@ abstract final class AppRoutes {
       '$organizations/${Uri.encodeComponent(id)}';
   static String manageMembers(String id) => '${organization(id)}/requests';
   static String memberRoster(String id) => '${organization(id)}/members';
+  static const events = '/events';
+  static const myEvents = '/my-events';
+  static String manageEvents(String org) =>
+      '${organization(org)}/events/manage';
+  static String createEvent(String org) => '${organization(org)}/events/new';
+  static String event(String org, String id) =>
+      '${organization(org)}/events/${Uri.encodeComponent(id)}';
+  static String editEvent(String org, String id) => '${event(org, id)}/edit';
+  static String participants(String org, String id) =>
+      '${event(org, id)}/participants';
+  static String confirmRegistration(String org, String id) =>
+      '${event(org, id)}/registration';
 }

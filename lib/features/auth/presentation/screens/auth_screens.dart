@@ -44,7 +44,7 @@ class OnboardingScreen extends StatelessWidget {
     message: 'Your student organization community starts here.',
     action: FilledButton(
       onPressed: () => context.go(AppRoutes.signIn),
-      child: const Text('Get started'),
+      child: const Text('Get Started'),
     ),
   );
 }
@@ -73,7 +73,7 @@ class SignInScreen extends StatelessWidget {
             FilledButton.icon(
               onPressed: auth.isBusy ? null : auth.signInWithGoogle,
               icon: const Icon(Icons.login),
-              label: const Text('Continue with Google'),
+              label: const Text('Continue With Google'),
             ),
         ],
       ),
@@ -90,7 +90,7 @@ class SignOutButton extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       child: OutlinedButton(
         onPressed: auth.isBusy ? null : auth.signOut,
-        child: Text(auth.isSigningOut ? 'Signing out...' : 'Sign out'),
+        child: Text(auth.isSigningOut ? 'Signing Out...' : 'Sign Out'),
       ),
     );
   }
@@ -121,11 +121,11 @@ class AccountStatusScreen extends StatelessWidget {
             onPressed: auth.isBusy
                 ? null
                 : () => context.go(AppRoutes.completeProfile),
-            child: const Text('Edit student profile'),
+            child: const Text('Edit Student Profile'),
           ),
           TextButton(
             onPressed: auth.isBusy ? null : auth.retry,
-            child: const Text('Refresh status'),
+            child: const Text('Refresh Status'),
           ),
           const SignOutButton(),
         ],

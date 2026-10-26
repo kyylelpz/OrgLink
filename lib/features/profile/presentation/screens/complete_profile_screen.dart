@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/widgets/capitalization_suggestion.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../auth/presentation/screens/auth_screens.dart';
 import '../../../auth/presentation/viewmodels/auth_view_model.dart';
@@ -108,7 +109,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       initialValue: auth.user?.email ?? '',
                       readOnly: true,
                       decoration: const InputDecoration(
-                        labelText: 'Google email',
+                        labelText: 'Google Email',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -118,8 +119,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       maxLength: 100,
                       textCapitalization: TextCapitalization.words,
                       validator: StudentDetails.validateName,
-                      decoration: const InputDecoration(labelText: 'Full name'),
+                      decoration: const InputDecoration(labelText: 'Full Name'),
                     ),
+                    CapitalizationSuggestion(controller: _name, enabled: !busy),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _number,
@@ -127,14 +129,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       maxLength: 30,
                       validator: StudentDetails.validateStudentNumber,
                       decoration: const InputDecoration(
-                        labelText: 'Student number',
+                        labelText: 'Student Number',
                       ),
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<int>(
                       initialValue: _year,
                       decoration: const InputDecoration(
-                        labelText: 'Year level',
+                        labelText: 'Year Level',
                       ),
                       items: [
                         for (var year = 1; year <= 6; year++)
@@ -172,7 +174,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     const SizedBox(height: 16),
                     FilledButton(
                       onPressed: busy ? null : _save,
-                      child: const Text('Save student profile'),
+                      child: const Text('Save Student Profile'),
                     ),
                     if (auth.profileStatus == ProfileStatus.ready)
                       TextButton(

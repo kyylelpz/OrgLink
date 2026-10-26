@@ -145,10 +145,10 @@ test('no client can create organizations, assign managers, grant roles or delete
     await assertFails(deleteDoc(ref(db(uid),'officer')));
   }
 });
-test('only approved published event summaries are readable and event writes remain denied',async()=>{
-  await adminWrite('organizations/public/events/live',{title:'Demo event',eventStatus:'published',approvalStatus:'approved',startAt:Timestamp.now()});
+test('published event summaries remain readable; malformed event and registration writes are denied',async()=>{
+  await adminWrite('organizations/public/events/live',{title:'Demo event',visibility:'public',eventStatus:'published',approvalStatus:'approved',startAt:Timestamp.now()});
   await adminWrite('organizations/public/events/draft',{title:'Draft',eventStatus:'draft',approvalStatus:'pending'});
-  await assertSucceeds(getDocs(query(collection(db(),'organizations/public/events'),where('eventStatus','==','published'),where('approvalStatus','==','approved'))));
+  await assertSucceeds(getDocs(query(collection(db(),'organizations/public/events'),where('eventStatus','==','published'),where('approvalStatus','==','approved'),where('visibility','==','public'))));
   await assertFails(getDoc(doc(db(),'organizations/public/events/draft')));
   await assertFails(setDoc(doc(db('manager'),'organizations/public/events/new'),{title:'Event'}));
   await assertFails(setDoc(doc(db(),'organizations/public/events/live/registrations/student'),{uid:'student'}));
