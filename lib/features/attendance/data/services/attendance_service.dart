@@ -1,13 +1,24 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../models/attendance.dart';
 
 class AttendanceService {
-  AttendanceService(this.store, this.functions);
+  AttendanceService(
+    this.store,
+    this.auth, {
+    this.client,
+    this.apiUrl = const String.fromEnvironment('ATTENDANCE_API_URL'),
+  });
   final FirestoreService store;
-  final FirebaseFunctions functions;
+  final FirebaseAuth auth;
+  final http.Client? client;
+  final String apiUrl;
   CollectionReference<Map<String, dynamic>> _records(
     String org,
     String event,
@@ -64,28 +75,92 @@ class AttendanceService {
     String name,
     Map<String, dynamic> data,
   ) async {
+    final uri = Uri.tryParse(apiUrl);
+    final local =
+        kDebugMode &&
+        uri?.scheme == 'http' &&
+        ['localhost', '127.0.0.1', '10.0.2.2'].contains(uri?.host);
+    if (uri == null ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
+        (uri.path.isNotEmpty && uri.path != '/') ||
+        (uri.scheme != 'https' && !local)) {
+      throw const AppFailure(
+        'Secure QR check-in is not configured. Manual attendance is available.',
+      );
+    }
+    final user = auth.currentUser;
+    if (user == null) {
+      throw const AppFailure('Sign in before using attendance.');
+    }
+    final transport = client ?? http.Client();
     try {
-      final result = await functions
-          .httpsCallable(
-            name,
-            options: HttpsCallableOptions(timeout: const Duration(seconds: 20)),
-          )
-          .call<Map<String, dynamic>>(data);
-      return result.data;
-    } on FirebaseFunctionsException catch (e) {
-      if (e.code == 'not-found' || e.code == 'unimplemented') {
-        throw const AppFailure(
-          'Secure QR check-in is not available yet. The attendance backend must be deployed. Manual attendance is available.',
-        );
-      }
-      if (e.code == 'unavailable' ||
-          e.code == 'deadline-exceeded' ||
-          e.code == 'internal') {
-        throw const AppFailure(
-          'Verification could not be confirmed. Check your connection and attendance status before retrying.',
-        );
-      }
-      throw AppFailure(e.message ?? 'QR verification failed. Please retry.');
+      return await (() async {
+        final token = await user.getIdToken();
+        if (token == null || auth.currentUser?.uid != user.uid) {
+          throw const AppFailure(
+            'Your session changed. Reopen attendance and try again.',
+          );
+        }
+        final endpoint = name == 'issueAttendanceCredential'
+            ? '/issue'
+            : '/redeem';
+        final request = http.Request('POST', uri.replace(path: endpoint))
+          ..followRedirects = false
+          ..headers.addAll({
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          })
+          ..body = jsonEncode(data);
+        final response = await transport.send(request);
+        final bytes = <int>[];
+        await for (final chunk in response.stream) {
+          if (bytes.length + chunk.length > 32768) {
+            throw const AppFailure('Invalid attendance server response.');
+          }
+          bytes.addAll(chunk);
+        }
+        if (auth.currentUser?.uid != user.uid) {
+          throw const AppFailure(
+            'Your session changed. Reopen attendance and try again.',
+          );
+        }
+        Map<String, dynamic> body;
+        try {
+          body = Map<String, dynamic>.from(
+            jsonDecode(utf8.decode(bytes)) as Map,
+          );
+        } catch (_) {
+          throw const AppFailure(
+            'Secure QR check-in is unavailable. Check the configured backend address.',
+          );
+        }
+        if (response.statusCode != 200) {
+          final error = body['error'];
+          if (error is Map && error['message'] is String) {
+            throw AppFailure(error['message'] as String);
+          }
+          throw const AppFailure(
+            'Verification could not be confirmed. Check attendance status before retrying.',
+          );
+        }
+        if (body['result'] is! Map) {
+          throw const AppFailure('Invalid attendance server response.');
+        }
+        return Map<String, dynamic>.from(body['result'] as Map);
+      })().timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw const AppFailure(
+        'Verification could not be confirmed. Check your connection and attendance status before retrying.',
+      );
+    } on http.ClientException {
+      throw const AppFailure(
+        'Unable to connect to attendance verification. Check your connection and retry.',
+      );
+    } finally {
+      if (client == null) transport.close();
     }
   }
 

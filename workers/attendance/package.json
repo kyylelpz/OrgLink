@@ -1,0 +1,14 @@
+{
+  "name": "orglink-attendance-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/auth.test.js",
+    "test:emulator": "node --test --test-concurrency=1 test/attendance.emulator.test.cjs",
+    "check": "wrangler deploy --dry-run --outdir .worker-build"
+  },
+  "devDependencies": {
+    "firebase-admin": "^13.10.0",
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,4 +1,3 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import '../features/attendance/data/services/attendance_service.dart';
 import '../features/attendance/data/repositories/attendance_repository.dart';
 import '../features/attendance/data/repositories/firestore_attendance_repository.dart';
@@ -57,7 +56,7 @@ class AppDependencies extends StatelessWidget {
         Provider(
           create: (context) => AttendanceService(
             context.read<FirestoreService>(),
-            FirebaseFunctions.instance,
+            FirebaseAuth.instance,
           ),
         ),
         Provider<AttendanceRepository>(

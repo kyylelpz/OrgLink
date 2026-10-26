@@ -248,6 +248,7 @@ a manual sign-in attempt.
 ## Module 4: Attendance
 
 Manual attendance, attendance reports, personal history and the global QR Hub are
-implemented. Secure QR check-in uses callable Functions that require a separate
-manual deployment. See [Module 4 setup, security and testing](docs/module4.md).
+implemented. Secure QR check-in uses Cloudflare Workers Free with Firebase ID-token
+authentication and atomic Firestore REST transactions; deployment and server-secret
+setup are manual, with no billing account required. See [Module 4 setup, security and testing](docs/module4.md).
 No billing changes or Firebase deployments are performed by the application.

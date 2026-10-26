@@ -11,9 +11,12 @@ existing provisioning and permission model.
 No resources were deployed, billing changed, live records written, or new Firebase
 projects introduced. The application still uses orglink-dev and Android ID
 com.example.orglink. Manual attendance needs the reviewed Firestore rules deployed;
-it does not need Cloud Functions. QR issuance/redemption additionally need the two
-callable functions deployed. Until then, the app reports that secure QR check-in
-is unavailable rather than generating an untrusted pass or reporting success.
+it does not need a hosted QR backend. QR issuance/redemption now use Cloudflare
+Workers Free instead of Firebase Cloud Functions. No billing account is required
+for the Worker or the existing Spark Firestore free quota. The Worker and its
+server-only secret must be configured manually. Until ATTENDANCE_API_URL is set,
+QR check-in reports that it is not configured. No insecure local credential or
+automatic paid fallback is generated.
 
 ## Architecture and affected files
 
@@ -27,7 +30,7 @@ New attendance code is under lib/features/attendance:
 - data/models/attendance.dart: typed records, statuses, methods, summary,
   permission helper, attendance-window display hint, QR parser and credential.
 - data/services/attendance_service.dart: server-confirmed Firestore reads/manual
-  transactions and callable transport. No optimistic attendance success.
+  transactions and authenticated Worker HTTPS transport. No optimistic attendance success.
 - data/repositories/attendance_repository.dart and
   firestore_attendance_repository.dart: typed operations/domain error mapping.
 - presentation/viewmodels/attendance_view_model.dart: authorized roster,
@@ -46,7 +49,7 @@ app/dependency_injection.dart; core/constants/app_routes.dart and
 core/utils/display_labels.dart; existing event detail/navigation, organization
 navigation and home screens; event_scope.dart; Android camera manifest;
 pubspec.yaml/lock; generated macOS plugin registration; firebase.json;
-firebase/firebase.rules; firebase/functions source, lockfile and tests;
+firebase/firebase.rules; workers/attendance source, lockfile and tests;
 firebase/tests/attendance.rules.test.mjs and test script; test/attendance_test.dart,
 test/support/test_attendance_repository.dart and test/router_test.dart; README.md;
 .gitignore. The existing event hub is now keyed to authenticated UID, fixing
@@ -142,8 +145,8 @@ existing event projection; its manual name-refresh operation is preserved.
 
 Only legitimately published, approved events with publishedAt and no archivedAt
 are eligible. The organization must be active. Server time must satisfy
-startAt <= now < endAt. Manual Rules use request.time; callable handlers check the
-trusted server clock inside every transaction attempt, after all required reads.
+startAt <= now < endAt. Manual Rules use request.time; Worker handlers check the
+trusted Worker server clock inside every transaction attempt, after all required reads.
 Device time is only a UI hint and cannot authorize a write. QR expiration is also
 capped at endAt. Existing Module 3 completion requires now >= endAt, so it does not
 conflict with this window. Completed/cancelled/archived events retain reporting
@@ -158,23 +161,97 @@ or fail afterward; it cannot bypass the transaction's checked state.
 
 ## QR credential architecture
 
-Callable functions (2nd generation, us-central1):
+### Feasibility investigation (completed before migration)
 
-- issueAttendanceCredential: authenticated UID, active complete profile, matching
-  active registration, event/window and no attendance. Generates 32 random bytes
+This architecture can securely operate on Workers Free using the existing
+orglink-dev default Firestore database and its free quota. No Cloud Functions,
+Cloud Run, Durable Objects, KV, R2, new database or billing-linked service is needed.
+
+- [Cloudflare Workers](https://www.cloudflare.com/products/workers/) offers free
+  signup without a credit card. [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+  and [limits](https://developers.cloudflare.com/workers/platform/limits/) currently
+  allow 100,000 requests/day, 10 ms CPU/request and 50 external subrequests/request.
+  Network waiting is not CPU time. These are limits, not guaranteed throughput.
+- [Firestore REST authentication](https://firebase.google.com/docs/firestore/use-rest-api)
+  accepts service-account OAuth tokens and uses IAM, bypassing client Rules.
+  Therefore the backend must explicitly retain all authorization checks.
+- REST [beginTransaction](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/beginTransaction),
+  [batchGet](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/batchGet)
+  and [commit](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/commit)
+  support read-write transactions and atomic writes. This migration tested these
+  actual REST operations against the Firestore emulator, including concurrency.
+  Non-atomic batchWrite and Cloudflare-local locks are never used.
+- [Firestore free quota](https://firebase.google.com/docs/firestore/quotas) supports
+  one free database, including 50,000 reads and 20,000 writes/day. The quota is
+  shared with Modules 1-3. No transaction-only billing feature is needed. Stay on
+  Spark; quota exhaustion fails requests instead of introducing a paid fallback.
+
+Cold-key verification, OAuth signing, cache misses and contention must still be
+measured on the manually deployed free Worker. Exceeding free CPU/quota limits
+can reduce availability; requests fail safely and never grant attendance. No
+production latency/capacity claim is inferred from local tests. Do not upgrade
+plans automatically to address a limit. If organizational IAM policy prohibits
+server credentials, stop setup and ask the project owner for a permitted trusted
+credential approach; never fall back to privileged client writes.
+
+### Worker endpoints and unchanged business checks
+
+- POST /issue: authenticated UID, active complete profile, matching active
+  registration, event/window and no attendance. Generates 32 random bytes
   (256 bits), encoded as 43 URL-safe characters. Valid for at most 60 seconds.
-- redeemAttendanceCredential: authenticates the scanner, verifies current
-  organization permission, token binding/expiry, student eligibility/registration,
-  event/window and existing attendance. Atomically creates Present and marks the
-  credential consumed. Concurrent retries return the original immutable result.
+- POST /redeem: authenticates the scanner, verifies current organization
+  permission, token binding/expiry, student eligibility/registration, event/window
+  and existing attendance. Atomically creates Present and consumes the token.
 
-Payload contains only version=1, type=attendance, organizationId, eventId and the
-opaque token. It contains no UID, profile data, password or Firebase session token.
-Client parsing rejects malformed/unsupported payloads; route identifiers alone
-never prove eligibility. Neither callable accepts a client verification time,
-student UID or operator UID as authority. Admin SDK bypasses Rules, so all relevant
-checks are explicit in attendance.js, and authoritative documents are read in the
-same transaction. Secrets are never logged or returned in Firestore queries.
+Requests use Authorization: Bearer <Firebase Authentication ID token> and JSON
+request bodies. Responses preserve the existing result fields inside {result:...};
+errors use {error:{code,message}} and appropriate HTTP status codes. There are only
+two endpoints; no arbitrary collection/path/proxy or administration API is exposed.
+Responses are no-store and contain no upstream OAuth or service-account details.
+Request bodies are bounded to 8 KiB. Redirects are rejected.
+
+Payload remains version=1, type=attendance, organizationId, eventId and the opaque
+token. It contains no UID/profile data/password/Firebase session token. The bearer
+Firebase token is sent only in the HTTPS header, never inside the QR or a URL.
+Neither endpoint accepts a client UID/operator/time as authority.
+
+The original attendance business logic was moved from firebase/functions to
+workers/attendance/src/attendance.js. Node crypto, Firebase Admin SDK and HttpsError
+were replaced with Workers-native Web Crypto, a domain error, and a Firestore REST
+adapter. Firebase Admin is a devDependency used only for emulator fixtures; it is
+not imported by or bundled into the Worker. The old Functions entry point,
+configuration, package and source were removed; there is no dual backend fallback.
+
+### Authentication and privileged Firestore access
+
+src/auth.js verifies RS256 signatures using Web Crypto against Google's fixed,
+trusted Firebase Secure Token public JWK endpoint. It validates alg/kid, issuer,
+audience orglink-dev, nonempty UID subject, expiry, issued-at, auth_time and nbf
+when present. It never accepts unsigned Auth-emulator JWTs or a caller-supplied
+key URL. Keys respect Cache-Control expiry and are cached per isolate, including
+bounded refresh on key rotation. Key retrieval failure fails closed. This follows
+[Firebase's token verification requirements](https://firebase.google.com/docs/auth/admin/verify-id-tokens).
+Normal ID-token verification is not immediate refresh-token revocation checking;
+current accountStatus/profile eligibility is rechecked from Firestore as before.
+
+A dedicated orglink-dev service account is configured only as an encrypted Worker
+secret. Web Crypto signs a Google OAuth JWT assertion for the datastore scope and
+exchanges it at the fixed oauth2.googleapis.com token endpoint. Access tokens are
+cached until shortly before expiry; no credentials or privileged tokens go to
+Flutter. See [Google service-account OAuth](https://developers.google.com/identity/protocols/oauth2/service-account).
+IAM bypasses client Rules, so all original business checks remain in the Worker.
+
+src/firestore.js uses beginTransaction, transaction-bound batchGet reads, and one
+atomic commit. Every checked profile, organization, membership, event, registration,
+credential and existing attendance belongs to that transaction. Attendance creation
+uses exists=false; token consumption has exists=true. Conflicts retry the whole
+transaction at most five times with retryTransaction and jittered backoff. A normal
+issue uses at most six reads, two writes and possibly a delete; redemption uses nine
+reads and two writes. At most 27 external calls including keys/OAuth are needed for
+five full redemption attempts, below the Free subrequest limit. Unknown commit
+outcomes are not reported as success; subsequent scans use the authoritative
+immutable record. Duplicate results also commit their read transaction before
+being returned. No registration/capacity records are changed.
 
 ### Server-only storage
 
@@ -192,8 +269,7 @@ returns existing attendance only to an authorized operator; expired or replaced
 passes fail. Returning a duplicate never changes status, method, time or operator.
 If a manual record wins the race, it remains final and QR cannot overwrite it.
 
-Functions cap instances at three. App Check enforcement and a distributed scanner
-abuse limit are deferred; Auth, current permissions and unguessable tokens remain
+App Check enforcement and a distributed scanner abuse limit are deferred; Auth, current permissions and unguessable tokens remain
 mandatory. No raw token is written to logs. Old expired records have no automatic
 TTL policy yet: expiry validation is mandatory regardless of retention, and
 regeneration removes the previous credential. Administrative cleanup/TTL can be
@@ -208,7 +284,7 @@ request duration. The backend is authoritative. Already Verified removes the pas
 
 Scan QR Code opens the camera only after the route permission check. It requires
 no prior organization/event selection. It parses identifiers, checks per-target
-permission, calls redemption, and shows projected name, organization, event,
+permission, calls the Worker redemption endpoint, and shows projected name, organization, event,
 status, method and verification timestamp. Loading pauses scanning; a result or
 error waits for Scan Next Participant. Camera denial/unavailability has a clear
 message and retry; camera resources stop on backgrounding/route disposal.
@@ -253,106 +329,163 @@ No new Firestore indexes are required: attendance uses per-event collections and
 own document reads; credential access uses hashes/direct documents. Existing
 firebase/firestore.indexes.json is unchanged.
 
-## Dependencies and local setup
+## Dependencies and changed migration files
 
-Flutter additions: cloud_functions 7.0.1, mobile_scanner 7.4.2, qr_flutter 4.1.0
-(and their resolved transitive packages). Android CAMERA permission is declared;
-camera hardware is optional. Google/Firebase working configuration and application
-ID are preserved. mobile_scanner uses bundled Android ML Kit by default.
+Flutter now directly depends on http 1.6.0 for the Worker transport; cloud_functions
+and its transitive packages were removed. QR rendering/scanning packages and every
+UI/ViewModel remain unchanged. AttendanceService now uses FirebaseAuth.currentUser
+and getIdToken, configured HTTPS, no redirects, timeouts, bounded responses and
+account-switch checks before/after requests. Dependency injection and its test
+fake constructor were updated; repository contracts/manual attendance are unchanged.
+Generated macOS plugin registration reflects removal of cloud_functions.
 
-Backend: firebase-admin 13.10.0 and firebase-functions 7.4.0 (locked). Runtime is
-Node.js 22; install Node 22 for matching deployment behavior. This machine ran the
-emulator under Node 24.11.1, which emitted a runtime-version warning. No service
-account credentials belong in the Flutter app or repository; deployed functions
-use the managed runtime identity.
+Worker runtime has no npm production dependencies. Dev dependencies are Wrangler
+and Firebase Admin (fixture seeding only). Node 22+ is recommended for local tools;
+this machine used Node 24.11.1. Added files:
 
-From repository root, install dependencies and run locally in PowerShell:
+- workers/attendance/src/attendance.js: migrated business logic.
+- workers/attendance/src/auth.js: Firebase JWT verification and Google OAuth.
+- workers/attendance/src/firestore.js: Firestore REST value codec/transactions.
+- workers/attendance/src/index.js: restricted HTTPS gateway.
+- workers/attendance/wrangler.jsonc, package.json/lock, .gitignore.
+- workers/attendance/test/auth.test.js and token-fixture.js.
+- workers/attendance/test/attendance.emulator.test.cjs: adapted original 23 tests.
+- test/attendance_transport_test.dart: Firebase bearer/response/account-switch tests.
+
+Removed obsolete firebase/functions files. firebase.json drops only the Functions
+source/runtime and Functions emulator; Firebase/Firestore/Auth configuration stays.
+Rules, indexes, attendance schema, Modules 1-3 and all attendance UI are unchanged.
+
+## Cloudflare and Firebase manual setup (not executed)
+
+1. Create a Cloudflare Free account without adding a payment method. Open Workers
+   & Pages, use the Workers Free plan and workers.dev subdomain. No custom domain
+   or paid bindings are necessary. Do not select Workers Paid or add R2/paid services.
+2. Use orglink-dev's existing default Firestore database on Spark; confirm its
+   plan manually. This task did not inspect or change billing status. Do not add
+   billing for this setup. In that project's IAM console, create a service account for
+   attendance, with the standard Cloud Datastore User (roles/datastore.user) role.
+   Do not grant Owner, Editor, Firebase Admin or Firebase Auth Admin. This role
+   can access Firestore data via IAM; protect its key as a privileged backend secret.
+   A project owner can instead review a suitable narrower custom IAM role.
+3. Generate that account's JSON private key and store it outside the repository
+   and Flutter assets. If IAM organization policy blocks keys, stop and resolve
+   that policy with the owner. If any console asks to enable billing, stop; this
+   design does not require enabling paid services. The existing Firestore API is
+   already used by OrgLink. No new Google Cloud hosted compute API is needed.
+4. From workers/attendance, install and log in locally:
 
 ```powershell
-flutter pub get
+npm.cmd ci
+npx.cmd wrangler login
+```
+
+5. Only when ready to publish manually (these commands were NOT executed):
+
+```powershell
+npx.cmd wrangler deploy
+Get-Content -Raw -LiteralPath 'C:\secure\orglink-worker-key.json' | npx.cmd wrangler secret put FIREBASE_SERVICE_ACCOUNT
+```
+
+The first deployment fails closed until the secret exists. The secret must contain
+project_id=orglink-dev, client_email and private_key from that dedicated account.
+Never paste its contents in a ticket/chat, commit it, print it to logs, embed it in
+Flutter, or use it as ATTENDANCE_API_URL. Wrangler stores secrets encrypted. Rotate
+keys manually and redeploy/restart isolates to clear cached OAuth credentials.
+Neither this repository nor the test suite provisions any real key or IAM role.
+
+6. Publish reviewed Module 4 Firestore rules manually if they have not already
+   been deployed. The migration itself makes no Rules/index changes:
+
+```powershell
+firebase.cmd deploy --only firestore:rules --project orglink-dev
+```
+
+Do not deploy Firebase Cloud Functions. There is no Functions config remaining.
+If older functions were previously deployed outside this task, inventory and retire
+them manually after the Worker is verified; this migration did not delete remote
+resources. Keep the previous provider disabled/unconfigured in mobile builds.
+
+## Flutter API configuration
+
+Use the exact HTTPS workers.dev origin printed by your manual deployment:
+
+```powershell
+flutter run --dart-define=ATTENDANCE_API_URL=https://orglink-attendance.YOUR-SUBDOMAIN.workers.dev
+flutter build apk --debug --dart-define=ATTENDANCE_API_URL=https://orglink-attendance.YOUR-SUBDOMAIN.workers.dev
+```
+
+This URL is public configuration, not a secret. It must have no credentials, query,
+fragment or path prefix. Only /issue and /redeem are used. Without it, manual
+attendance keeps working while QR reports that it is not configured. No redeployment
+or billing change is triggered by the app. No browser CORS support was added;
+OrgLink's target remains native Android. No UI or navigation changes are needed.
+
+## Local testing
+
+All emulator tests use orglink-dev synthetic data only and refuse to run without
+FIRESTORE_EMULATOR_HOST. Test RSA keys are generated in memory. Firebase-shaped
+JWTs in tests are RS256 signed and verified using test-only injected public-key
+fetch responses; production uses Google's fixed URL. No unsigned-token bypass is
+present. Fixture Admin SDK usage is confined to test files/dev dependencies.
+
+From repository root:
+
+```powershell
 npm.cmd --prefix firebase/tests ci
-npm.cmd --prefix firebase/functions ci
-$env:FUNCTIONS_EMULATOR_HOST = '127.0.0.1:5001'
-firebase.cmd emulators:exec --only firestore,auth,functions --project orglink-dev "npm.cmd --prefix firebase/tests test && npm.cmd --prefix firebase/functions test"
-dart format .
+npm.cmd --prefix workers/attendance ci
+npm.cmd --prefix workers/attendance test
+firebase.cmd emulators:exec --only firestore --project orglink-dev "npm.cmd --prefix workers/attendance run test:emulator"
+npm.cmd --prefix workers/attendance run check
+flutter pub get
+dart format lib/features/attendance/data/services/attendance_service.dart lib/app/dependency_injection.dart test/attendance_test.dart test/attendance_transport_test.dart
 flutter analyze
 flutter test
 flutter build apk --debug
 ```
 
-The emulator test process refuses to run without FIRESTORE_EMULATOR_HOST; CLI
-sets it and the Auth host for the child process. Functions host is explicit above.
-Tests use only orglink-dev emulator fixtures and Auth emulator accounts, including
-authenticated HTTP callable issuance/redemption/replay. Emulators require Java 21+
-and the Firebase CLI. On Windows, if CLI shutdown leaves its Java emulator process
-behind, stop that specific owned emulator before restarting; do not kill unrelated
-Java processes. Logs are local ignored *.log files.
+check is wrangler deploy --dry-run: it bundles locally and does not deploy. The
+regular app still connects to configured Firebase; emulator tests inject test
+repositories/REST endpoints. Tests explicitly deny live REST access for fixtures.
+For optional manual Wrangler local development, use npx wrangler dev --local and
+an ignored workers/attendance/.dev.vars file with FIRESTORE_EMULATOR_HOST set to
+127.0.0.1:8080. Only loopback emulator endpoints are accepted; none is set in the
+production Wrangler config. Such local access uses emulator owner authentication
+for Firestore only; Firebase caller JWT verification is never disabled. To try the
+real app locally, its Firebase UID must have corresponding emulator fixtures,
+with a genuine orglink-dev Firebase ID token; emulator unsigned tokens are rejected.
+Use http://10.0.2.2:8787 for a debug Android emulator build's ATTENDANCE_API_URL.
+HTTP is restricted to loopback/Android emulator development hosts in debug mode;
+release builds require HTTPS. Do not set FIRESTORE_EMULATOR_HOST on a deployed
+Worker. Secret files and Wrangler/build outputs are ignored.
 
-The regular Android entry point continues connecting to configured Firebase,
-not the local emulators. No emulator toggle or fake Google login was inserted.
-The provided JS integration tests exercise actual local callables; Flutter tests
-inject explicitly named test repositories. Testing the Android app locally against
-emulators would additionally require deliberately wiring all three SDKs to emulator
-hosts and using an Auth emulator account. That wiring is not enabled by default.
+## Migration validation results
 
-## Validation results
+- Flutter analysis: no issues; full Flutter suite: 68 passed.
+- Worker authentication/OAuth/REST transport unit tests: 16 passed.
+- Adapted Firestore REST emulator tests: 23 passed, including authorization,
+  60-second expiry, replay, concurrent redemption, manual/QR race and in-flight
+  registration/event/permission revocation.
+- Existing Firestore Rules are byte-for-byte unchanged; previous Module 4 rules
+  validation was 124 passing tests. That historical count is not a claim of a new
+  rules run in this migration.
+- Wrangler bundle dry-run passed with no production bindings/dependencies.
+- Native workerd runtime smoke passed: missing authentication returns 401; unknown
+  endpoint returns 404. No live backend calls were made.
+- Android debug APK build passed; no endpoint configured in that validation build.
 
-Executed final results:
+The initial REST concurrency test exhausted a three-attempt retry policy; it was
+fixed using Firestore retryTransaction plus five bounded, jittered attempts. All
+23 integration tests then passed. No global Java process cleanup is used; if the
+Windows Firebase CLI leaves its own emulator alive, stop that specific process
+before the next run. No production endpoints, IAM credentials, Google live writes,
+Cloudflare deployments or billing changes were tested or performed.
 
-| Check | Actual result |
-| --- | --- |
-| flutter pub get / dependency resolution | Passed |
-| dart format . | Passed; original generated Firebase options preserved |
-| flutter analyze --no-pub | No issues found |
-| flutter test --no-pub | 63 passed |
-| Firestore emulator rules suite | 124 passed, 0 skipped |
-| QR backend / callable emulator suite | 23 passed, 0 skipped |
-| Existing provisioning unit/emulator tests | 4 passed, 0 skipped |
-| flutter build apk --debug | Passed; build/app/outputs/flutter-apk/app-debug.apk |
-| Physical Android camera / two-phone check-in | Not exercised |
-
-The combined emulator run completed with exit code 0. Initial development failures
-(a concurrency fixture using two Firestore instances and retained event-hub state
-after account switching) were corrected; the final runs above passed.
-
-Validation covers full existing Module 1-3 Flutter workflows plus attendance models, summary,
-permissions, names, manual confirmation, duplicate guards, reporting failure,
-QR selection/display, payload parsing, scanner errors, UID switching and disposal.
-Rules tests cover exact schema/timestamps, privileged reads, no self-verification,
-unauthorized clients, lifecycle/window, invalid/withdrawn registrations, immutable
-records, concurrent manual attempts, private projections and credential denial.
-Backend tests cover Auth, registration/student/event binding, secure storage,
-expiry, regeneration/rate limit, replay, missing projections, concurrent redemption,
-manual/QR races, in-flight revocation/cancellation/expiry and callable HTTP transport.
-
-Android debug build passed with Flutter/plugin Kotlin migration warnings; these
-are compatibility warnings for a future Flutter upgrade, not a failed build.
-Physical-device camera permission/scanning and a two-phone QR workflow have not
-been exercised. Automated camera decoding is not claimed by widget/backend tests.
-
-## Manual deployment and Console requirements (not executed)
-
-1. Review Rules/functions and keep project selection explicitly orglink-dev.
-2. Cloud Functions deployment requires a Blaze-capable Firebase project and
-   associated APIs/permissions. A project owner must review/approve any billing
-   or API enablement; no such changes were made or assumed here.
-3. Keep Firebase Auth Google provider, fingerprints and existing Android Firebase
-   files as already configured. No new OAuth secret or client ID is needed.
-4. With approved deployment credentials outside the app/repository, deploy only
-   these reviewed resources, explicitly and manually:
-
-```powershell
-firebase.cmd deploy --only firestore:rules --project orglink-dev
-firebase.cmd deploy --only functions:attendance --project orglink-dev
-```
-
-No index deployment is necessary for Module 4. Both functions are in us-central1,
-matching FirebaseFunctions.instance's default region. Ensure callable HTTPS
-endpoints are invocable by the mobile SDK while Firebase Auth authorization remains
-inside the handlers; do not make Firestore credentials readable. Provision officer
-manageAttendance=true only through an authorized administrative process. Existing
-clients cannot grant that permission. Review App Check as a later hardening step
-before broader usage; do not enable enforcement until Android attestation is set up.
+Production IAM/OAuth permissions, Cloudflare Free CPU usage, device camera scanning
+and the two-phone workflow require manual verification after setup/deployment.
+The local suite verifies a signed OAuth assertion and mocks the token endpoint;
+it does not exchange a real service-account credential. Quota exhaustion and
+network/unknown commit outcomes fail safely. No paid fallback is implemented.
 
 ## Manual verification checklist
 
@@ -384,7 +517,7 @@ before broader usage; do not enable enforcement until Android attestation is set
 
 ## Limitations and next steps
 
-- Manual resource deployment is required for live use; backend source authorization
+- Manual resource deployment is required for live use; backend migration authorization
   does not authorize automatic deployment or billing changes.
 - No physical-device camera/two-phone acceptance test yet.
 - CSV export, separate date range filters, audited attendance corrections, automatic

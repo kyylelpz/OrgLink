@@ -1,10 +1,27 @@
-const { randomBytes, createHash } = require("node:crypto");
-const { Timestamp } = require("firebase-admin/firestore");
-const { HttpsError } = require("firebase-functions/v2/https");
+import { Timestamp } from "./firestore.js";
+export class AttendanceError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+}
+const randomToken = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
+export function base64url(bytes) {
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
 const fail = (code, message) => {
-  throw new HttpsError(code, message);
+  throw new AttendanceError(code, message);
 };
-const hash = (token) => createHash("sha256").update(token).digest("hex");
+const hash = async (token) =>
+  Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)),
+    ),
+    (b) => b.toString(16).padStart(2, "0"),
+  ).join("");
 function id(value) {
   return (
     typeof value === "string" &&
@@ -95,8 +112,8 @@ function attendanceBackend(db, clock = Date.now) {
   }
   async function issue(request) {
     const { uid, org, event, base } = input(request);
-    const token = randomBytes(32).toString("base64url"),
-      digest = hash(token);
+    const token = randomToken(),
+      digest = await hash(token);
     return db.runTransaction(async (t) => {
       const refs = [
         `users/${uid}`,
@@ -155,6 +172,7 @@ function attendanceBackend(db, clock = Date.now) {
         "invalid-argument",
         "This is not a supported OrgLink attendance QR code.",
       );
+    const digest = await hash(token);
     return db.runTransaction(async (t) => {
       const [profile, organization, membership, target, credential] = (
         await t.getAll(
@@ -163,7 +181,7 @@ function attendanceBackend(db, clock = Date.now) {
             `organizations/${org}`,
             `organizations/${org}/memberships/${uid}`,
             base,
-            `_attendanceCredentials/${hash(token)}`,
+            `_attendanceCredentials/${digest}`,
           ].map((p) => db.doc(p)),
         )
       ).map((d) => d.data());
@@ -228,7 +246,7 @@ function attendanceBackend(db, clock = Date.now) {
         verificationMethod: "qr",
       };
       t.create(db.doc(`${base}/attendance/${credential.uid}`), record);
-      t.update(db.doc(`_attendanceCredentials/${hash(token)}`), {
+      t.update(db.doc(`_attendanceCredentials/${digest}`), {
         consumedAt: Timestamp.fromMillis(now),
       });
       return safeResult(record, false);
@@ -236,4 +254,4 @@ function attendanceBackend(db, clock = Date.now) {
   }
   return { issue, redeem };
 }
-module.exports = { attendanceBackend, eligible, operator };
+export { attendanceBackend, eligible, operator };

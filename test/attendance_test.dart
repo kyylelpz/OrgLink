@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -55,10 +54,10 @@ void openWindow(TestEventRepository events) => events.change({
 
 class FakeStore extends Fake implements FirestoreService {}
 
-class FakeFunctions extends Fake implements FirebaseFunctions {}
+class FakeAttendanceAuth extends Fake implements FirebaseAuth {}
 
 class FailingAttendanceService extends AttendanceService {
-  FailingAttendanceService() : super(FakeStore(), FakeFunctions());
+  FailingAttendanceService() : super(FakeStore(), FakeAttendanceAuth());
   @override
   Future<AttendanceResult> mark(
     String org,

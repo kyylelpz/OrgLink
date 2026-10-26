@@ -2,9 +2,11 @@ const { test, before, after, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
 const { initializeApp, deleteApp } = require("firebase-admin/app");
 const { getFirestore, Timestamp } = require("firebase-admin/firestore");
-const { attendanceBackend } = require("../attendance");
+let attendanceBackend, workerDb;
 const { createRequire } = require("node:module");
-const testRequire = createRequire(require.resolve("../../tests/package.json"));
+const testRequire = createRequire(
+  require.resolve("../../../firebase/tests/package.json"),
+);
 const { initializeTestEnvironment } = testRequire(
   "@firebase/rules-unit-testing",
 );
@@ -31,12 +33,20 @@ const code = (expected) => (e) => {
   return true;
 };
 before(async () => {
+  ({ attendanceBackend } = await import("../src/attendance.js"));
+  const { RestFirestore } = await import("../src/firestore.js");
+  workerDb = new RestFirestore(() => Promise.resolve("owner"), {
+    origin: `http://${process.env.FIRESTORE_EMULATOR_HOST}`,
+  });
   app = initializeApp({ projectId: "orglink-dev" }, "attendance-tests");
   db = getFirestore(app);
   env = await initializeTestEnvironment({
     projectId: "orglink-dev",
     firestore: {
-      rules: readFileSync(require.resolve("../../firebase.rules"), "utf8"),
+      rules: readFileSync(
+        require.resolve("../../../firebase/firebase.rules"),
+        "utf8",
+      ),
     },
   });
 });
@@ -48,7 +58,7 @@ after(async () => {
 beforeEach(async () => {
   await env.clearFirestore();
   now = Date.now();
-  backend = attendanceBackend(db, () => now);
+  backend = attendanceBackend(workerDb, () => now);
   for (const uid of [
     "student",
     "otherStudent",
@@ -311,111 +321,44 @@ test("already marked student cannot issue, and organizers cannot verify themselv
   });
   await assert.rejects(backend.issue(req()), code("already-exists"));
 });
-test("callable emulator accepts Auth emulator token and returns private-safe response", async () => {
-  if (
-    !process.env.FIREBASE_AUTH_EMULATOR_HOST ||
-    !process.env.FUNCTIONS_EMULATOR_HOST
-  )
-    throw Error("Auth and Functions emulators are required.");
-  const auth = await fetch(
-    `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=emulator-key`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: `module4-${Date.now()}@example.test`,
-        password: "Demo-only-password-123",
-        returnSecureToken: true,
-      }),
-    },
-  ).then((r) => r.json());
-  assert.ok(auth.idToken, JSON.stringify(auth));
-  const uid = auth.localId;
-  await seed(`users/${uid}`, {
-    uid,
-    fullName: "Callable Student",
-    studentNumber: "DEMO-002",
-    yearLevel: 1,
-    section: "A",
-    accountStatus: "active",
+test("Worker HTTP endpoint authenticates signed Firebase-shaped JWT and uses real REST transactions", async () => {
+  const { createHandler } = await import("../src/index.js");
+  const { tokenFixture } = await import("./token-fixture.js");
+  const fixture = await tokenFixture(() => now);
+  const handler = createHandler({
+    fetchImpl: fixture.fetchKeys,
+    clock: () => now,
   });
-  await seed(`${base}/registrations/${uid}`, {
-    uid,
-    eventId: "demo",
-    organizationId: "public",
-    registrationStatus: "registered",
-  });
-  const url = `http://${process.env.FUNCTIONS_EMULATOR_HOST}/orglink-dev/us-central1/issueAttendanceCredential`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${auth.idToken}`,
-    },
-    body: JSON.stringify({
-      data: { organizationId: "public", eventId: "demo" },
-    }),
-  }).then((r) => r.json());
-  assert.match(
-    response.result?.token ?? "",
-    /^[A-Za-z0-9_-]{43}$/,
-    JSON.stringify(response),
-  );
-  assert.equal(response.result.uid, undefined);
-  const denied = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      data: { organizationId: "public", eventId: "demo" },
-    }),
-  }).then((r) => r.json());
-  assert.equal(denied.error.status, "UNAUTHENTICATED");
-  const organizer = await fetch(
-    `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=emulator-key`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: `organizer-${Date.now()}@example.test`,
-        password: "Demo-only-password-123",
-        returnSecureToken: true,
-      }),
-    },
-  ).then((r) => r.json());
-  await seed(`users/${organizer.localId}`, {
-    uid: organizer.localId,
-    fullName: "Callable Manager",
-    studentNumber: "DEMO-003",
-    yearLevel: 1,
-    section: "A",
-    accountStatus: "active",
-  });
-  await update("organizations/public", { managerUid: organizer.localId });
-  const redeemUrl = `http://${process.env.FUNCTIONS_EMULATOR_HOST}/orglink-dev/us-central1/redeemAttendanceCredential`;
-  const redeem = async (authToken) =>
-    fetch(redeemUrl, {
+  const env = { FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST };
+  const post = async (path, uid, data) => {
+    const token = uid ? await fixture.sign(uid) : null;
+    const request = new Request(`https://worker.example${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${authToken}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
-        data: {
-          organizationId: "public",
-          eventId: "demo",
-          version: 1,
-          type: "attendance",
-          token: response.result.token,
-        },
+        organizationId: "public",
+        eventId: "demo",
+        ...data,
       }),
-    }).then((r) => r.json());
-  const unauthorized = await redeem(auth.idToken);
-  assert.equal(unauthorized.error.status, "PERMISSION_DENIED");
-  const verified = await redeem(organizer.idToken);
-  assert.equal(verified.result?.record?.uid, uid, JSON.stringify(verified));
-  assert.equal(verified.result.record.verifiedBy, organizer.localId);
-  assert.equal(verified.result.record.verificationMethod, "qr");
-  const duplicate = await redeem(organizer.idToken);
+    });
+    const response = await handler(request, env);
+    return { status: response.status, ...(await response.json()) };
+  };
+  const missing = await post("/issue", null, {});
+  assert.equal(missing.status, 401);
+  const issued = await post("/issue", "student", {});
+  assert.equal(issued.status, 200, JSON.stringify(issued));
+  assert.match(issued.result.token, /^[A-Za-z0-9_-]{43}$/);
+  const data = { version: 1, type: "attendance", token: issued.result.token };
+  const denied = await post("/redeem", "other", data);
+  assert.equal(denied.status, 403);
+  const verified = await post("/redeem", "manager", data);
+  assert.equal(verified.result.record.uid, "student");
+  assert.equal(verified.result.record.verifiedBy, "manager");
+  const duplicate = await post("/redeem", "scanner", data);
   assert.equal(duplicate.result.duplicate, true);
   assert.deepEqual(duplicate.result.record, verified.result.record);
 });
@@ -428,9 +371,9 @@ for (const change of ["registration", "event", "permission", "expiry"])
       gate = new Promise((resolve) => (release = resolve));
     let first = true;
     const controlled = {
-      doc: db.doc.bind(db),
+      doc: workerDb.doc.bind(workerDb),
       runTransaction: (handler) =>
-        db.runTransaction((t) =>
+        workerDb.runTransaction((t) =>
           handler(
             new Proxy(t, {
               get(target, key) {
