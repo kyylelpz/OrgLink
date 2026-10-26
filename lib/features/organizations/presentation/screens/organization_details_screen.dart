@@ -91,7 +91,21 @@ class OrganizationDetailsScreen extends StatelessWidget {
                   ListTile(
                     title: Text(event.title),
                     subtitle: Text(displayDate(event.startAt)),
+                    onTap: () => context.go(AppRoutes.event(org.id, event.id)),
                   ),
+              OutlinedButton(
+                onPressed: () => context.go(AppRoutes.events),
+                child: const Text('Browse events'),
+              ),
+              if (model.isManager ||
+                  (model.membership.value?.role == 'officer' &&
+                      model.membership.value?.status == 'active' &&
+                      model.membership.value?.permissions['manageEvents'] ==
+                          true))
+                FilledButton.tonal(
+                  onPressed: () => context.go(AppRoutes.manageEvents(org.id)),
+                  child: const Text('Manage organization events'),
+                ),
               const Divider(),
               if (model.membership.loading)
                 const LinearProgressIndicator()

@@ -10,7 +10,7 @@ class OrganizationScope extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) {
-    final uid = context.read<AuthViewModel>().user?.id;
+    final uid = context.select<AuthViewModel, String?>((auth) => auth.user?.id);
     if (uid == null) return const SizedBox.shrink();
     return ChangeNotifierProvider(
       key: ValueKey(uid),
@@ -31,7 +31,7 @@ class OrganizationDetailsScope extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) {
-    final uid = context.read<AuthViewModel>().user?.id;
+    final uid = context.select<AuthViewModel, String?>((auth) => auth.user?.id);
     if (uid == null) return const SizedBox.shrink();
     return ChangeNotifierProvider(
       key: ValueKey('$uid/$id'),

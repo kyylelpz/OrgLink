@@ -1,5 +1,8 @@
 # Module 2: Organization discovery and membership
 
+Module 3 extends the read-only event baseline described here; see
+[module3.md](module3.md) for current event permissions and summary-query compatibility.
+
 Implemented against the organization and membership structure in
 Elective3_FinalProject.pdf (roles, screens 7-10 and 19-20, hierarchy, data
 architecture and authorization requirements). The current user instruction to

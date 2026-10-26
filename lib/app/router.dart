@@ -1,3 +1,9 @@
+import '../features/events/presentation/event_scope.dart';
+import '../features/events/presentation/screens/event_discovery_screen.dart';
+import '../features/events/presentation/screens/my_events_screen.dart';
+import '../features/events/presentation/screens/event_details_screen.dart';
+import '../features/events/presentation/screens/event_editor_screen.dart';
+import '../features/events/presentation/screens/event_management_screen.dart';
 import '../features/organizations/presentation/organization_scope.dart';
 import '../features/organizations/presentation/screens/organization_discovery_screen.dart';
 import '../features/organizations/presentation/screens/organization_details_screen.dart';
@@ -41,6 +47,65 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     ShellRoute(
       builder: (_, _, child) => OrganizationScope(child: child),
       routes: [
+        ShellRoute(
+          builder: (_, _, child) => EventHubScope(child: child),
+          routes: [
+            GoRoute(
+              path: AppRoutes.events,
+              builder: (_, _) => const EventDiscoveryScreen(),
+            ),
+            GoRoute(
+              path: AppRoutes.myEvents,
+              builder: (_, _) => const MyEventsScreen(),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/events/manage',
+          builder: (_, state) => EventContextScope(
+            organizationId: state.pathParameters['organizationId']!,
+            child: const EventManagementScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/events/new',
+          builder: (_, state) => EventContextScope(
+            organizationId: state.pathParameters['organizationId']!,
+            child: const EventEditorScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/events/:eventId',
+          builder: (_, state) => EventContextScope(
+            organizationId: state.pathParameters['organizationId']!,
+            eventId: state.pathParameters['eventId']!,
+            child: const EventDetailsScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/events/:eventId/edit',
+          builder: (_, state) => EventContextScope(
+            organizationId: state.pathParameters['organizationId']!,
+            eventId: state.pathParameters['eventId']!,
+            child: const EventEditorScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/events/:eventId/participants',
+          builder: (_, state) => EventContextScope(
+            organizationId: state.pathParameters['organizationId']!,
+            eventId: state.pathParameters['eventId']!,
+            child: const ParticipantsScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/organizations/:organizationId/events/:eventId/registration',
+          builder: (_, state) => EventContextScope(
+            organizationId: state.pathParameters['organizationId']!,
+            eventId: state.pathParameters['eventId']!,
+            child: const RegistrationConfirmationScreen(),
+          ),
+        ),
         GoRoute(
           path: AppRoutes.organizations,
           builder: (_, _) => const OrganizationDiscoveryScreen(),
@@ -115,6 +180,8 @@ String? authRedirect(
   }
   if (path == AppRoutes.completeProfile ||
       path == AppRoutes.home ||
+      path == AppRoutes.events ||
+      path == AppRoutes.myEvents ||
       path == AppRoutes.organizations ||
       path == AppRoutes.myOrganizations ||
       path == AppRoutes.membershipRequests ||

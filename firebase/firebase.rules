@@ -83,14 +83,148 @@ service cloud.firestore {
             || (request.resource.data.membershipStatus == 'rejected' && request.resource.data.joinedAt == null));
       }
       match /events/{eventId} {
-        // Read-only summaries of published, approved events. No event writes or
-        // registration subcollection permissions are introduced in this module.
-        allow read: if accessibleOrganization(orgId) && resource.data.eventStatus == 'published'
-          && resource.data.approvalStatus == 'approved';
+        // Eligibility is checked once at each allow boundary.
+        function assignedManager() { return organization(orgId).managerUid == request.auth.uid; }
+        function eventOrganizationAccess() {
+          return (organization(orgId).visibility == 'public' && organization(orgId).status == 'active')
+            || assignedManager() || activeMember(orgId);
+        }
+        function eventOfficer() {
+          return activeMember(orgId)
+            && get(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)).data.membershipRole == 'officer'
+            && get(/databases/$(database)/documents/organizations/$(orgId)/memberships/$(request.auth.uid)).data.permissions.get('manageEvents',false) == true;
+        }
+        function eventEditor(data) { return assignedManager() || (eventOfficer() && data.createdBy == request.auth.uid); }
+        function eventVisibility(data) { return data.get('visibility','public'); }
+        function visibleEvent(data) {
+          return eventOrganizationAccess()
+            && (eventVisibility(data) == 'public' || activeMember(orgId) || eventEditor(data));
+        }
+        function windowOpen(data) {
+          return organization(orgId).status == 'active' && data.eventStatus == 'published' && data.approvalStatus == 'approved'
+            && request.time < data.registrationDeadline && request.time < data.startAt;
+        }
+        function withdrawalOpen(data) {
+          return data.eventStatus in ['published','cancelled'] && data.approvalStatus == 'approved'
+            && request.time < data.registrationDeadline && request.time < data.startAt;
+        }
+        function joinEligible(data) {
+          return windowOpen(data) && eventOrganizationAccess()
+            && (eventVisibility(data) == 'public' || activeMember(orgId));
+        }
+        function validEvent(data) {
+          return data.eventId == eventId && data.organizationId == orgId
+            && data.title is string && data.title.size() > 0 && data.title.size() <= 200 && data.title.matches('.*[^ ].*')
+            && data.description is string && data.description.size() > 0 && data.description.size() <= 5000 && data.description.matches('.*[^ ].*')
+            && data.venue is string && data.venue.size() > 0 && data.venue.size() <= 200 && data.venue.matches('.*[^ ].*')
+            && data.startAt is timestamp && data.startAt > request.time && data.endAt is timestamp && data.endAt > data.startAt
+            && data.registrationDeadline is timestamp && data.registrationDeadline > request.time && data.registrationDeadline <= data.startAt
+            && data.capacity is int && data.capacity >= 1 && data.capacity <= 100000
+            && data.visibility in ['public','private']
+            && (organization(orgId).visibility == 'public' || data.visibility == 'private')
+            && (data.posterURL == null || (data.posterURL is string && data.posterURL.size() <= 2048 && data.posterURL.matches('https://.+')));
+        }
+        function counterChange() {
+          let path = /databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(request.auth.uid);
+          let previous = exists(path) ? get(path).data.registrationStatus : 'none';
+          let after = getAfter(path).data;
+          let delta = request.resource.data.registrationCount - resource.data.registrationCount;
+          return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationCount','updatedAt'])
+            && request.resource.data.updatedAt == request.time
+            && after.uid == request.auth.uid && after.updatedAt == request.time
+            && ((delta == 1 && previous in ['none','cancelled'] && after.registrationStatus == 'registered'
+                && joinEligible(resource.data) && resource.data.registrationCount < resource.data.capacity)
+              || (delta == -1 && withdrawalOpen(resource.data) && previous == 'registered' && after.registrationStatus == 'cancelled' && resource.data.registrationCount > 0));
+        }
+        function editDraft() {
+          return eventEditor(resource.data) && organization(orgId).status == 'active'
+            && resource.data.eventStatus == 'draft' && resource.data.get('archivedAt',null) == null
+            && !(resource.data.approvalStatus == 'pending' && resource.data.get('submittedAt',null) != null)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','visibility','approvalStatus','submittedAt','updatedAt'])
+            && request.resource.data.approvalStatus == 'pending' && request.resource.data.submittedAt == null
+            && validEvent(request.resource.data);
+        }
+        function submitDraft() {
+          return eventEditor(resource.data) && organization(orgId).status == 'active' && resource.data.eventStatus == 'draft'
+            && (resource.data.approvalStatus == 'rejected' || resource.data.get('submittedAt',null) == null)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvalStatus','submittedAt','updatedAt'])
+            && request.resource.data.approvalStatus == 'pending' && request.resource.data.submittedAt == request.time
+            && validEvent(request.resource.data);
+        }
+        function reviewDraft() {
+          return assignedManager() && organization(orgId).status == 'active' && resource.data.eventStatus == 'draft'
+            && resource.data.approvalStatus == 'pending' && resource.data.get('submittedAt',null) is timestamp
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvalStatus','reviewedAt','reviewedBy','updatedAt'])
+            && request.resource.data.approvalStatus in ['approved','rejected']
+            && request.resource.data.reviewedAt == request.time && request.resource.data.reviewedBy == request.auth.uid;
+        }
+        function managerTransition() {
+          let changed = request.resource.data.diff(resource.data).affectedKeys();
+          return assignedManager() && organization(orgId).status == 'active' && resource.data.get('archivedAt',null) == null
+            && ((resource.data.eventStatus == 'draft' && resource.data.approvalStatus == 'approved'
+                && changed.hasOnly(['eventStatus','publishedAt','updatedAt']) && request.resource.data.eventStatus == 'published'
+                && request.resource.data.publishedAt == request.time && validEvent(request.resource.data))
+              || (resource.data.eventStatus in ['draft','published'] && changed.hasOnly(['eventStatus','cancelledAt','updatedAt'])
+                && request.resource.data.eventStatus == 'cancelled' && request.resource.data.cancelledAt == request.time)
+              || (resource.data.eventStatus == 'published' && request.time >= resource.data.endAt
+                && changed.hasOnly(['eventStatus','completedAt','updatedAt']) && request.resource.data.eventStatus == 'completed' && request.resource.data.completedAt == request.time)
+              || (resource.data.eventStatus in ['completed','cancelled'] && changed.hasOnly(['archivedAt','updatedAt']) && request.resource.data.archivedAt == request.time));
+        }
+        allow read: if eligible() && (eventEditor(resource.data)
+          || (visibleEvent(resource.data) && ((resource.data.eventStatus in ['published','completed'] && resource.data.approvalStatus == 'approved')
+            || (resource.data.eventStatus == 'cancelled' && exists(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(request.auth.uid))))));
+        allow create: if eligible() && organization(orgId).status == 'active' && (assignedManager() || eventOfficer())
+          && request.resource.data.keys().hasAll(['eventId','organizationId','title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','registrationCount','eventStatus','approvalStatus','createdBy','createdAt','updatedAt','visibility','submittedAt','reviewedAt','reviewedBy','publishedAt','cancelledAt','completedAt','archivedAt'])
+          && request.resource.data.keys().hasOnly(['eventId','organizationId','title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','registrationCount','eventStatus','approvalStatus','createdBy','createdAt','updatedAt','visibility','submittedAt','reviewedAt','reviewedBy','publishedAt','cancelledAt','completedAt','archivedAt'])
+          && validEvent(request.resource.data) && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.registrationCount == 0 && request.resource.data.eventStatus == 'draft' && request.resource.data.approvalStatus == 'pending'
+          && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+          && request.resource.data.submittedAt == null && request.resource.data.reviewedAt == null && request.resource.data.reviewedBy == null
+          && request.resource.data.publishedAt == null && request.resource.data.cancelledAt == null && request.resource.data.completedAt == null && request.resource.data.archivedAt == null;
+        allow update: if eligible() && request.resource.data.updatedAt == request.time
+          && ((request.resource.data.registrationCount != resource.data.registrationCount && counterChange())
+            || (request.resource.data.registrationCount == resource.data.registrationCount && (editDraft() || submitDraft() || reviewDraft() || managerTransition())));
+        match /participantIdentities/{uid} {
+          function registrationAfter() { return getAfter(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(uid)).data; }
+          allow read: if eligible() && eventEditor(get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data);
+          allow create, update: if eligible() && owner(uid)
+            && request.resource.data.keys().hasAll(['uid','fullName','updatedAt'])
+            && request.resource.data.keys().hasOnly(['uid','fullName','updatedAt'])
+            && request.resource.data.uid == uid && request.resource.data.fullName is string
+            && request.resource.data.fullName == get(/databases/$(database)/documents/users/$(uid)).data.fullName
+            && request.resource.data.updatedAt == request.time
+            && registrationAfter().uid == uid && registrationAfter().organizationId == orgId && registrationAfter().eventId == eventId
+            && registrationAfter().registrationStatus in ['registered','cancelled'];
+        }
+        match /registrations/{uid} {
+          function eventBefore() { return get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data; }
+          function eventAfter() { return getAfter(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data; }
+          function identityAfter() {
+            let identity = getAfter(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/participantIdentities/$(uid)).data;
+            return identity.uid == uid && identity.fullName == get(/databases/$(database)/documents/users/$(uid)).data.fullName && identity.updatedAt == request.time;
+          }
+          function paired(delta) { return eventAfter().registrationCount == eventBefore().registrationCount + delta && eventAfter().updatedAt == request.time; }
+          allow get: if eligible() && (owner(uid) || eventEditor(eventBefore()));
+          allow list: if eligible() && eventEditor(eventBefore());
+          allow create: if eligible() && owner(uid) && joinEligible(eventBefore()) && eventBefore().registrationCount < eventBefore().capacity
+            && request.resource.data.keys().hasAll(['uid','eventId','organizationId','registrationStatus','registeredAt','updatedAt'])
+            && request.resource.data.keys().hasOnly(['uid','eventId','organizationId','registrationStatus','registeredAt','updatedAt'])
+            && request.resource.data.uid == uid && request.resource.data.eventId == eventId && request.resource.data.organizationId == orgId
+            && request.resource.data.registrationStatus == 'registered' && request.resource.data.registeredAt == request.time
+            && request.resource.data.updatedAt == request.time && identityAfter() && paired(1);
+          allow update: if eligible() && owner(uid) && request.resource.data.updatedAt == request.time
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus','updatedAt'])
+            && ((resource.data.registrationStatus == 'registered' && request.resource.data.registrationStatus == 'cancelled' && withdrawalOpen(eventBefore()) && paired(-1))
+              || (resource.data.registrationStatus == 'cancelled' && request.resource.data.registrationStatus == 'registered'
+                && joinEligible(eventBefore()) && eventBefore().registrationCount < eventBefore().capacity && identityAfter() && paired(1)));
+        }
       }
     }
     // Collection-group queries must filter uid == the authenticated UID.
     match /{path=**}/memberships/{uid} {
+      allow list: if eligible() && resource.data.uid == request.auth.uid;
+    }
+    match /{path=**}/registrations/{uid} {
       allow list: if eligible() && resource.data.uid == request.auth.uid;
     }
     match /{document=**} { allow read, write: if false; }

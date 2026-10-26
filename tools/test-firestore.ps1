@@ -7,7 +7,7 @@ $testStartedAt = Get-Date
 $testExitCode = 1
 Push-Location -LiteralPath $workspacePath
 try {
-  & firebase.cmd emulators:exec --project orglink-dev --only firestore 'node --test --test-concurrency=1 firebase/tests/profile.rules.test.mjs firebase/tests/organization.rules.test.mjs tools/admin/provision-demo.emulator.test.mjs'
+  & firebase.cmd emulators:exec --project orglink-dev --only firestore 'node --test --test-concurrency=1 firebase/tests/profile.rules.test.mjs firebase/tests/organization.rules.test.mjs firebase/tests/event.rules.test.mjs tools/admin/provision-demo.emulator.test.mjs'
   $testExitCode = $LASTEXITCODE
 } finally {
   # On Windows, a Java child can outlive the CLI shutdown. Clean up only test
