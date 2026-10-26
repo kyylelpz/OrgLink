@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "250705466224",
+    "project_id": "orglink-dev",
+    "storage_bucket": "orglink-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250705466224:android:e61d3a43fae18e607eb5b5",
+        "android_client_info": {
+          "package_name": "com.example.orglink"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "250705466224-9msodth3omns78fmhk5mc37dejtucquh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.orglink",
+            "certificate_hash": "65033e9480ac607043937d30c44b6fbdb3b9a29f"
+          }
+        },
+        {
+          "client_id": "250705466224-4vj305f646534ui5tpjn8jl65ohi1eb8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALwHqP16cijs7tkvFUhmXraQgZh3nncDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "250705466224-4vj305f646534ui5tpjn8jl65ohi1eb8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
