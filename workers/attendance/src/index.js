@@ -1,6 +1,6 @@
 import { attendanceBackend, AttendanceError } from "./attendance.js";
 import { firebaseVerifier, googleAccessToken } from "./auth.js";
-import { RestFirestore } from "./firestore.js";
+import { BackendError, RestFirestore, TransportError } from "./firestore.js";
 const status = {
   unauthenticated: 401,
   "permission-denied": 403,
@@ -61,7 +61,11 @@ async function readJSON(request) {
     throw new AttendanceError("invalid-argument", "Invalid JSON request.");
   }
 }
-export function createHandler({ fetchImpl = fetch, clock = Date.now } = {}) {
+export function createHandler({
+  fetchImpl = fetch,
+  clock = Date.now,
+  logFailure = (entry) => console.error(JSON.stringify(entry)),
+} = {}) {
   const verify = firebaseVerifier({ fetchImpl, clock }),
     oauth = googleAccessToken({ fetchImpl, clock });
   return async (request, env) => {
@@ -81,13 +85,16 @@ export function createHandler({ fetchImpl = fetch, clock = Date.now } = {}) {
         },
         405,
       );
+    let stage = "firebase-auth";
     try {
       const uid = await verify(request.headers.get("Authorization"));
+      stage = "request-json";
       const data = await readJSON(request);
+      stage = "configuration";
       let origin = "https://firestore.googleapis.com";
       if (env.FIRESTORE_EMULATOR_HOST) {
         if (!/^(127\.0\.0\.1|localhost):\d+$/.test(env.FIRESTORE_EMULATOR_HOST))
-          throw Error("Invalid local emulator.");
+          throw new BackendError("configuration", "invalid-emulator-host");
         origin = `http://${env.FIRESTORE_EMULATOR_HOST}`;
       }
       const db = new RestFirestore(
@@ -98,10 +105,12 @@ export function createHandler({ fetchImpl = fetch, clock = Date.now } = {}) {
         { fetchImpl, origin },
       );
       const backend = attendanceBackend(db, clock);
+      stage = path === "/issue" ? "attendance.issue" : "attendance.redeem";
       const result = await backend[path === "/issue" ? "issue" : "redeem"]({
         auth: { uid },
         data,
       });
+      stage = "response";
       return response({ result });
     } catch (error) {
       if (error instanceof AttendanceError)
@@ -110,6 +119,29 @@ export function createHandler({ fetchImpl = fetch, clock = Date.now } = {}) {
           status[error.code] ?? 400,
         );
       // Never return upstream Google errors, token contents or service-account details.
+      const diagnostic = {
+        event: "attendance_backend_failure",
+        endpoint: path === "/issue" ? "issue" : "redeem",
+        stage: error instanceof BackendError ? error.stage : stage,
+        code: "unavailable",
+        reason:
+          error instanceof BackendError ? error.reason : "unexpected-error",
+      };
+      if (error instanceof TransportError) {
+        diagnostic.errorName = error.errorName;
+        if (error.runtimeCode) diagnostic.runtimeCode = error.runtimeCode;
+      }
+      if (
+        error instanceof BackendError &&
+        Number.isInteger(error.upstreamStatus)
+      ) {
+        diagnostic.upstreamStatus = error.upstreamStatus;
+      }
+      try {
+        logFailure(diagnostic);
+      } catch {
+        /* Diagnostics must not affect the response. */
+      }
       return response(
         {
           error: {

@@ -10,9 +10,53 @@ export class Timestamp {
     return this.milliseconds;
   }
 }
-export class RestError extends Error {
-  constructor(status) {
-    super("Firestore request failed.");
+// Only fixed stage/reason identifiers and numeric HTTP status may reach logs.
+export class BackendError extends Error {
+  constructor(stage, reason, upstreamStatus) {
+    super("Attendance backend failed.");
+    this.stage = stage;
+    this.reason = reason;
+    this.upstreamStatus = upstreamStatus;
+  }
+}
+// Allowlisted runtime identifiers only; exception messages and causes stay private.
+export class TransportError extends BackendError {
+  constructor(stage, error) {
+    super(
+      stage,
+      error?.name === "TimeoutError" ? "timeout" : "transport-error",
+    );
+    this.errorName = [
+      "Error",
+      "TypeError",
+      "RangeError",
+      "AbortError",
+      "TimeoutError",
+      "NetworkError",
+    ].includes(error?.name)
+      ? error.name
+      : "UnknownError";
+    const code = error?.code ?? error?.cause?.code;
+    if (
+      [
+        "ECONNRESET",
+        "ECONNREFUSED",
+        "ETIMEDOUT",
+        "ENOTFOUND",
+        "EAI_AGAIN",
+        "ERR_INVALID_ARG_VALUE",
+        "ERR_INVALID_URL",
+        "UND_ERR_CONNECT_TIMEOUT",
+        "UND_ERR_SOCKET",
+        "ABORT_ERR",
+      ].includes(code)
+    )
+      this.runtimeCode = code;
+  }
+}
+export class RestError extends BackendError {
+  constructor(status, method = "request") {
+    super(`firestore.${method}`, "http-error", status);
     this.status = status;
   }
 }
@@ -65,7 +109,8 @@ export class RestFirestore {
     { fetchImpl = fetch, origin = "https://firestore.googleapis.com" } = {},
   ) {
     this.bearer = bearer;
-    this.fetch = fetchImpl;
+    // Invoke ambient fetch without the client instance as its receiver (workerd brand check).
+    this.fetch = (...args) => fetchImpl(...args);
     this.root = "projects/orglink-dev/databases/(default)";
     if (
       origin !== "https://firestore.googleapis.com" &&
@@ -79,24 +124,39 @@ export class RestFirestore {
   }
   async call(method, body) {
     const token = await this.bearer();
-    const response = await this.fetch(
-      `${this.origin}/v1/${this.root}/documents:${method}`,
-      {
-        method: "POST",
-        redirect: "error",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+    let response;
+    try {
+      response = await this.fetch(
+        `${this.origin}/v1/${this.root}/documents:${method}`,
+        {
+          method: "POST",
+          // Workers does not support "error". Return redirects without forwarding credentials.
+          redirect: "manual",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(8000),
         },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(8000),
-      },
-    );
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new RestError(response.status);
+      );
+    } catch (error) {
+      throw new TransportError(`firestore.${method}`, error);
     }
-    return response.json();
+    // Includes every 3xx response: never follow Location or accept a redirected write.
+    if (!response.ok) {
+      try {
+        await response.body?.cancel();
+      } catch {
+        /* Keep the HTTP failure. */
+      }
+      throw new RestError(response.status, method);
+    }
+    try {
+      return await response.json();
+    } catch {
+      throw new BackendError(`firestore.${method}`, "invalid-json-response");
+    }
   }
   async runTransaction(handler) {
     let retryTransaction;

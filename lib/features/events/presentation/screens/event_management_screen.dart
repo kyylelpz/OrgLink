@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../attendance/data/models/attendance.dart';
 import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/utils/live_query.dart';
@@ -152,6 +153,22 @@ class ParticipantsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Event Participants'),
+        actions: [
+          if (model.organization.failure == null &&
+              model.membership.failure == null &&
+              canManageAttendance(
+                model.organization.value,
+                model.membership.value,
+                model.uid,
+              ))
+            IconButton(
+              tooltip: 'Attendance Verification',
+              icon: const Icon(Icons.fact_check_outlined),
+              onPressed: () => context.go(
+                AppRoutes.attendance(model.organizationId, model.eventId!),
+              ),
+            ),
+        ],
         leading: IconButton(
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back),

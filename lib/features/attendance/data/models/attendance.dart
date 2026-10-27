@@ -17,14 +17,22 @@ bool canManageAttendance(Organization? org, Membership? member, String uid) =>
 
 // A UI hint only; Rules and the backend enforce authoritative server time.
 bool attendanceWindow(OrgEvent event, DateTime now) =>
-    event.eventStatus == 'published' &&
-    event.approvalStatus == 'approved' &&
-    event.publishedAt != null &&
-    event.archivedAt == null &&
-    event.startAt != null &&
-    event.endAt != null &&
-    !now.isBefore(event.startAt!) &&
-    now.isBefore(event.endAt!);
+    attendanceUnavailableReason(event, now) == null;
+
+String? attendanceUnavailableReason(OrgEvent event, DateTime now) {
+  if (event.eventStatus != 'published') return 'This event is not published.';
+  if (event.approvalStatus != 'approved') return 'This event is not approved.';
+  if (event.publishedAt == null) {
+    return 'The event publication timestamp is missing. Contact the organizer.';
+  }
+  if (event.archivedAt != null) return 'This event has been archived.';
+  if (event.startAt == null || event.endAt == null) {
+    return 'The event schedule is incomplete. Contact the organizer.';
+  }
+  if (now.isBefore(event.startAt!)) return 'Attendance has not opened yet.';
+  if (!now.isBefore(event.endAt!)) return 'The attendance window has closed.';
+  return null;
+}
 
 enum AttendanceStatus { present, absent }
 

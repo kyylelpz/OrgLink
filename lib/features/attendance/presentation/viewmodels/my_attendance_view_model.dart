@@ -7,20 +7,82 @@ import '../../data/models/attendance.dart';
 import '../../data/repositories/attendance_repository.dart';
 
 class MyAttendanceViewModel extends ChangeNotifier {
-  MyAttendanceViewModel(this.repository, this.events) {
+  MyAttendanceViewModel(
+    this.repository,
+    this.events, {
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now {
     events.addListener(_sync);
     _sync();
   }
   final AttendanceRepository repository;
   final EventHubViewModel events;
+  final DateTime Function() _now;
   final Map<String, LiveQuery<AttendanceRecord?>> records = {};
   bool _disposed = false, busy = false;
   AppFailure? failure;
   QRCheckInCredential? credential;
   String? selected;
   Timer? _timer;
+  Timer? _windowTimer;
   Stopwatch? _elapsed;
   int _generation = 0;
+  String? _lastWindowDiagnostic;
+  String? get windowMessage {
+    final event = events.registeredEvents[selected]?.value;
+    return event == null ? null : attendanceUnavailableReason(event, _now());
+  }
+
+  bool get canGenerate {
+    final event = events.registeredEvents[selected], record = records[selected];
+    return !busy &&
+        !events.mine.loading &&
+        events.mine.failure == null &&
+        (events.mine.value ?? []).any(
+          (r) =>
+              '${r.organizationId}/${r.eventId}' == selected &&
+              r.status == 'registered',
+        ) &&
+        event?.loading == false &&
+        event?.failure == null &&
+        event?.value != null &&
+        windowMessage == null &&
+        record?.loading == false &&
+        record?.failure == null &&
+        record?.value == null;
+  }
+
+  void _scheduleWindowRefresh() {
+    _windowTimer?.cancel();
+    final event = events.registeredEvents[selected]?.value;
+    if (_disposed || event == null) return;
+    final now = _now();
+    // No Firestore refetch: wake at start/end, and periodically check clock changes.
+    var delay = const Duration(seconds: 30);
+    for (final boundary in [event.startAt, event.endAt]) {
+      if (boundary != null && boundary.isAfter(now)) {
+        final remaining = boundary.difference(now);
+        if (remaining < delay) delay = remaining;
+      }
+    }
+    _windowTimer = Timer(delay, _sync);
+    if (kDebugMode) {
+      final diagnostic =
+          'QR window $selected: startAt=${event.startAt?.toUtc().toIso8601String()}, '
+          'endAt=${event.endAt?.toUtc().toIso8601String()}, eventStatus=${event.eventStatus}, '
+          'approvalStatus=${event.approvalStatus}, publishedAt=${event.publishedAt?.toUtc().toIso8601String()}, '
+          'archivedAt=${event.archivedAt?.toUtc().toIso8601String()}, '
+          'localStart=${event.startAt?.toLocal().toIso8601String()}, localEnd=${event.endAt?.toLocal().toIso8601String()}, '
+          'offset=${now.timeZoneOffset}, reason=${windowMessage ?? 'open'}';
+      if (diagnostic != _lastWindowDiagnostic) {
+        _lastWindowDiagnostic = diagnostic;
+        debugPrint(
+          '$diagnostic; deviceNow=${now.toUtc().toIso8601String()}, localNow=${now.toLocal().toIso8601String()}',
+        );
+      }
+    }
+  }
+
   int get secondsRemaining => credential == null
       ? 0
       : ((credential!.expiresAt
@@ -60,13 +122,14 @@ class MyAttendanceViewModel extends ChangeNotifier {
             (events.registeredEvents[selected]?.value != null &&
                 !attendanceWindow(
                   events.registeredEvents[selected]!.value!,
-                  DateTime.now(),
+                  _now(),
                 )))) {
       credential = null;
       _timer?.cancel();
       _generation++;
       busy = false;
     }
+    _scheduleWindowRefresh();
     notifyListeners();
   }
 
@@ -88,6 +151,7 @@ class MyAttendanceViewModel extends ChangeNotifier {
     _generation++;
     busy = false;
     _timer?.cancel();
+    _scheduleWindowRefresh();
     notifyListeners();
   }
 
@@ -100,26 +164,15 @@ class MyAttendanceViewModel extends ChangeNotifier {
 
   Future<void> generate() async {
     if (_disposed || busy || selected == null) return;
-    final key = selected!, parts = key.split('/'), generation = ++_generation;
-    final reg = (events.mine.value ?? []).where(
-      (r) =>
-          r.organizationId == parts[0] &&
-          r.eventId == parts[1] &&
-          r.status == 'registered',
-    );
-    final event = events.registeredEvents[key]?.value;
-    if (reg.isEmpty ||
-        event == null ||
-        !attendanceWindow(event, DateTime.now()) ||
-        records[key]?.value != null ||
-        records[key]?.loading != false ||
-        records[key]?.failure != null) {
-      failure = const AppFailure(
-        'An active registration, open attendance window and unverified attendance are required.',
+    if (!canGenerate) {
+      failure = AppFailure(
+        windowMessage ??
+            'An active registration, open attendance window and unverified attendance are required.',
       );
       notifyListeners();
       return;
     }
+    final parts = selected!.split('/'), generation = ++_generation;
     busy = true;
     failure = null;
     credential = null;
@@ -152,6 +205,7 @@ class MyAttendanceViewModel extends ChangeNotifier {
     _disposed = true;
     _generation++;
     _timer?.cancel();
+    _windowTimer?.cancel();
     events.removeListener(_sync);
     for (final q in records.values) {
       q.dispose();

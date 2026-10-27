@@ -63,8 +63,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '250705466224',
     projectId: 'orglink-dev',
     storageBucket: 'orglink-dev.firebasestorage.app',
-    androidClientId: '250705466224-9msodth3omns78fmhk5mc37dejtucquh.apps.googleusercontent.com',
-    iosClientId: '250705466224-hu4i3ov0ociv8ciiorf5u6ojtcr4f3or.apps.googleusercontent.com',
+    androidClientId:
+        '250705466224-9msodth3omns78fmhk5mc37dejtucquh.apps.googleusercontent.com',
+    iosClientId:
+        '250705466224-hu4i3ov0ociv8ciiorf5u6ojtcr4f3or.apps.googleusercontent.com',
     iosBundleId: 'com.example.orglink',
   );
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,8 +75,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '250705466224',
     projectId: 'orglink-dev',
     storageBucket: 'orglink-dev.firebasestorage.app',
-    androidClientId: '250705466224-9msodth3omns78fmhk5mc37dejtucquh.apps.googleusercontent.com',
-    iosClientId: '250705466224-hu4i3ov0ociv8ciiorf5u6ojtcr4f3or.apps.googleusercontent.com',
+    androidClientId:
+        '250705466224-9msodth3omns78fmhk5mc37dejtucquh.apps.googleusercontent.com',
+    iosClientId:
+        '250705466224-hu4i3ov0ociv8ciiorf5u6ojtcr4f3or.apps.googleusercontent.com',
     iosBundleId: 'com.example.orglink',
   );
 

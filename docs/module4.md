@@ -85,6 +85,8 @@ resources are disposed on leaving their scope.
 ## Manual attendance workflow
 
 1. Open Attendance Management from Home or QR Hub.
+   Alternatively, open Attendance Verification from Event Details or the
+   attendance icon in the Event Participants AppBar (authorized operators only).
 2. Expand an authorized organization; select an event (report icon opens reporting).
 3. Use Manual Lookup to search projected participant names; filter attendance.
 4. Inspect registration, attendance, method and timestamp.
@@ -93,6 +95,12 @@ resources are disposed on leaving their scope.
    writes only if it is absent. Rules enforce current permissions, registration,
    event lifecycle and request.time. Existing results return Already Verified.
 7. A server read confirms the saved timestamp/result. The live roster updates.
+
+The verification roster explains a closed or ineligible attendance window and
+refreshes at its start/end boundaries without refetching the roster. Reporting is
+read-only; use Attendance Verification to open manual marking. Registered,
+unmarked participants other than the operator show Mark Present and Mark Absent
+only while the window is open. Firestore rules remain authoritative.
 
 No placeholder attendance documents are created. The first successful result is
 final. Present/Absent and Manual/QR cannot be changed or deleted through ordinary

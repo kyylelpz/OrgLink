@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../../../core/utils/live_query.dart';
@@ -8,12 +9,15 @@ import '../../data/models/attendance.dart';
 import '../../data/repositories/attendance_repository.dart';
 
 class AttendanceViewModel extends ChangeNotifier {
-  AttendanceViewModel(this.repository, this.context) {
+  AttendanceViewModel(this.repository, this.context, {DateTime Function()? now})
+    : _now = now ?? DateTime.now {
     context.addListener(_sync);
     _sync();
   }
   final AttendanceRepository repository;
   final EventContextViewModel context;
+  final DateTime Function() _now;
+  Timer? _windowTimer;
   LiveQuery<List<AttendanceRecord>>? records;
   LiveQuery<List<EventRegistration>>? registrations;
   LiveQuery<List<ParticipantIdentity>>? identities;
@@ -45,6 +49,23 @@ class AttendanceViewModel extends ChangeNotifier {
       identities?.failure;
   AttendanceSummary get summary =>
       AttendanceSummary(registrations?.value ?? [], records?.value ?? []);
+  String? get manualUnavailableReason {
+    final event = context.event?.value;
+    return event == null
+        ? 'Event no longer available.'
+        : attendanceUnavailableReason(event, _now());
+  }
+
+  bool canMark(EventRegistration registration) =>
+      authorized &&
+      !loading &&
+      loadFailure == null &&
+      registration.status == 'registered' &&
+      registration.uid != context.uid &&
+      registration.organizationId == context.organizationId &&
+      registration.eventId == context.eventId &&
+      recordFor(registration.uid) == null &&
+      manualUnavailableReason == null;
   String nameFor(String uid) {
     for (final identity in identities?.value ?? <ParticipantIdentity>[]) {
       if (identity.uid == uid && identity.fullName.trim().isNotEmpty) {
@@ -78,6 +99,21 @@ class AttendanceViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _refreshWindowTimer() {
+    _windowTimer?.cancel();
+    final event = context.event?.value;
+    if (!authorized || event == null) return;
+    final now = _now();
+    var delay = const Duration(seconds: 30);
+    for (final boundary in [event.startAt, event.endAt]) {
+      if (boundary != null && boundary.isAfter(now)) {
+        final remaining = boundary.difference(now);
+        if (remaining < delay) delay = remaining;
+      }
+    }
+    _windowTimer = Timer(delay, _sync);
+  }
+
   void _sync() {
     if (_disposed) return;
     if (authorized && records == null && context.eventId != null) {
@@ -104,6 +140,7 @@ class AttendanceViewModel extends ChangeNotifier {
       result = null;
       failure = null;
     }
+    _refreshWindowTimer();
     notifyListeners();
   }
 
@@ -149,7 +186,7 @@ class AttendanceViewModel extends ChangeNotifier {
       return result;
     }
     final event = context.event?.value;
-    if (event == null || !attendanceWindow(event, DateTime.now())) {
+    if (event == null || !attendanceWindow(event, _now())) {
       failure = const AppFailure(
         'Attendance is available only during the published event. Server time determines final eligibility.',
       );
@@ -185,6 +222,7 @@ class AttendanceViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _windowTimer?.cancel();
     context.removeListener(_sync);
     _clear();
     super.dispose();

@@ -177,6 +177,8 @@ class AttendanceScreen extends StatelessWidget {
             const Text(
               'The first verification is final. Server time and current permissions determine whether marking is allowed.',
             ),
+          if (!report && model.manualUnavailableReason != null)
+            Text(model.manualUnavailableReason!),
           Wrap(
             spacing: 8,
             children: [
@@ -258,11 +260,7 @@ class AttendanceScreen extends StatelessWidget {
                       'Registration: ${displayIdentifier(registration.status)} | Attendance: ${attendanceLabel(model.recordFor(registration.uid))}',
                     ),
                     Text(verificationLabel(model.recordFor(registration.uid))),
-                    if (!report &&
-                        registration.status == 'registered' &&
-                        registration.uid != model.context.uid &&
-                        model.recordFor(registration.uid) == null &&
-                        attendanceWindow(event, DateTime.now()))
+                    if (!report && model.canMark(registration))
                       Wrap(
                         spacing: 8,
                         children: [

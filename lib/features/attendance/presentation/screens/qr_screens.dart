@@ -167,10 +167,7 @@ class MyQRCodeScreen extends StatelessWidget {
               Text(attendanceLabel(record!.value)),
               Text(verificationLabel(record.value)),
             ] else ...[
-              if (event != null && !attendanceWindow(event, DateTime.now()))
-                const Text(
-                  'QR issuance is unavailable outside the published event attendance window.',
-                ),
+              if (model.windowMessage != null) Text(model.windowMessage!),
               if (model.credential != null && model.secondsRemaining > 0)
                 Center(
                   child: QrImageView(
@@ -187,14 +184,7 @@ class MyQRCodeScreen extends StatelessWidget {
                       : 'This pass has expired. Generate another before scanning.',
                 ),
               FilledButton(
-                onPressed:
-                    model.busy ||
-                        event == null ||
-                        record?.loading != false ||
-                        record?.failure != null ||
-                        !attendanceWindow(event, DateTime.now())
-                    ? null
-                    : model.generate,
+                onPressed: model.canGenerate ? model.generate : null,
                 child: Text(
                   model.credential == null
                       ? 'Generate QR Pass'
