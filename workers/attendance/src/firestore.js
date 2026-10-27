@@ -180,19 +180,37 @@ export class RestFirestore {
                 .filter((d) => d.found)
                 .map((d) => [
                   d.found.name,
-                  decode({ mapValue: { fields: d.found.fields ?? {} } }),
+                  {
+                    value: decode({
+                      mapValue: { fields: d.found.fields ?? {} },
+                    }),
+                    updateTime: d.found.updateTime,
+                  },
                 ]),
             );
-            return names.map((name) => ({ data: () => docs.get(name) }));
+            return names.map((name) => ({
+              data: () => docs.get(name)?.value,
+              updateTime: docs.get(name)?.updateTime,
+            }));
           },
           set: (name, data) =>
             writes.push({
               update: { name, fields: encode(data).mapValue.fields },
             }),
-          create: (name, data) =>
+          create: (name, data, { serverTimestampFields = [] } = {}) =>
             writes.push({
               update: { name, fields: encode(data).mapValue.fields },
               currentDocument: { exists: false },
+              ...(serverTimestampFields.length
+                ? {
+                    updateTransforms: serverTimestampFields.map(
+                      (fieldPath) => ({
+                        fieldPath,
+                        setToServerValue: "REQUEST_TIME",
+                      }),
+                    ),
+                  }
+                : {}),
             }),
           update: (name, data) =>
             writes.push({

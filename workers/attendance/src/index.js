@@ -9,6 +9,7 @@ const status = {
   "failed-precondition": 409,
   "already-exists": 409,
   "resource-exhausted": 429,
+  conflict: 409,
 };
 const response = (body, code = 200) =>
   Response.json(body, {
@@ -70,7 +71,7 @@ export function createHandler({
     oauth = googleAccessToken({ fetchImpl, clock });
   return async (request, env) => {
     const path = new URL(request.url).pathname;
-    if (!["/issue", "/redeem"].includes(path))
+    if (!["/issue", "/redeem", "/correct"].includes(path))
       return response(
         { error: { code: "not-found", message: "Endpoint not found." } },
         404,
@@ -105,8 +106,9 @@ export function createHandler({
         { fetchImpl, origin },
       );
       const backend = attendanceBackend(db, clock);
-      stage = path === "/issue" ? "attendance.issue" : "attendance.redeem";
-      const result = await backend[path === "/issue" ? "issue" : "redeem"]({
+      const operation = path.slice(1);
+      stage = `attendance.${operation}`;
+      const result = await backend[operation]({
         auth: { uid },
         data,
       });
@@ -121,7 +123,7 @@ export function createHandler({
       // Never return upstream Google errors, token contents or service-account details.
       const diagnostic = {
         event: "attendance_backend_failure",
-        endpoint: path === "/issue" ? "issue" : "redeem",
+        endpoint: path.slice(1),
         stage: error instanceof BackendError ? error.stage : stage,
         code: "unavailable",
         reason:

@@ -36,6 +36,15 @@ String? attendanceUnavailableReason(OrgEvent event, DateTime now) {
 
 enum AttendanceStatus { present, absent }
 
+// Pending is absence of the active document, never a stored attendance status.
+enum AttendanceCorrectionStatus { present, absent, pending }
+
+class AttendanceCorrectionPreview {
+  const AttendanceCorrectionPreview(this.previousStatus, this.revision);
+  final AttendanceStatus previousStatus;
+  final String revision;
+}
+
 enum VerificationMethod { manual, qr }
 
 class AttendanceRecord {

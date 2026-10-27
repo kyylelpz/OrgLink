@@ -96,7 +96,10 @@ void main() {
           // Only the other, active, unmarked participant is eligible.
           expect(find.text('Mark Present'), findsOneWidget);
           expect(find.text('Mark Absent'), findsOneWidget);
-          await tester.ensureVisible(find.text('Mark Present'));
+          await tester.ensureVisible(
+            find.widgetWithText(OutlinedButton, 'Mark Present'),
+          );
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Mark Present'));
           await tester.pumpAndSettle();
           expect(find.text('Mark Present?'), findsOneWidget);

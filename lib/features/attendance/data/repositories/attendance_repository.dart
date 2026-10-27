@@ -12,4 +12,17 @@ abstract interface class AttendanceRepository {
   );
   Future<QRCheckInCredential> issue(String org, String event);
   Future<AttendanceResult> redeem(QRPayload payload);
+  Future<AttendanceCorrectionPreview> previewCorrection(
+    String org,
+    String event,
+    String uid,
+  );
+  Future<void> correct(
+    String org,
+    String event,
+    String uid,
+    AttendanceCorrectionPreview preview,
+    AttendanceCorrectionStatus status,
+    String reason,
+  );
 }

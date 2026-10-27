@@ -31,6 +31,68 @@ class _Auth extends Fake implements FirebaseAuth {
 
 void main() {
   test(
+    'correction preview/apply use Firebase bearer, revision and dedicated endpoint',
+    () async {
+      final auth = _Auth()..current = _User('manager');
+      var calls = 0;
+      final client = MockClient((request) async {
+        calls++;
+        expect(request.url.path, '/correct');
+        expect(request.headers['Authorization'], 'Bearer firebase-id-token');
+        expect(request.followRedirects, isFalse);
+        final data = jsonDecode(request.body) as Map;
+        expect(data['participantUid'], 'student');
+        expect(data['organizationId'], 'robotics');
+        expect(data['eventId'], 'demo');
+        expect(data.containsKey('role'), isFalse);
+        expect(data.containsKey('correctedBy'), isFalse);
+        if (calls == 1) {
+          expect(data['operation'], 'preview');
+          return http.Response(
+            jsonEncode({
+              'result': {
+                'previousStatus': 'present',
+                'revision': '2026-10-27T00:00:00.123456789Z',
+              },
+            }),
+            200,
+          );
+        }
+        expect(data['operation'], 'apply');
+        expect(data['revision'], '2026-10-27T00:00:00.123456789Z');
+        expect(data['newStatus'], 'pending');
+        expect(data['reason'], 'Checked roster');
+        return http.Response(
+          jsonEncode({
+            'result': {'correctionId': 'audit', 'newStatus': 'pending'},
+          }),
+          200,
+        );
+      });
+      final service = AttendanceService(
+        _Store(),
+        auth,
+        client: client,
+        apiUrl: 'https://orglink.example',
+      );
+      final preview = await service.previewCorrection(
+        'robotics',
+        'demo',
+        'student',
+      );
+      await service.correct(
+        'robotics',
+        'demo',
+        'student',
+        preview,
+        AttendanceCorrectionStatus.pending,
+        ' Checked roster ',
+      );
+      expect(calls, 2);
+      client.close();
+    },
+  );
+  test(
     'Worker issuance sends Firebase bearer token over HTTPS and preserves credential contract',
     () async {
       final auth = _Auth()..current = _User('student');

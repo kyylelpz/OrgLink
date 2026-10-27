@@ -87,8 +87,10 @@ class AttendanceService {
         uri.hasFragment ||
         (uri.path.isNotEmpty && uri.path != '/') ||
         (uri.scheme != 'https' && !local)) {
-      throw const AppFailure(
-        'Secure QR check-in is not configured. Manual attendance is available.',
+      throw AppFailure(
+        name == 'correctAttendance'
+            ? 'Attendance corrections require the configured attendance backend. Normal manual marking remains available.'
+            : 'Secure QR check-in is not configured. Manual attendance is available.',
       );
     }
     final user = auth.currentUser;
@@ -104,9 +106,12 @@ class AttendanceService {
             'Your session changed. Reopen attendance and try again.',
           );
         }
-        final endpoint = name == 'issueAttendanceCredential'
-            ? '/issue'
-            : '/redeem';
+        final endpoint = switch (name) {
+          'issueAttendanceCredential' => '/issue',
+          'redeemAttendanceCredential' => '/redeem',
+          'correctAttendance' => '/correct',
+          _ => throw const AppFailure('Unsupported attendance operation.'),
+        };
         final request = http.Request('POST', uri.replace(path: endpoint))
           ..followRedirects = false
           ..headers.addAll({
@@ -180,6 +185,42 @@ class AttendanceService {
         isUtc: true,
       ),
     );
+  }
+
+  Future<AttendanceCorrectionPreview> previewCorrection(
+    String org,
+    String event,
+    String uid,
+  ) async {
+    final data = await _call('correctAttendance', {
+      'operation': 'preview',
+      'organizationId': org,
+      'eventId': event,
+      'participantUid': uid,
+    });
+    return AttendanceCorrectionPreview(
+      AttendanceStatus.values.byName(data['previousStatus'] as String),
+      data['revision'] as String,
+    );
+  }
+
+  Future<void> correct(
+    String org,
+    String event,
+    String uid,
+    AttendanceCorrectionPreview preview,
+    AttendanceCorrectionStatus status,
+    String reason,
+  ) async {
+    await _call('correctAttendance', {
+      'operation': 'apply',
+      'organizationId': org,
+      'eventId': event,
+      'participantUid': uid,
+      'revision': preview.revision,
+      'newStatus': status.name,
+      'reason': reason.trim(),
+    });
   }
 
   Future<AttendanceResult> redeem(QRPayload payload) async {

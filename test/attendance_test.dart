@@ -154,7 +154,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.ensureVisible(find.text('Mark Absent').first);
+      await tester.ensureVisible(
+        find.widgetWithText(OutlinedButton, 'Mark Absent').first,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Mark Absent').first);
       await tester.pumpAndSettle();
       expect(find.text('Mark Absent?'), findsOneWidget);

@@ -209,8 +209,13 @@ service cloud.firestore {
             && eventData().eventStatus == 'published' && eventData().approvalStatus == 'approved'
             && eventData().get('publishedAt',null) is timestamp && eventData().get('archivedAt',null) == null
             && request.time >= eventData().startAt && request.time < eventData().endAt;
-          // First result is final; QR writes are trusted backend operations only.
+            // Ordinary first results are final. Corrections use the trusted Worker only.
         }
+          match /attendanceCorrections/{correctionId} {
+            allow read: if eligible() && organization(orgId).managerUid == request.auth.uid;
+            // Append-only audit writes and attendance updates/deletes are Worker-only.
+            allow write: if false;
+          }
         match /participantIdentities/{uid} {
           function registrationAfter() { return getAfter(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(uid)).data; }
           allow read: if eligible() && (attendanceOperator(orgId) || eventEditor(get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data));

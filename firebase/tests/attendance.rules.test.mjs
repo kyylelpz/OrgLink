@@ -45,6 +45,49 @@ const record = (changes = {}) => ({
   verificationMethod: "manual",
   ...changes,
 });
+
+test("correction audit is manager-readable and no client can create, mutate or delete audit history", async () => {
+  const path = `${base}/attendanceCorrections/audit-one`;
+  const audit = {
+    eventId: "demo",
+    participantUid: "student",
+    previousStatus: "present",
+    newStatus: "pending",
+    reason: "Verified correction",
+    correctedBy: "manager",
+    correctedAt: Timestamp.now(),
+  };
+  await seed(path, audit);
+  await assertSucceeds(getDoc(doc(db("manager"), path)));
+  await assertSucceeds(
+    getDocs(collection(db("manager"), `${base}/attendanceCorrections`)),
+  );
+  for (const uid of ["manager", "scanner", "student", "other", "suspended"]) {
+    await assertFails(
+      setDoc(doc(db(uid), `${base}/attendanceCorrections/new-audit`), audit),
+    );
+    await assertFails(updateDoc(doc(db(uid), path), { reason: "Forged" }));
+    await assertFails(deleteDoc(doc(db(uid), path)));
+    if (uid !== "manager") {
+      await assertFails(getDoc(doc(db(uid), path)));
+      await assertFails(
+        getDocs(collection(db(uid), `${base}/attendanceCorrections`)),
+      );
+    }
+  }
+});
+
+test("clients cannot directly correct or reset attendance even with a fabricated audit", async () => {
+  await seed(
+    `${base}/attendance/student`,
+    record({ verifiedAt: Timestamp.now() }),
+  );
+  for (const uid of ["manager", "scanner", "student", "other"]) {
+    await assertFails(updateDoc(ref(db(uid)), { attendanceStatus: "absent" }));
+    await assertFails(deleteDoc(ref(db(uid))));
+    await assertFails(updateDoc(ref(db(uid)), { attendanceStatus: "pending" }));
+  }
+});
 async function seed(path, data) {
   await env.withSecurityRulesDisabled(async (c) =>
     setDoc(doc(c.firestore(), path), data),

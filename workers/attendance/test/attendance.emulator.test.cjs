@@ -361,6 +361,22 @@ test("Worker HTTP endpoint authenticates signed Firebase-shaped JWT and uses rea
   const duplicate = await post("/redeem", "scanner", data);
   assert.equal(duplicate.result.duplicate, true);
   assert.deepEqual(duplicate.result.record, verified.result.record);
+  const preview = await post("/correct", "manager", {
+    operation: "preview",
+    participantUid: "student",
+  });
+  assert.equal(preview.status, 200);
+  const correction = {
+    operation: "apply",
+    participantUid: "student",
+    revision: preview.result.revision,
+    newStatus: "pending",
+    reason: "Checked roster in person",
+  };
+  assert.equal((await post("/correct", null, correction)).status, 401);
+  assert.equal((await post("/correct", "scanner", correction)).status, 403);
+  assert.equal((await post("/correct", "manager", correction)).status, 200);
+  assert.equal((await post("/correct", "manager", correction)).status, 409);
 });
 
 for (const change of ["registration", "event", "permission", "expiry"])
@@ -412,3 +428,280 @@ for (const change of ["registration", "event", "permission", "expiry"])
     await rejection;
     assert.equal((await db.collection(`${base}/attendance`).get()).size, 0);
   });
+
+async function seedAttendance(uid = "student") {
+  await seed(`${base}/attendance/${uid}`, {
+    uid,
+    eventId: "demo",
+    organizationId: "public",
+    attendanceStatus: "present",
+    verifiedAt: Timestamp.fromMillis(now - 1000),
+    verifiedBy: "scanner",
+    verificationMethod: "qr",
+  });
+}
+const previewCorrection = (uid = "manager", participantUid = "student") =>
+  backend.correct(req(uid, { operation: "preview", participantUid }));
+const applyCorrection = (preview, changes = {}, uid = "manager") =>
+  backend.correct(
+    req(uid, {
+      operation: "apply",
+      participantUid: "student",
+      revision: preview.revision,
+      newStatus: "absent",
+      reason: " Attendance verified against organizer records. ",
+      ...changes,
+    }),
+  );
+
+test("manager correction preserves seven-field schema and atomically appends a server-timestamped audit snapshot", async () => {
+  await seedAttendance();
+  const preview = await previewCorrection();
+  assert.equal(preview.previousStatus, "present");
+  assert.match(preview.revision, /^\d{4}-/);
+  await applyCorrection(preview, {
+    correctedBy: "other",
+    previousStatus: "absent",
+    role: "platformAdmin",
+  });
+  const record = (await db.doc(`${base}/attendance/student`).get()).data();
+  assert.equal(Object.keys(record).length, 7);
+  assert.equal(record.attendanceStatus, "absent");
+  assert.equal(record.verifiedBy, "manager");
+  assert.equal(record.verificationMethod, "manual");
+  const audits = await db.collection(`${base}/attendanceCorrections`).get();
+  assert.equal(audits.size, 1);
+  const audit = audits.docs[0].data();
+  assert.equal(audit.previousStatus, "present");
+  assert.equal(audit.newStatus, "absent");
+  assert.equal(audit.correctedBy, "manager");
+  assert.equal(audit.eventId, "demo");
+  assert.equal(audit.participantUid, "student");
+  assert.equal(audit.reason, "Attendance verified against organizer records.");
+  assert.ok(audit.correctedAt instanceof Timestamp);
+  assert.equal(audit.previousRecord.verificationMethod, "qr");
+  const next = await previewCorrection();
+  await applyCorrection(next, { newStatus: "present" });
+  assert.equal(
+    (await db.collection(`${base}/attendanceCorrections`).get()).size,
+    2,
+  );
+});
+
+for (const uid of [
+  null,
+  "student",
+  "scanner",
+  "coordinator",
+  "other",
+  "suspended",
+])
+  test(`correction rejects non-manager ${uid} without audit writes`, async () => {
+    await seedAttendance();
+    await assert.rejects(
+      previewCorrection(uid),
+      code(uid ? "permission-denied" : "unauthenticated"),
+    );
+    await assert.rejects(
+      applyCorrection({ revision: "forged" }, {}, uid),
+      code(uid ? "permission-denied" : "unauthenticated"),
+    );
+    assert.equal(
+      (await db.collection(`${base}/attendanceCorrections`).get()).size,
+      0,
+    );
+  });
+
+test("correction validates reason, statuses, event/participant ownership and prevents self correction", async () => {
+  await seedAttendance();
+  const preview = await previewCorrection();
+  for (const changes of [
+    { reason: " " },
+    { reason: "x".repeat(1001) },
+    { newStatus: "approved" },
+    { operation: "delete" },
+    { participantUid: "../student" },
+  ])
+    await assert.rejects(
+      applyCorrection(preview, changes),
+      code("invalid-argument"),
+    );
+  await assert.rejects(
+    applyCorrection(preview, { newStatus: "present" }),
+    code("invalid-argument"),
+  );
+  await assert.rejects(
+    previewCorrection("manager", "manager"),
+    code("permission-denied"),
+  );
+  await update(`${base}/registrations/student`, { eventId: "another-event" });
+  await assert.rejects(applyCorrection(preview), code("failed-precondition"));
+  await update(`${base}/registrations/student`, { eventId: "demo" });
+  await update(base, { organizationId: "another-organization" });
+  await assert.rejects(applyCorrection(preview), code("failed-precondition"));
+  assert.equal(
+    (await db.collection(`${base}/attendanceCorrections`).get()).size,
+    0,
+  );
+});
+
+test("correction is allowed after completion but never before start, on cancellation or archive", async () => {
+  await seedAttendance();
+  const preview = await previewCorrection();
+  await update(base, { startAt: Timestamp.fromMillis(now + 1) });
+  await assert.rejects(applyCorrection(preview), code("failed-precondition"));
+  await update(base, {
+    startAt: Timestamp.fromMillis(now - 10000),
+    endAt: Timestamp.fromMillis(now - 1),
+    eventStatus: "completed",
+  });
+  await applyCorrection(preview);
+  const next = await previewCorrection();
+  await update(base, { eventStatus: "cancelled" });
+  await assert.rejects(
+    applyCorrection(next, { newStatus: "pending" }),
+    code("failed-precondition"),
+  );
+  await update(base, {
+    eventStatus: "completed",
+    archivedAt: Timestamp.fromMillis(now),
+  });
+  await assert.rejects(
+    applyCorrection(next, { newStatus: "pending" }),
+    code("failed-precondition"),
+  );
+});
+
+test("concurrent corrections from the same revision produce exactly one audit and one explicit conflict", async () => {
+  await seedAttendance();
+  const preview = await previewCorrection();
+  const results = await Promise.allSettled([
+    applyCorrection(preview),
+    applyCorrection(preview, { newStatus: "pending" }),
+  ]);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+  assert.equal(
+    results.find((r) => r.status === "rejected").reason.code,
+    "conflict",
+  );
+  const audit = await db.collection(`${base}/attendanceCorrections`).get();
+  assert.equal(audit.size, 1);
+  const record = await db.doc(`${base}/attendance/student`).get();
+  assert.equal(
+    record.data()?.attendanceStatus ?? "pending",
+    audit.docs[0].data().newStatus,
+  );
+});
+
+test("stale revision, manager reassignment and malformed record fail closed", async () => {
+  await seedAttendance();
+  const preview = await previewCorrection();
+  await update(`${base}/attendance/student`, { verifiedBy: "manager" });
+  await assert.rejects(applyCorrection(preview), code("conflict"));
+  const next = await previewCorrection();
+  await update("organizations/public", { managerUid: "other" });
+  await assert.rejects(applyCorrection(next), code("permission-denied"));
+  await update("organizations/public", { managerUid: "manager" });
+  await update(`${base}/attendance/student`, { organizationId: "forged" });
+  await assert.rejects(previewCorrection(), code("failed-precondition"));
+  assert.equal(
+    (await db.collection(`${base}/attendanceCorrections`).get()).size,
+    0,
+  );
+});
+
+for (const consumed of [false, true])
+  test(`reset preserves audit and invalidates ${consumed ? "redeemed" : "unused"} pre-reset QR`, async () => {
+    const issued = await backend.issue(req());
+    if (consumed) await backend.redeem(req("manager", payload(issued)));
+    else await seedAttendance();
+    await applyCorrection(await previewCorrection(), { newStatus: "pending" });
+    assert.equal(
+      (await db.doc(`${base}/attendance/student`).get()).exists,
+      false,
+    );
+    assert.equal(
+      (await db.collection(`${base}/attendanceCorrections`).get()).size,
+      1,
+    );
+    await assert.rejects(
+      backend.redeem(req("manager", payload(issued))),
+      code("invalid-argument"),
+    );
+    now = issued.expiresAt;
+    await assert.rejects(
+      backend.redeem(req("manager", payload(issued))),
+      code("invalid-argument"),
+    );
+    const next = await backend.issue(req());
+    assert.notEqual(next.token, issued.token);
+    await backend.redeem(req("manager", payload(next)));
+    await assert.rejects(
+      applyCorrection({ revision: "stale" }),
+      code("conflict"),
+    );
+    assert.equal(
+      (await db.doc(`${base}/attendance/student`).get()).data()
+        .attendanceStatus,
+      "present",
+    );
+  });
+
+test("failed atomic correction commit leaves attendance, audit and QR credential unchanged", async () => {
+  const issued = await backend.issue(req());
+  await seedAttendance();
+  const preview = await previewCorrection();
+  const failing = Object.create(workerDb);
+  failing.call = async function (method, body) {
+    if (method === "commit" && body.writes?.length)
+      throw Error("Test-only commit rejection");
+    return workerDb.call(method, body);
+  };
+  const controlled = attendanceBackend(failing, () => now);
+  await assert.rejects(
+    controlled.correct(
+      req("manager", {
+        operation: "apply",
+        participantUid: "student",
+        revision: preview.revision,
+        newStatus: "pending",
+        reason: "Retry later",
+      }),
+    ),
+  );
+  assert.equal(
+    (await db.doc(`${base}/attendance/student`).get()).data().attendanceStatus,
+    "present",
+  );
+  assert.equal(
+    (await db.collection(`${base}/attendanceCorrections`).get()).size,
+    0,
+  );
+  assert.equal((await db.collection("_attendanceCredentials").get()).size, 1);
+});
+
+test("concurrent QR redemption and Pending reset cannot resurrect the old result", async () => {
+  const issued = await backend.issue(req());
+  await seedAttendance();
+  const preview = await previewCorrection();
+  const results = await Promise.allSettled([
+    applyCorrection(preview, { newStatus: "pending" }),
+    backend.redeem(req("scanner", payload(issued))),
+  ]);
+  assert.equal(results[0].status, "fulfilled");
+  if (results[1].status === "fulfilled")
+    assert.equal(results[1].value.duplicate, true);
+  else assert.equal(results[1].reason.code, "invalid-argument");
+  assert.equal(
+    (await db.doc(`${base}/attendance/student`).get()).exists,
+    false,
+  );
+  assert.equal(
+    (await db.collection(`${base}/attendanceCorrections`).get()).size,
+    1,
+  );
+  await assert.rejects(
+    backend.redeem(req("scanner", payload(issued))),
+    code("invalid-argument"),
+  );
+});

@@ -22,6 +22,8 @@ class TestAttendanceRepository implements AttendanceRepository {
   int marks = 0, issues = 0, redemptions = 0;
   final ownWatches = <String>[];
   Object? error;
+  int corrections = 0;
+  String? correctionReason;
   Completer<void>? gate;
   @override
   Stream<List<AttendanceRecord>> records(String org, String event) =>
@@ -83,4 +85,40 @@ class TestAttendanceRepository implements AttendanceRepository {
   }
 
   Future<void> close() => feed.close();
+  @override
+  Future<AttendanceCorrectionPreview> previewCorrection(
+    String org,
+    String event,
+    String uid,
+  ) async {
+    if (error case final e?) throw e;
+    return AttendanceCorrectionPreview(
+      feed.value.firstWhere((r) => r.uid == uid).status,
+      'test-revision',
+    );
+  }
+
+  @override
+  Future<void> correct(
+    String org,
+    String event,
+    String uid,
+    AttendanceCorrectionPreview preview,
+    AttendanceCorrectionStatus status,
+    String reason,
+  ) async {
+    corrections++;
+    await gate?.future;
+    if (error case final e?) throw e;
+    correctionReason = reason;
+    feed.emit([
+      for (final record in feed.value)
+        if (record.uid != uid) record,
+      if (status != AttendanceCorrectionStatus.pending)
+        attendanceRecord(
+          uid: uid,
+          status: AttendanceStatus.values.byName(status.name),
+        ),
+    ]);
+  }
 }

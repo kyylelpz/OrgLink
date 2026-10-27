@@ -102,11 +102,166 @@ read-only; use Attendance Verification to open manual marking. Registered,
 unmarked participants other than the operator show Mark Present and Mark Absent
 only while the window is open. Firestore rules remain authoritative.
 
-No placeholder attendance documents are created. The first successful result is
-final. Present/Absent and Manual/QR cannot be changed or deleted through ordinary
-clients. There is no correction or backdated-marking workflow. Organizers cannot
+No placeholder attendance documents are created. The first successful normal result is
+final for manual marking and QR redemption. Present/Absent and Manual/QR cannot be changed or deleted through ordinary
+Firestore clients. Corrections use the separate manager-only workflow below. Organizers cannot
 verify their own attendance. Registration/capacity documents are never mutated by
 attendance operations. Missing name projections show Unknown Participant.
+
+## Manager-only attendance corrections
+
+Open Attendance Verification, find an existing result, and select **Correct
+Attendance**. Only the assigned organization manager sees this action; officers,
+including manageAttendance officers, and platform admins gain no correction power.
+The confirmation dialog displays the participant/current result, requires a new
+status and a nonempty reason (maximum 1000 characters), and submits only after
+**Confirm Correction**. Busy state prevents duplicate submissions. Server failures
+remain visible; a stale correction must be closed and reviewed again.
+
+Project policy: an eligible manager of an active organization may correct an
+existing result after an approved, published event has started, including after
+it is completed. Cancelled, archived, unapproved, or future events are excluded.
+Self-correction is prohibited. The registration must belong to the participant,
+organization and event; historical registered/cancelled registrations are allowed.
+An inactive student's historical result may be corrected without granting the
+student any registration or verification eligibility. Normal marking/QR retain
+their existing active-registration, account and attendance-window checks.
+
+Present can become Absent or Pending; Absent can become Present or Pending.
+Pending means **no active attendance document**, displayed as Not Marked in the
+existing roster/history statistics. It is not a third stored attendance status.
+Pending-to-Present/Absent is not a correction: a new normal verification must
+satisfy the normal window and all current eligibility checks. Resetting after
+event completion therefore cannot create a backdated normal verification.
+
+### Endpoint, atomicity and audit
+
+`POST /correct` uses the same verified Firebase ID token and service-account REST
+access as the existing endpoints. The Flutter client never sends an authoritative
+role, previous status, operator identity, or server time.
+
+- Preview body: organizationId, eventId, participantUid, operation=preview.
+  The server authorizes the manager and returns previousStatus and the exact
+  Firestore document updateTime as an opaque revision (including submillisecond
+  precision). No changes are written.
+- Apply body: the same identifiers, operation=apply, revision, newStatus
+  (present/absent/pending), and reason. The transaction reauthorizes the current
+  manager and checks event/registration/attendance ownership and validity. The
+  requested revision must match the server-read document. Missing/replaced results
+  or stale revisions return HTTP 409 / conflict; retries never silently change the
+  correction's expected revision. Same-status requests are rejected.
+- One atomic commit changes the seven-field attendance record, or deletes it for
+  Pending; creates a new audit entry with exists=false; and revokes the currently
+  issued credential/issuance slot if it belongs to this participant and event.
+  A changed result uses verificationMethod=manual, the manager UID and trusted
+  Worker verification time; original provenance is preserved in the audit.
+- Audit path: organizations/{organizationId}/events/{eventId}/attendanceCorrections/{randomUuid}.
+  Fields: eventId, participantUid, previousStatus, newStatus, reason, correctedBy,
+  correctedAt, previousRecord (the original seven-field record). correctedAt uses
+  Firestore's [REQUEST_TIME transform](https://firebase.google.com/docs/firestore/reference/rest/v1/Write).
+  The application only creates audit entries and never edits/deletes them.
+  Assigned eligible managers can read history via Firestore; no audit history
+  viewer is included in Flutter yet. All client audit writes are denied.
+
+Normal attendance updates/deletes remain denied to every Firestore client,
+including managers. The Worker exposes no generic audit modification API. As with
+all privileged Firestore data, infrastructure administrators with IAM write access
+can operate outside application Rules; protect the existing backend credential.
+Correction reasons and private audit data never enter diagnostic logs.
+
+Reset deletes the matching outstanding credential atomically. Consumed/expired
+credentials are never cleared for reuse; other-event credentials are not touched.
+Concurrent issuance/redemption conflicts on transaction-read documents; a fresh
+post-reset pass requires a new random token and current eligibility. An old
+redeemed, unused or expired pre-reset QR cannot restore attendance. Audit records
+survive every reset and subsequent normal verification.
+
+Roster and My Attendance use existing server-confirmed listeners, so corrections
+and deletions update status/statistics automatically. The roster also refreshes its
+attendance query after confirmed correction success. No attendance schema,
+registration/capacity document, Firebase project, package or IAM change is needed.
+Preview needs one read-only transaction; apply uses at most seven document reads,
+four writes and four REST calls per attempt, plus existing authentication/OAuth
+fetches. It requires neither Cloud Functions nor paid Workers bindings. Free-tier
+quotas and actual deployed CPU usage still need normal monitoring.
+
+### Manual release steps (not executed)
+
+1. Run local checks from the repository root:
+
+```powershell
+npm.cmd --prefix workers/attendance ci
+npm.cmd --prefix workers/attendance test
+firebase.cmd emulators:exec --only firestore --project orglink-dev "npm.cmd --prefix workers/attendance run test:emulator && npm.cmd --prefix firebase/tests test"
+npm.cmd --prefix workers/attendance run check
+flutter analyze
+flutter test
+```
+
+2. Publish the reviewed Rules to orglink-dev. This adds manager audit reads and
+   retains denial of all client correction/audit writes:
+
+```powershell
+firebase.cmd deploy --only firestore:rules --project orglink-dev
+```
+
+3. Publish the Worker using the existing Cloudflare account and existing secret:
+
+```powershell
+Set-Location workers/attendance
+npx.cmd wrangler deploy
+npx.cmd wrangler tail --format json
+```
+
+Do not replace FIREBASE_SERVICE_ACCOUNT or change IAM/billing for this feature.
+Keep the Worker restricted to orglink-dev and the existing Workers Free plan.
+If the existing secret/account setup is absent, follow the manual setup section
+below; do not embed credentials in Flutter. No Firestore index or migration is
+required. A Worker release is necessary for /correct even if QR already works.
+
+4. From the repository root, rebuild/run Flutter with the existing Worker origin:
+
+```powershell
+flutter run --dart-define=ATTENDANCE_API_URL=https://orglink-attendance.YOUR-SUBDOMAIN.workers.dev
+```
+
+5. Using synthetic test accounts/events, verify manager correction Present to
+   Absent, reason validation, Pending reset, live student history, officer denial,
+   old-pass rejection, and two manager sessions submitting the same revision. One
+   correction must succeed and the other must report conflict. Review the retained
+   audit in Firestore. These manual release/acceptance steps have not been run.
+
+### Correction validation and changed files
+
+Local validation: 83 Flutter tests, 48 Worker unit/native-workerd tests, 38 Worker
+Firestore-emulator tests, and 126 Firestore Rules tests passed. Flutter analysis
+reported no issues; Dart formatting and Wrangler dry-run passed. Security tests
+cover officer/student/platform-admin denial, ownership/reason validation, direct
+client correction/audit denial, manager reassignment, stale revisions, simultaneous
+corrections, failed commits and QR/reset races. UI tests cover reason/confirmation,
+duplicate submits, conflict errors and live personal-history resets.
+
+Changed files (no dependencies added):
+
+- workers/attendance/src/attendance.js, firestore.js, index.js
+- workers/attendance/test/attendance.emulator.test.cjs
+- firebase/firebase.rules, firebase/tests/attendance.rules.test.mjs
+- lib/features/attendance/data/models/attendance.dart
+- lib/features/attendance/data/repositories/attendance_repository.dart,
+  firestore_attendance_repository.dart
+- lib/features/attendance/data/services/attendance_service.dart
+- lib/features/attendance/presentation/viewmodels/attendance_view_model.dart
+- lib/features/attendance/presentation/screens/attendance_screens.dart,
+  attendance_correction_dialog.dart (new)
+- test/attendance_correction_test.dart (new), attendance_transport_test.dart,
+  attendance_test.dart, manual_attendance_access_test.dart,
+  support/test_attendance_repository.dart
+- docs/module4.md
+
+The existing marking tests now scroll the entire button into view before tapping,
+so the additional correction explanation does not leave their target below the
+test viewport. No backend/rules/live-data deployment, IAM or billing change, index
+creation or record migration was performed.
 
 ## Authorization matrix
 
@@ -210,11 +365,13 @@ credential approach; never fall back to privileged client writes.
 - POST /redeem: authenticates the scanner, verifies current organization
   permission, token binding/expiry, student eligibility/registration, event/window
   and existing attendance. Atomically creates Present and consumes the token.
+- POST /correct: manager-only preview/apply of an existing attendance correction,
+  with a required reason, revision check and atomic append-only audit (see above).
 
 Requests use Authorization: Bearer <Firebase Authentication ID token> and JSON
 request bodies. Responses preserve the existing result fields inside {result:...};
 errors use {error:{code,message}} and appropriate HTTP status codes. There are only
-two endpoints; no arbitrary collection/path/proxy or administration API is exposed.
+three endpoints; no arbitrary collection/path/proxy or administration API is exposed.
 Responses are no-store and contain no upstream OAuth or service-account details.
 Request bodies are bounded to 8 KiB. Redirects are rejected.
 
@@ -528,7 +685,7 @@ network/unknown commit outcomes fail safely. No paid fallback is implemented.
 - Manual resource deployment is required for live use; backend migration authorization
   does not authorize automatic deployment or billing changes.
 - No physical-device camera/two-phone acceptance test yet.
-- CSV export, separate date range filters, audited attendance corrections, automatic
+- CSV export, separate date range filters, an in-app correction audit viewer, automatic
   TTL cleanup, pagination and scanner-specific distributed abuse limits are deferred.
 - Full rosters and per-registration own-history listeners suit this demonstration
   MVP; large datasets should add pagination/listener bounds in a future task.

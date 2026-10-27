@@ -42,4 +42,19 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   @override
   Future<AttendanceResult> redeem(QRPayload payload) =>
       _run(() => service.redeem(payload));
+  @override
+  Future<AttendanceCorrectionPreview> previewCorrection(
+    String org,
+    String event,
+    String uid,
+  ) => _run(() => service.previewCorrection(org, event, uid));
+  @override
+  Future<void> correct(
+    String org,
+    String event,
+    String uid,
+    AttendanceCorrectionPreview preview,
+    AttendanceCorrectionStatus status,
+    String reason,
+  ) => _run(() => service.correct(org, event, uid, preview, status, reason));
 }

@@ -252,6 +252,158 @@ function attendanceBackend(db, clock = Date.now) {
       return safeResult(record, false);
     });
   }
-  return { issue, redeem };
+  async function correct(request) {
+    const { uid, org, event, base } = input(request);
+    const { operation, participantUid, newStatus, reason, revision } =
+      request.data;
+    if (!["preview", "apply"].includes(operation) || !id(participantUid))
+      fail("invalid-argument", "Invalid attendance correction request.");
+    if (
+      operation === "apply" &&
+      (!["present", "absent", "pending"].includes(newStatus) ||
+        typeof reason !== "string" ||
+        !reason.trim() ||
+        reason.trim().length > 1000 ||
+        typeof revision !== "string" ||
+        revision.length > 100)
+    )
+      fail(
+        "invalid-argument",
+        "Select a status and provide a correction reason (1–1000 characters).",
+      );
+    const auditId = crypto.randomUUID();
+    return db.runTransaction(async (t) => {
+      const paths = [
+        `users/${uid}`,
+        `organizations/${org}`,
+        base,
+        `${base}/registrations/${participantUid}`,
+        `${base}/attendance/${participantUid}`,
+        `_attendanceIssuance/${participantUid}`,
+      ];
+      const snapshots = await t.getAll(...paths.map((p) => db.doc(p)));
+      const [profile, organization, target, registration, existing, slot] =
+        snapshots.map((d) => d.data());
+      if (
+        !eligible(profile) ||
+        organization?.managerUid !== uid ||
+        organization?.status !== "active"
+      )
+        fail(
+          "permission-denied",
+          "Only the assigned organization manager can correct attendance.",
+        );
+      if (participantUid === uid)
+        fail("permission-denied", "You cannot correct your own attendance.");
+      const now = clock();
+      if (
+        !target ||
+        target.organizationId !== org ||
+        target.eventId !== event ||
+        !["published", "completed"].includes(target.eventStatus) ||
+        target.approvalStatus !== "approved" ||
+        !(target.publishedAt instanceof Timestamp) ||
+        target.archivedAt != null ||
+        !(target.startAt instanceof Timestamp) ||
+        now < target.startAt.toMillis()
+      )
+        fail(
+          "failed-precondition",
+          "Corrections require an approved, unarchived event that has started.",
+        );
+      if (
+        registration?.uid !== participantUid ||
+        registration.organizationId !== org ||
+        registration.eventId !== event ||
+        !["registered", "cancelled"].includes(registration.registrationStatus)
+      )
+        fail(
+          "failed-precondition",
+          "The participant does not belong to this event.",
+        );
+      if (!existing)
+        fail(
+          "conflict",
+          "Attendance changed or is Pending. Refresh the roster before correcting.",
+        );
+      if (
+        existing.uid !== participantUid ||
+        existing.organizationId !== org ||
+        existing.eventId !== event ||
+        !["present", "absent"].includes(existing.attendanceStatus) ||
+        !(existing.verifiedAt instanceof Timestamp) ||
+        !["manual", "qr"].includes(existing.verificationMethod) ||
+        typeof existing.verifiedBy !== "string" ||
+        Object.keys(existing).length !== 7
+      )
+        fail(
+          "failed-precondition",
+          "The stored attendance record is invalid and cannot be corrected.",
+        );
+      const currentRevision = snapshots[4].updateTime;
+      if (typeof currentRevision !== "string" || !currentRevision)
+        throw Error("Attendance revision unavailable.");
+      if (operation === "preview")
+        return {
+          previousStatus: existing.attendanceStatus,
+          revision: currentRevision,
+        };
+      if (revision !== currentRevision)
+        fail(
+          "conflict",
+          "Attendance changed. Review the current result and confirm a new correction.",
+        );
+      if (newStatus === existing.attendanceStatus)
+        fail("invalid-argument", "Choose a different attendance status.");
+      // Read the current credential before writes. Concurrent issuance/redemption conflicts
+      // on these transaction reads; a reset never reactivates a pre-correction pass.
+      let credential;
+      if (slot?.tokenHash) {
+        if (
+          typeof slot.tokenHash !== "string" ||
+          !/^[a-f0-9]{64}$/.test(slot.tokenHash)
+        )
+          throw Error("Invalid issuance slot.");
+        [credential] = (
+          await t.getAll(db.doc(`_attendanceCredentials/${slot.tokenHash}`))
+        ).map((d) => d.data());
+      }
+      const attendanceRef = db.doc(`${base}/attendance/${participantUid}`);
+      if (newStatus === "pending") t.delete(attendanceRef);
+      else
+        t.set(attendanceRef, {
+          uid: participantUid,
+          eventId: event,
+          organizationId: org,
+          attendanceStatus: newStatus,
+          verifiedAt: Timestamp.fromMillis(now),
+          verifiedBy: uid,
+          verificationMethod: "manual",
+        });
+      t.create(
+        db.doc(`${base}/attendanceCorrections/${auditId}`),
+        {
+          eventId: event,
+          participantUid,
+          previousStatus: existing.attendanceStatus,
+          newStatus,
+          reason: reason.trim(),
+          correctedBy: uid,
+          previousRecord: existing,
+        },
+        { serverTimestampFields: ["correctedAt"] },
+      );
+      if (
+        credential?.uid === participantUid &&
+        credential.organizationId === org &&
+        credential.eventId === event
+      ) {
+        t.delete(db.doc(`_attendanceCredentials/${slot.tokenHash}`));
+        t.delete(db.doc(`_attendanceIssuance/${participantUid}`));
+      }
+      return { correctionId: auditId, newStatus };
+    });
+  }
+  return { issue, redeem, correct };
 }
 export { attendanceBackend, eligible, operator };

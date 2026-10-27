@@ -24,6 +24,7 @@ class AttendanceViewModel extends ChangeNotifier {
   bool _disposed = false, busy = false;
   AppFailure? failure;
   AttendanceResult? result;
+  String? correctionMessage;
   String search = '', filter = 'All';
   bool get authorized =>
       canManageAttendance(
@@ -66,6 +67,100 @@ class AttendanceViewModel extends ChangeNotifier {
       registration.eventId == context.eventId &&
       recordFor(registration.uid) == null &&
       manualUnavailableReason == null;
+  bool canCorrect(EventRegistration registration) {
+    final event = context.event?.value;
+    return authorized &&
+        context.organization.value?.managerUid == context.uid &&
+        !loading &&
+        loadFailure == null &&
+        registration.uid != context.uid &&
+        registration.organizationId == context.organizationId &&
+        registration.eventId == context.eventId &&
+        ['registered', 'cancelled'].contains(registration.status) &&
+        recordFor(registration.uid) != null &&
+        event != null &&
+        ['published', 'completed'].contains(event.eventStatus) &&
+        event.approvalStatus == 'approved' &&
+        event.publishedAt != null &&
+        event.archivedAt == null &&
+        event.startAt != null &&
+        !_now().isBefore(event.startAt!);
+  }
+
+  Future<T?> _correction<T>(
+    EventRegistration registration,
+    Future<T> Function() action,
+  ) async {
+    if (_disposed || busy) return null;
+    if (!canCorrect(registration)) {
+      failure = const AppFailure(
+        'Attendance or permissions changed. Close this dialog and refresh the roster before correcting.',
+      );
+      notifyListeners();
+      return null;
+    }
+    busy = true;
+    failure = null;
+    result = null;
+    correctionMessage = null;
+    notifyListeners();
+    try {
+      final value = await action();
+      if (_disposed ||
+          !authorized ||
+          context.organization.value?.managerUid != context.uid) {
+        return null;
+      }
+      return value;
+    } catch (error) {
+      if (!_disposed && authorized) failure = AppFailure.from(error);
+      return null;
+    } finally {
+      if (!_disposed) {
+        busy = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<AttendanceCorrectionPreview?> previewCorrection(
+    EventRegistration registration,
+  ) => _correction(
+    registration,
+    () => repository.previewCorrection(
+      context.organizationId,
+      context.eventId!,
+      registration.uid,
+    ),
+  );
+
+  Future<bool> correct(
+    EventRegistration registration,
+    AttendanceCorrectionPreview preview,
+    AttendanceCorrectionStatus status,
+    String reason,
+  ) async {
+    if (reason.trim().isEmpty || reason.trim().length > 1000) return false;
+    final success = await _correction(registration, () async {
+      await repository.correct(
+        context.organizationId,
+        context.eventId!,
+        registration.uid,
+        preview,
+        status,
+        reason.trim(),
+      );
+      return true;
+    });
+    if (success != true) return false;
+    correctionMessage = status == AttendanceCorrectionStatus.pending
+        ? 'Attendance reset to Pending (Not Marked). Correction history was retained.'
+        : 'Attendance corrected. Correction history was retained.';
+    records?.retry();
+    notifyListeners();
+    return true;
+  }
+
   String nameFor(String uid) {
     for (final identity in identities?.value ?? <ParticipantIdentity>[]) {
       if (identity.uid == uid && identity.fullName.trim().isNotEmpty) {
@@ -139,6 +234,7 @@ class AttendanceViewModel extends ChangeNotifier {
       _clear();
       result = null;
       failure = null;
+      correctionMessage = null;
     }
     _refreshWindowTimer();
     notifyListeners();

@@ -12,6 +12,7 @@ import '../../../events/presentation/viewmodels/event_hub_view_model.dart';
 import '../../data/models/attendance.dart';
 import '../viewmodels/attendance_view_model.dart';
 import '../viewmodels/my_attendance_view_model.dart';
+import 'attendance_correction_dialog.dart';
 
 String attendanceLabel(AttendanceRecord? record) =>
     record == null ? 'Not Marked' : displayIdentifier(record.status.name);
@@ -175,7 +176,7 @@ class AttendanceScreen extends StatelessWidget {
           ),
           if (!report)
             const Text(
-              'The first verification is final. Server time and current permissions determine whether marking is allowed.',
+              'Normal verification cannot replace an existing result. Managers use Correct Attendance separately. Server time and current permissions determine whether marking is allowed.',
             ),
           if (!report && model.manualUnavailableReason != null)
             Text(model.manualUnavailableReason!),
@@ -234,6 +235,7 @@ class AttendanceScreen extends StatelessWidget {
           ),
           if (model.busy) const LinearProgressIndicator(),
           if (model.failure != null) Text(model.failure!.message),
+          if (model.correctionMessage != null) Text(model.correctionMessage!),
           if (model.result != null)
             Text(
               model.result!.duplicate
@@ -260,6 +262,31 @@ class AttendanceScreen extends StatelessWidget {
                       'Registration: ${displayIdentifier(registration.status)} | Attendance: ${attendanceLabel(model.recordFor(registration.uid))}',
                     ),
                     Text(verificationLabel(model.recordFor(registration.uid))),
+                    if (!report && model.canCorrect(registration))
+                      TextButton(
+                        onPressed: model.busy
+                            ? null
+                            : () async {
+                                final preview = await model.previewCorrection(
+                                  registration,
+                                );
+                                if (!context.mounted ||
+                                    preview == null ||
+                                    !model.canCorrect(registration)) {
+                                  return;
+                                }
+                                await showDialog<void>(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (_) => AttendanceCorrectionDialog(
+                                    model: model,
+                                    registration: registration,
+                                    preview: preview,
+                                  ),
+                                );
+                              },
+                        child: const Text('Correct Attendance'),
+                      ),
                     if (!report && model.canMark(registration))
                       Wrap(
                         spacing: 8,
@@ -342,6 +369,9 @@ class MyAttendanceScreen extends StatelessWidget {
           ),
           if ((events.mine.value ?? []).isEmpty)
             const Text('You have no event registrations.'),
+          const Text(
+            'Not Marked means Pending: no active attendance result. Manager corrections update this view automatically.',
+          ),
           for (final reg in events.mine.value ?? [])
             Builder(
               builder: (context) {
