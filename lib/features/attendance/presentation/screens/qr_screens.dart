@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/community_components.dart';
+import '../../../../core/widgets/app_components.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import '../../../events/presentation/viewmodels/event_hub_view_model.dart';
@@ -67,8 +70,12 @@ class QRHubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text(
-            'Show your event pass to an authorized organizer, or scan participants when you have attendance permission.',
+          const CommunityHeader(
+            title: 'Your Event Pass',
+            description:
+                'Show your event pass to an authorized organizer, or scan participants when you have attendance permission.',
+            icon: Icons.qr_code_rounded,
+            emphasized: true,
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
@@ -76,6 +83,14 @@ class QRHubScreen extends StatelessWidget {
             icon: const Icon(Icons.qr_code),
             label: const Text('My QR Code'),
           ),
+          const SizedBox(height: AppSpacing.xl),
+          TextButton(
+            onPressed: () => context.go(AppRoutes.myAttendance),
+            child: const Text('My Attendance'),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const AppSectionHeading(title: 'Organizer Tools'),
+          const SizedBox(height: AppSpacing.sm),
           FilledButton.tonalIcon(
             onPressed: !attendancePermissionsReady(hub) || permissions.isEmpty
                 ? null
@@ -98,10 +113,6 @@ class QRHubScreen extends StatelessWidget {
               message: 'Unable to load attendance permissions.',
               onRetry: orgs.retry,
             ),
-          TextButton(
-            onPressed: () => context.go(AppRoutes.myAttendance),
-            child: const Text('My Attendance'),
-          ),
           if (permissions.isNotEmpty)
             TextButton(
               onPressed: () => context.go(AppRoutes.attendanceHub),
@@ -398,47 +409,54 @@ class _CameraScannerState extends State<_CameraScanner>
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Scan an OrgLink attendance pass from any organization you are authorized to verify. Visually confirm the participant before scanning.',
+          const AppSectionHeading(
+            title: 'Verify an Event Pass',
+            description:
+                'Scan an OrgLink attendance pass from any organization you are authorized to verify. Visually confirm the participant before scanning.',
           ),
+          const SizedBox(height: AppSpacing.lg),
           Offstage(
             offstage: model.paused,
-            child: SizedBox(
-              height: 300,
-              child: MobileScanner(
-                controller: camera,
-                useAppLifecycleState: false,
-                onDetect: (capture) {
-                  for (final barcode in capture.barcodes) {
-                    final raw = barcode.rawValue;
-                    if (raw != null && !model.paused) {
-                      final verification = model.scan(raw);
-                      _syncCamera();
-                      unawaited(verification);
-                      break;
+            child: ClipRRect(
+              borderRadius: AppShape.feature,
+              child: SizedBox(
+                height: 300,
+                child: MobileScanner(
+                  controller: camera,
+                  useAppLifecycleState: false,
+                  onDetect: (capture) {
+                    for (final barcode in capture.barcodes) {
+                      final raw = barcode.rawValue;
+                      if (raw != null && !model.paused) {
+                        final verification = model.scan(raw);
+                        _syncCamera();
+                        unawaited(verification);
+                        break;
+                      }
                     }
-                  }
-                },
-                errorBuilder: (context, error) => Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        error.errorCode ==
-                                MobileScannerErrorCode.permissionDenied
-                            ? 'Camera permission was denied. Enable camera access in Android settings.'
-                            : 'The camera is unavailable. Check camera access and retry.',
-                      ),
-                      TextButton(
-                        onPressed: _syncCamera,
-                        child: const Text('Retry Camera'),
-                      ),
-                    ],
+                  },
+                  errorBuilder: (context, error) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          error.errorCode ==
+                                  MobileScannerErrorCode.permissionDenied
+                              ? 'Camera permission was denied. Enable camera access in Android settings.'
+                              : 'The camera is unavailable. Check camera access and retry.',
+                        ),
+                        TextButton(
+                          onPressed: _syncCamera,
+                          child: const Text('Retry Camera'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+          const SizedBox(height: AppSpacing.lg),
           if (_cameraFailure != null)
             AppErrorView(message: _cameraFailure!, onRetry: _syncCamera),
           if (model.paused && !model.busy) ...[
@@ -470,6 +488,8 @@ class _CameraScannerState extends State<_CameraScanner>
             onPressed: () => context.go(AppRoutes.attendanceHub),
             child: const Text('Manual Lookup'),
           ),
+          const SizedBox(height: AppSpacing.lg),
+          const AppSectionHeading(title: 'More QR Actions'),
           Wrap(
             spacing: 8,
             children: [

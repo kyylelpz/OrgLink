@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
+import '../../../../core/widgets/community_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../auth/presentation/screens/auth_screens.dart';
 import '../../../auth/presentation/viewmodels/auth_view_model.dart';
@@ -59,7 +60,9 @@ class _DashboardState extends State<_Dashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppSectionHeading(
+            CommunityHeader(
+              emphasized: true,
+              icon: Icons.waving_hand_outlined,
               title: 'Welcome, $firstName!',
               description: 'Explore events and your organizations.',
             ),
@@ -71,26 +74,39 @@ class _DashboardState extends State<_Dashboard> {
               hintText: 'Search events or organizations',
             ),
             const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                _Shortcut(
-                  label: 'My Events',
-                  icon: Icons.event_note,
-                  route: AppRoutes.myEvents,
-                ),
-                _Shortcut(
-                  label: 'My Orgs',
-                  icon: Icons.groups_outlined,
-                  route: AppRoutes.myOrganizations,
-                ),
-                _Shortcut(
-                  label: 'Notifications',
-                  icon: Icons.notifications_outlined,
-                  route: AppRoutes.notifications,
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = MediaQuery.textScalerOf(context).scale(14) > 21
+                    ? 1
+                    : 3;
+                final width =
+                    (constraints.maxWidth - AppSpacing.md * (columns - 1)) /
+                    columns;
+                return Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
+                  children: [
+                    for (final action in const [
+                      _Shortcut(
+                        label: 'My Events',
+                        icon: Icons.event_note,
+                        route: AppRoutes.myEvents,
+                      ),
+                      _Shortcut(
+                        label: 'My Orgs',
+                        icon: Icons.groups_outlined,
+                        route: AppRoutes.myOrganizations,
+                      ),
+                      _Shortcut(
+                        label: 'Notifications',
+                        icon: Icons.notifications_outlined,
+                        route: AppRoutes.notifications,
+                      ),
+                    ])
+                      SizedBox(width: width, child: action),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.xl),
             if (model.failure != null)
@@ -212,9 +228,9 @@ class _Shortcut extends StatelessWidget {
   final String label, route;
   final IconData icon;
   @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
+  Widget build(BuildContext context) => CommunityQuickAction(
     onPressed: () => context.push(route),
-    icon: Icon(icon),
-    label: Text(label),
+    icon: icon,
+    label: label,
   );
 }

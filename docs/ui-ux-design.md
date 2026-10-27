@@ -346,3 +346,57 @@ confirmation, keyboard insets, TalkBack and large fonts. Widget/platform fakes
 verify routing and lifecycle calls; they do not certify native camera drivers or
 real-device resource timing. Calendar and Notifications remain intentionally
 unimplemented; no Module 5 UI/backend is claimed complete. No deployment occurred.
+
+
+## 11. Phase 2 Modern Visual Refinement
+
+The wireframes define functional hierarchy and navigation, not pixel-perfect
+visual targets. The modern direction uses generous spacing, quiet mist page
+surfaces, white rounded cards, midnight/navy introductions, blue actions, and
+Open Sans. Purple remains a restrained accent in the existing palette rather
+than a competing background. No new branding, statistics, stock photos, fonts,
+or dependencies were introduced.
+
+- Shared CommunityHeader and CommunityQuickAction keep introductions and the
+  three Home shortcuts consistent. Feature/action radii (24/20) are centralized
+  beside the original field/card tokens. Search surfaces are borderless at rest;
+  focus/error feedback still comes from the shared theme.
+- Home retains the real searchable catalog and two-event limit. A welcoming navy
+  gradient panel leads to search, prominent shortcuts, then upcoming events.
+  Shortcuts stack at enlarged text sizes. All existing activity links remain.
+- Shared event cards show the real poster when available (safe omission on image
+  failure), organization, title, icon-led schedule/venue, registration state,
+  available capacity and publication/approval labels. No event data is fabricated.
+  Existing details navigation, registration decisions and casing are preserved.
+- Organization discovery uses a community introduction, selected navy pill
+  filters, actual identity/description/visibility/status and existing membership
+  badges and Join/View routes. Description previews are limited to three lines;
+  full descriptions remain in organization details. No new membership query or
+  permission condition was added.
+- Calendar and Notifications have a centered, scrollable branded empty state
+  and a real Discover Events action. Neither destination simulates future work.
+- QR keeps automatic camera entry for authorized operators, with a rounded live
+  preview and a clearly labeled secondary actions section. Student landing puts
+  My QR Code and My Attendance before organizer tools. Existing disabled scan,
+  loading, permission failure/retry and verification states remain intact.
+- Bottom navigation retains all five exact labels and existing Back handling.
+  Rounded upper corners, subtle elevation and an emphasized central blue QR
+  action distinguish the navigation surface. Compact labels use the bundled
+  Open Sans width axis (75, verified in its fvar table), without replacing the
+  typeface or shortening destination names. Profile retains the established
+  shared form components, validation, save/cancel and sign-out.
+
+Validation: formatting, Flutter analysis and the full Flutter suite are required
+for this refinement. The focused design/navigation suite has 27 tests, including
+new dark-header contrast, enlarged text, touch target, label and action checks.
+Home, Organizations, Profile, Calendar and student QR previews are generated at
+320x720 and 430x932 in ignored build/ui-phase2/. These use synthetic test fixtures
+only. The enlarged-text core layout check also includes Calendar and student QR.
+The final full suite passes 114 tests; analysis reports no issues.
+
+Manual acceptance remains Android camera permission/lifecycle, native Back,
+keyboard insets and TalkBack on hardware. No Firebase configuration, Rules,
+Worker, IAM, schema, repository, ViewModel or authorization logic was changed.
+Nothing was deployed and no live records were accessed. Official standalone
+OrgLink logo exports are still missing; existing meaningful icons are not
+presented as a replacement logo.

@@ -5,6 +5,7 @@ import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
+import '../../../../core/widgets/community_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../viewmodels/organization_hub_view_model.dart';
 import '../widgets/organization_widgets.dart';
@@ -54,7 +55,8 @@ class _OrganizationDiscoveryScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AppSectionHeading(
+            const CommunityHeader(
+              icon: Icons.diversity_3_outlined,
               title: 'Find Your Community',
               description:
                   'Explore organizations and keep track of your memberships.',
@@ -75,6 +77,18 @@ class _OrganizationDiscoveryScreenState
                   FilterChip(
                     label: Text(displayIdentifier(filter.name)),
                     selected: model.browseFilter == filter,
+                    showCheckmark: false,
+                    backgroundColor: Colors.white,
+                    selectedColor: AppColors.brandNavy,
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppShape.feature,
+                    ),
+                    labelStyle: TextStyle(
+                      color: model.browseFilter == filter
+                          ? Colors.white
+                          : AppColors.brandNavy,
+                    ),
                     onSelected: (_) => model.browse(filter),
                   ),
               ],
@@ -112,7 +126,14 @@ class _OrganizationDiscoveryScreenState
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          OrganizationLogo(org.logoURL),
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              color: AppColors.brandMist,
+                              borderRadius: AppShape.action,
+                            ),
+                            child: OrganizationLogo(org.logoURL),
+                          ),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Text(
@@ -127,7 +148,11 @@ class _OrganizationDiscoveryScreenState
                         org.description.isEmpty
                             ? 'No description available.'
                             : org.description,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
                         '${displayIdentifier(org.visibility)} | ${displayIdentifier(org.status)}',
                       ),
@@ -147,10 +172,11 @@ class _OrganizationDiscoveryScreenState
                               : AppStatusTone.neutral,
                         ),
                       const SizedBox(height: AppSpacing.sm),
-                      OutlinedButton(
+                      FilledButton.tonalIcon(
+                        icon: const Icon(Icons.arrow_forward, size: 18),
                         onPressed: () =>
                             context.push(AppRoutes.organization(org.id)),
-                        child: Text(
+                        label: Text(
                           model.membership(org.id) == null &&
                                   org.managerUid != model.uid &&
                                   org.status == 'active' &&

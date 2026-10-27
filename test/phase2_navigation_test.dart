@@ -390,6 +390,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Search Results'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsOneWidget);
+      await tester.ensureVisible(find.text('Demo Robotics'));
       await tester.tap(find.text('Demo Robotics'));
       await tester.pumpAndSettle();
       expect(
@@ -482,6 +483,8 @@ void main() {
     for (final path in [
       AppRoutes.home,
       AppRoutes.organizations,
+      AppRoutes.calendar,
+      AppRoutes.qr,
       AppRoutes.completeProfile,
     ]) {
       app.router.go(path);
@@ -639,6 +642,8 @@ void main() {
         ('home', AppRoutes.home),
         ('organizations', AppRoutes.organizations),
         ('profile', AppRoutes.completeProfile),
+        ('calendar', AppRoutes.calendar),
+        ('qr', AppRoutes.qr),
       ]) {
         app.router.go(path);
         await tester.pumpAndSettle();

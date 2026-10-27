@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orglink/core/theme/app_theme.dart';
 import 'package:orglink/core/theme/app_tokens.dart';
 import 'package:orglink/core/widgets/app_components.dart';
+import 'package:orglink/core/widgets/community_components.dart';
 import 'package:orglink/core/widgets/app_feedback.dart';
 
 double contrast(Color a, Color b) {
@@ -34,6 +35,56 @@ void main() {
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
     await icons.load();
   });
+
+  testWidgets(
+    'community surfaces support large text, accessible actions and dark header contrast',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
+      var taps = 0;
+      await tester.pumpWidget(
+        app(
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                const CommunityHeader(
+                  title: 'Welcome, Student!',
+                  description: 'Explore events and your organizations.',
+                  emphasized: true,
+                ),
+                CommunityQuickAction(
+                  label: 'My Events',
+                  icon: Icons.event_note,
+                  onPressed: () => taps++,
+                ),
+              ],
+            ),
+          ),
+          scale: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('My Events'));
+      await tester.tap(find.text('My Events'));
+      expect(taps, 1);
+      expect(
+        contrast(AppColors.white, AppColors.brandNavy),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(AppColors.white, AppColors.brandMidnight),
+        greaterThanOrEqualTo(4.5),
+      );
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      semantics.dispose();
+    },
+  );
 
   test('brand palette, Material 3 role contrast and typography', () {
     expect(

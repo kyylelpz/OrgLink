@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/app_routes.dart';
+import '../theme/app_tokens.dart';
 import 'app_back_button.dart';
 
 class AuthenticatedShell extends StatefulWidget {
@@ -118,42 +119,74 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
           back: _back,
           child: Scaffold(
             body: widget.child,
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: index,
-              onDestinationSelected: (index) {
-                context.go(roots[index]);
-              },
-              destinations: [
-                const NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home',
+            bottomNavigationBar: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppShape.featureRadius),
                 ),
-                const NavigationDestination(
-                  icon: Icon(Icons.calendar_month_outlined),
-                  label: 'Calendar',
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 24,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppShape.featureRadius),
                 ),
-                NavigationDestination(
-                  icon: CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: Icon(
-                      Icons.qr_code_scanner,
-                      color: Theme.of(context).colorScheme.onPrimary,
+                child: NavigationBar(
+                  labelPadding: const EdgeInsets.symmetric(vertical: 2),
+                  labelTextStyle: WidgetStatePropertyAll(
+                    Theme.of(context).textTheme.labelMedium?.copyWith(
+                      letterSpacing: 0,
+                      // The bundled font supports wdth 75-100; retain full labels on compact phones.
+                      fontVariations: MediaQuery.sizeOf(context).width < 380
+                          ? const [FontVariation('wdth', 75)]
+                          : null,
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
                   ),
-                  label: 'QR',
+                  selectedIndex: index,
+                  onDestinationSelected: (index) {
+                    context.go(roots[index]);
+                  },
+                  destinations: [
+                    const NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: 'Home',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(Icons.calendar_month_outlined),
+                      label: 'Calendar',
+                    ),
+                    NavigationDestination(
+                      icon: CircleAvatar(
+                        radius: 23,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        child: Icon(
+                          Icons.qr_code_scanner,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+                      label: 'QR',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(Icons.groups_outlined),
+                      selectedIcon: Icon(Icons.groups),
+                      label: 'Organizations',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(Icons.person_outline),
+                      selectedIcon: Icon(Icons.person),
+                      label: 'Profile',
+                    ),
+                  ],
                 ),
-                const NavigationDestination(
-                  icon: Icon(Icons.groups_outlined),
-                  selectedIcon: Icon(Icons.groups),
-                  label: 'Organizations',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Profile',
-                ),
-              ],
+              ),
             ),
           ),
         ),

@@ -253,6 +253,14 @@ class AppSearchField extends StatelessWidget {
           decoration: InputDecoration(
             labelText: label,
             hintText: hintText,
+            enabledBorder: const OutlineInputBorder(
+              borderRadius: AppShape.action,
+              borderSide: BorderSide.none,
+            ),
+            disabledBorder: const OutlineInputBorder(
+              borderRadius: AppShape.action,
+              borderSide: BorderSide.none,
+            ),
             prefixIcon: const Icon(Icons.search),
             suffixIcon: value.text.isEmpty
                 ? null

@@ -30,6 +30,10 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppShape {
+  static const featureRadius = 24.0;
+  static const actionRadius = 20.0;
+  static const feature = BorderRadius.all(Radius.circular(featureRadius));
+  static const action = BorderRadius.all(Radius.circular(actionRadius));
   static const fieldRadius = 12.0;
   static const cardRadius = 16.0;
   static const field = BorderRadius.all(Radius.circular(fieldRadius));
