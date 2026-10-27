@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../attendance/data/models/attendance.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -41,10 +42,7 @@ class EventDetailsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Event Details'),
-        leading: IconButton(
-          onPressed: () => context.go(AppRoutes.events),
-          icon: const Icon(Icons.arrow_back),
-        ),
+        leading: const AppBackButton(),
       ),
       body: EventAccessView(
         requireEvent: true,
@@ -246,12 +244,7 @@ class RegistrationConfirmationScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Registration Confirmation'),
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () =>
-              context.go(AppRoutes.event(model.organizationId, model.eventId!)),
-        ),
+        leading: const AppBackButton(),
       ),
       body: EventAccessView(
         requireEvent: true,

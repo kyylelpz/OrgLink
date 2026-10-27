@@ -82,10 +82,18 @@ class SignInScreen extends StatelessWidget {
 }
 
 class SignOutButton extends StatelessWidget {
-  const SignOutButton({super.key});
+  const SignOutButton({super.key, this.compact = false});
+  final bool compact;
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthViewModel>();
+    if (compact) {
+      return IconButton(
+        tooltip: auth.isSigningOut ? 'Signing Out...' : 'Sign Out',
+        onPressed: auth.isBusy ? null : auth.signOut,
+        icon: const Icon(Icons.logout_outlined),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.all(8),
       child: OutlinedButton(

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/utils/display_labels.dart';
 import '../../data/models/event_registration.dart';
 import 'package:flutter/material.dart';
@@ -22,10 +23,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Events'),
-        leading: IconButton(
-          onPressed: () => context.go(AppRoutes.home),
-          icon: const Icon(Icons.home),
-        ),
+        leading: const AppBackButton(),
       ),
       bottomNavigationBar: const EventNavigation(1),
       body: Column(

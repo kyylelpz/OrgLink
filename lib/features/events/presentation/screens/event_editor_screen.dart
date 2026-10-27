@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -15,15 +16,7 @@ class EventEditorScreen extends StatelessWidget {
     final model = context.watch<EventContextViewModel>();
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(
-            model.eventId == null
-                ? AppRoutes.manageEvents(model.organizationId)
-                : AppRoutes.event(model.organizationId, model.eventId!),
-          ),
-        ),
+        leading: const AppBackButton(),
         title: Text(model.eventId == null ? 'Create Event' : 'Edit Event'),
       ),
       body: EventAccessView(

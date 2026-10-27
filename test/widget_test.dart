@@ -1,3 +1,7 @@
+import 'package:orglink/features/events/data/repositories/event_repository.dart';
+import 'support/test_event_repository.dart';
+import 'package:orglink/features/organizations/data/repositories/organization_repository.dart';
+import 'support/test_organization_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +18,8 @@ void main() {
     (tester) async {
       final repository = TestAuthRepository();
       final profiles = TestProfileRepository();
+      final organizations = TestOrganizationRepository(),
+          events = TestEventRepository();
       final auth = AuthViewModel(repository, profiles);
       final router = createAppRouter(auth);
       await tester.pumpWidget(
@@ -21,6 +27,8 @@ void main() {
           providers: [
             ChangeNotifierProvider.value(value: auth),
             Provider<GoRouter>.value(value: router),
+            Provider<EventRepository>.value(value: events),
+            Provider<OrganizationRepository>.value(value: organizations),
           ],
           child: const OrgLinkApp(),
         ),
@@ -61,6 +69,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Home Dashboard'), findsOneWidget);
       expect(profiles.saveCalls, 1);
+      await tester.ensureVisible(
+        find.widgetWithText(TextButton, 'Edit Student Profile'),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Edit Student Profile'));
       await tester.pumpAndSettle();
       expect(
@@ -86,6 +98,8 @@ void main() {
       auth.dispose();
       await repository.controller.close();
       await profiles.controller.close();
+      await organizations.close();
+      await events.close();
     },
   );
 }

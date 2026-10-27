@@ -1,3 +1,6 @@
+import '../../../../core/widgets/app_back_button.dart';
+import '../../../../core/widgets/app_components.dart';
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -77,115 +80,110 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Student Profile'),
-        actions: const [SignOutButton()],
+        leading: auth.profile?.isEligible == true
+            ? const AppBackButton()
+            : null,
+        actions: const [SignOutButton(compact: true)],
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _form,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (photo != null)
-                      Center(
-                        child: ClipOval(
-                          child: Image.network(
-                            photo,
-                            width: 72,
-                            height: 72,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
-                                const Icon(Icons.account_circle, size: 72),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      initialValue: auth.user?.email ?? '',
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Google Email',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _name,
-                      enabled: !busy,
-                      maxLength: 100,
-                      textCapitalization: TextCapitalization.words,
-                      validator: StudentDetails.validateName,
-                      decoration: const InputDecoration(labelText: 'Full Name'),
-                    ),
-                    CapitalizationSuggestion(controller: _name, enabled: !busy),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _number,
-                      enabled: !busy,
-                      maxLength: 30,
-                      validator: StudentDetails.validateStudentNumber,
-                      decoration: const InputDecoration(
-                        labelText: 'Student Number',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<int>(
-                      initialValue: _year,
-                      decoration: const InputDecoration(
-                        labelText: 'Year Level',
-                      ),
-                      items: [
-                        for (var year = 1; year <= 6; year++)
-                          DropdownMenuItem(
-                            value: year,
-                            child: Text('Year $year'),
-                          ),
-                      ],
-                      onChanged: busy
-                          ? null
-                          : (value) => setState(() => _year = value),
-                      validator: (value) =>
-                          value == null ? 'Select a year level.' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _section,
-                      enabled: !busy,
-                      maxLength: 30,
-                      validator: StudentDetails.validateSection,
-                      decoration: const InputDecoration(labelText: 'Section'),
-                    ),
-                    const SizedBox(height: 16),
-                    if (auth.failure != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(
-                          auth.failure!.message,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    if (busy) const Center(child: CircularProgressIndicator()),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: busy ? null : _save,
-                      child: const Text('Save Student Profile'),
-                    ),
-                    if (auth.profileStatus == ProfileStatus.ready)
-                      TextButton(
-                        onPressed: busy
-                            ? null
-                            : () => context.go(AppRoutes.home),
-                        child: const Text('Cancel'),
-                      ),
-                  ],
+      body: AppPageBody(
+        maxWidth: AppLayout.formWidth,
+        child: AppSurfaceCard(
+          child: Form(
+            key: _form,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const AppSectionHeading(
+                  title: 'Your Student Profile',
+                  description:
+                      'Update your student information. Your Google email remains read-only.',
                 ),
-              ),
+                const SizedBox(height: AppSpacing.lg),
+                if (photo != null)
+                  Center(
+                    child: ClipOval(
+                      child: Image.network(
+                        photo,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.account_circle, size: 72),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  initialValue: auth.user?.email ?? '',
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Google Email'),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _name,
+                  enabled: !busy,
+                  maxLength: 100,
+                  textCapitalization: TextCapitalization.words,
+                  validator: StudentDetails.validateName,
+                  decoration: const InputDecoration(labelText: 'Full Name'),
+                ),
+                CapitalizationSuggestion(controller: _name, enabled: !busy),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _number,
+                  enabled: !busy,
+                  maxLength: 30,
+                  validator: StudentDetails.validateStudentNumber,
+                  decoration: const InputDecoration(
+                    labelText: 'Student Number',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  initialValue: _year,
+                  decoration: const InputDecoration(labelText: 'Year Level'),
+                  items: [
+                    for (var year = 1; year <= 6; year++)
+                      DropdownMenuItem(value: year, child: Text('Year $year')),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (value) => setState(() => _year = value),
+                  validator: (value) =>
+                      value == null ? 'Select a year level.' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _section,
+                  enabled: !busy,
+                  maxLength: 30,
+                  validator: StudentDetails.validateSection,
+                  decoration: const InputDecoration(labelText: 'Section'),
+                ),
+                const SizedBox(height: 16),
+                if (auth.failure != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      auth.failure!.message,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                if (busy) const Center(child: CircularProgressIndicator()),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: busy ? null : _save,
+                  child: const Text('Save Student Profile'),
+                ),
+                if (auth.profileStatus == ProfileStatus.ready)
+                  TextButton(
+                    onPressed: busy ? null : () => context.go(AppRoutes.home),
+                    child: const Text('Cancel'),
+                  ),
+              ],
             ),
           ),
         ),

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -28,10 +29,7 @@ class OrganizationDetailsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Organization Details'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(AppRoutes.organizations),
-        ),
+        leading: const AppBackButton(),
       ),
       body: QueryContent(
         query: model.organization,

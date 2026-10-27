@@ -1,8 +1,7 @@
+import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/display_labels.dart';
-import '../../../../core/constants/app_routes.dart';
 import '../../../organizations/presentation/viewmodels/organization_details_view_model.dart';
 import '../../../organizations/presentation/widgets/organization_widgets.dart';
 import '../viewmodels/member_list_view_model.dart';
@@ -19,10 +18,7 @@ class MemberListScreen extends StatelessWidget {
         title: Text(
           pending ? 'Membership Request Management' : 'Member Roster',
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(AppRoutes.organization(details.id)),
-        ),
+        leading: const AppBackButton(),
       ),
       body: QueryContent(
         query: details.organization,

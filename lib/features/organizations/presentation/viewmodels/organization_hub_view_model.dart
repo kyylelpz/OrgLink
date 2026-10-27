@@ -4,6 +4,8 @@ import '../../data/models/organization.dart';
 import '../../data/repositories/organization_repository.dart';
 import '../../../memberships/data/models/membership.dart';
 
+enum OrganizationBrowseFilter { all, joined, discover }
+
 class OrganizationHubViewModel extends ChangeNotifier {
   OrganizationHubViewModel(this.repository, this.uid) {
     discovery = LiveQuery(repository.discover);
@@ -19,6 +21,32 @@ class OrganizationHubViewModel extends ChangeNotifier {
   late final LiveQuery<List<Membership>> mine;
   final Map<String, LiveQuery<Organization?>> associated = {};
   String search = '';
+  OrganizationBrowseFilter browseFilter = OrganizationBrowseFilter.all;
+  List<Organization> get browseResults {
+    final orgs = {
+      for (final org in discovery.value ?? <Organization>[]) org.id: org,
+      for (final query in associated.values)
+        if (query.value != null) query.value!.id: query.value!,
+      for (final org in managed.value ?? <Organization>[]) org.id: org,
+    };
+    return orgs.values.where((org) {
+      final joined =
+          membership(org.id)?.status == 'active' || org.managerUid == uid;
+      return org.name.toLowerCase().contains(search.toLowerCase().trim()) &&
+          switch (browseFilter) {
+            OrganizationBrowseFilter.all => true,
+            OrganizationBrowseFilter.joined => joined,
+            OrganizationBrowseFilter.discover =>
+              !joined && org.visibility == 'public' && org.status == 'active',
+          };
+    }).toList()..sort((a, b) => a.name.compareTo(b.name));
+  }
+
+  void browse(OrganizationBrowseFilter value) {
+    browseFilter = value;
+    notifyListeners();
+  }
+
   List<Organization> get results =>
       (discovery.value ?? [])
           .where(
@@ -62,6 +90,9 @@ class OrganizationHubViewModel extends ChangeNotifier {
     discovery.retry();
     mine.retry();
     managed.retry();
+    for (final query in associated.values) {
+      query.retry();
+    }
     notifyListeners();
   }
 

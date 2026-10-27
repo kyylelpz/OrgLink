@@ -57,7 +57,19 @@ Page 2 depicts editorial whitespace, geometric blocks, strong navy/blue/purple c
 
 ## 4. Navigation and information architecture
 
-**Preserve the currently implemented authenticated shell:** `Home | Organizations | QR | Events | Profile`, with emphasized central QR Hub. The original general PDF mentions `Home | Organizations | Events | Badges | Profile`; the existing Module 4 QR navigation is a deliberate functional evolution. Do not replace QR with Badges without an explicit product decision. Make Badge Collection discoverable from Home, Profile, or another clearly labeled entry point; manager Badge Management should be a role-scoped management action.
+**Current Phase 2 authenticated shell:** `Home | Calendar | QR | Organizations | Profile`.
+This explicit updated user requirement supersedes both the older Phase 1 navigation
+and the earlier general PDF/wireframe tab arrangements. QR stays centered and
+emphasized. Events is no longer a bottom tab; all existing event URLs, My Events,
+discovery, registration, detail and management flows remain available through
+Home and existing organization/event links. Calendar is Coming Soon, not a fake
+calendar. Notifications has a clearly labeled Coming Soon destination.
+
+QR opens the existing scanner immediately only after organization-scoped scan
+permission has loaded and is allowed. Other students receive the usable QR Hub
+with My QR Code/My Attendance and no camera request. Scanner secondary actions
+retain My QR Code, My Attendance, Manual Lookup and QR Hub Actions. Future badges
+must not displace QR or imply real awarding until separately implemented.
 
 Keep `go_router` guards and direct-link authorization. Preserve all current attendance routes and QR scanner behavior. Provide back navigation and organization context consistently.
 
@@ -113,7 +125,7 @@ Keep `go_router` guards and direct-link authorization. Preserve all current atte
 
 The existing app already had a central Material 3 ThemeData, Provider/go_router,
 shared loading/error panels, organization/event cards and the authenticated
-Home | Organizations | QR | Events | Profile shell. Module 4 navigation, scanner,
+former Home | Organizations | QR | Events | Profile shell (superseded by Phase 2). Module 4 navigation, scanner,
 window refresh, ordinary marking and correction controls were functional. The old
 theme used an unrelated #315DA8 seed, no registered font, mostly default component
 styles, and local spacing values. Status text existed but there was no shared
@@ -222,3 +234,115 @@ Changed files: app_theme.dart, new app_tokens.dart, new app_components.dart,
 app_feedback.dart, pubspec.yaml, new Open Sans font/license/provenance assets,
 new test/design_system_test.dart, and this implementation record. Source PDFs
 were inspected without modification.
+
+
+## 10. Phase 2 completion record - 27 October 2026
+
+### Scope and reference interpretation
+
+The supplied Phase 2 user request overrides the older tab layout. The new
+`docs/wireframes-orglink.png` was visually inspected for the Home greeting/search,
+three shortcuts, two upcoming event cards, organization search/filter/cards and
+profile form hierarchy. Existing PDFs retain functional and visual authority;
+Phase 1 tokens/Open Sans remain the implementation foundation. No wireframe logo,
+fictional sample event, member count, category, notification badge or statistic
+was copied into working screens. No original OrgLink logo export was available.
+
+### Completed screens and navigation
+
+- **Shell:** exactly Home, Calendar, QR, Organizations, Profile. Repeated tab taps
+  use go_router.go to select a root without stacking duplicate pages. Existing
+  URLs are unchanged; new routes are /calendar, /notifications and /qr/actions.
+  Authentication/profile/account redirects guard all new routes. Account changes
+  key the shell's presentation history to the Firebase user ID.
+- **Home:** Welcome, [first name]! and the requested subtitle; local search over
+  the existing authorized event/organization catalog; My Events, My Orgs and
+  Notifications shortcuts; Upcoming Events plus See All; at most two future,
+  approved/published, unarchived events with publication metadata, sorted by
+  startAt (stable organization/event ID tie-break). Event cards retain existing
+  details/registration entry. Search results navigate to real existing details.
+  Loading, empty and failure/retry states are explicit; route guards prevent
+  ineligible access. All former Home actions remain in Your Activity, including
+  membership requests, profile editing, sign-out and attendance management/history.
+- **Calendar/Notifications:** branded Coming Soon states with Back navigation.
+  No calendar dates, event feed, notification feed or fake statistics are generated.
+- **Organizations:** Search, All/Joined/Discover filters, actual name/logo or
+  existing group-icon placeholder, description/visibility/account-independent
+  organization status and membership status. Joined includes active memberships
+  and assigned managers; Discover includes active public organizations that are
+  not already joined/managed. Pending/rejected/removed memberships are not Joined.
+  Cards and Join/View buttons navigate to existing organization details; Join
+  does not bypass the existing request flow. My Organizations, Membership Requests
+  and scoped detail/manager/officer controls remain available. Existing discovery,
+  association and manager streams are reused without widening Firestore queries.
+- **Profile:** the existing form uses AppPageBody, AppSurfaceCard and section
+  hierarchy. Google email remains read-only; field validation, opt-in casing,
+  account guards, save/cancel and error/loading behavior are unchanged. The
+  AppBar sign-out action uses an accessible labeled icon to leave room for the
+  title on compact phones. No settings or security features are simulated.
+- **QR:** authorized tab entry mounts the existing camera; ordinary students or
+  unresolved permissions keep the QR Hub and personal actions. Scan permission
+  is not inferred from platform role or manageEvents. Camera operations are
+  serialized across scanner instances; route cover/pop, background/resume,
+  paused scan results and rapid tab re-entry recheck whether the camera should
+  run. A delayed permission/native startup is stopped if its route is no longer
+  active; disposal waits for pending startup/stop operations. The plugin's real
+  denial/error messages and Retry Camera action remain available.
+- **Back:** shared AppBackButton uses actual navigator pop when possible, then
+  bounded current-account presentation history or a valid parent URL for direct
+  links. Non-Home root tabs return Home. Root Home asks Exit OrgLink? with Stay
+  and Exit; SystemNavigator.pop is called only after Exit. Root PopScope keeps
+  Android Back under app handling, while BackButtonListener serves Router Back
+  dispatch. Dialogs and pushed pages pop before fallback navigation. Declarative
+  sign-out/account redirects still remove protected pages and pending dialogs.
+
+Home uses a new presentation-only HomeViewModel over the existing EventHub model.
+Provider scopes are reused so no second repository/service implementation or
+parallel authentication listener is introduced. Organization filtering remains
+presentation-only. No Firebase initialization, Rules, Worker, IAM, Firestore
+schema, registration/capacity logic, attendance/correction authorization or
+repository/service contracts were changed. No new dependency or font was added.
+Module 5 and badge awarding remain outside this phase.
+
+### Validation and previews
+
+- `test/phase2_navigation_test.dart`: 15 focused tests cover all five tabs, Home
+  sorting/limit/search, organization classification and filter chips, student QR
+  access without camera startup, officer scanner entry, revocation, denial/error
+  retry, route cover/resume, delayed startup and rapid re-entry, duplicate-root
+  avoidance, parent/previous Back, explicit exit and sign-out during confirmation.
+- Compact 320x720 and large 430x932 widget previews use the actual bundled Open
+  Sans and Material Icons. Core layouts also run at 2x Android text scaling;
+  profile save remains reachable by scrolling. Generated previews are in ignored
+  `build/ui-phase2/` (Home, Organizations and Profile at both widths). Synthetic
+  events/camera views exist only in test fixtures, not production source.
+- Existing auth, membership, event registration, QR, ordinary marking, correction
+  and router regression tests are retained. Harnesses now supply the same event
+  repository required by the data-backed Home. Exact greeting/root labels were
+  updated; off-screen controls are scrolled into view before tapping.
+- Final validation: all **113 Flutter tests passed**, including the **15 new
+  Phase 2 tests**; `flutter analyze` reported **no issues**. Dart formatting and
+  diff whitespace checks passed. No deployment or live Firebase data access
+  occurred. Source diffs confirm Firebase Rules/configuration, Worker code,
+  Firestore models, repository/service contracts and attendance ViewModels were
+  unchanged.
+
+Changed files: router.dart, app_routes.dart, authenticated_shell.dart, new
+app_back_button.dart, AppSurfaceCard's optional navigation callback, new Home
+ViewModel and ComingSoonScreen, Home/Organizations/Profile presentation, QR
+landing/camera presentation and new scanner_route_observer.dart. Existing event,
+organization, membership and attendance AppBars now use the shared Back button.
+SignOutButton gained an optional compact rendering; its operation is unchanged.
+Tests: new phase2_navigation_test.dart and updates to widget_test.dart,
+text_formatting_test.dart, organization_workflow_test.dart and router_test.dart.
+Documentation: this record and Module 4's navigation paragraph/route table only.
+
+### Remaining manual checks
+
+Verify on Android hardware: permission grant/deny and settings recovery, rapid QR
+entry/exit while permission UI is open, camera background/resume, two-device QR
+verification with the existing deployed backend, native Back/predictive-back
+confirmation, keyboard insets, TalkBack and large fonts. Widget/platform fakes
+verify routing and lifecycle calls; they do not certify native camera drivers or
+real-device resource timing. Calendar and Notifications remain intentionally
+unimplemented; no Module 5 UI/backend is claimed complete. No deployment occurred.

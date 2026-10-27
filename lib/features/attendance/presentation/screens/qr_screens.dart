@@ -6,6 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/widgets/app_feedback.dart';
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../events/presentation/viewmodels/event_hub_view_model.dart';
 import '../../../events/presentation/widgets/event_widgets.dart';
 import '../../data/models/attendance.dart';
@@ -13,6 +14,12 @@ import '../../data/repositories/attendance_repository.dart';
 import '../viewmodels/my_attendance_view_model.dart';
 import '../viewmodels/scanner_view_model.dart';
 import 'attendance_screens.dart';
+import '../scanner_route_observer.dart';
+
+// The plugin owns one native camera session. Serialize operations across route
+// instances as well as within one scanner (including rapid tab re-entry).
+Future<void> _cameraOperations = Future<void>.value();
+MobileScannerPlatform? _cameraPlatform;
 
 Set<String> attendanceOrganizations(EventHubViewModel hub) => {
   for (final org in hub.availableOrganizations.values)
@@ -24,6 +31,27 @@ Set<String> attendanceOrganizations(EventHubViewModel hub) => {
       org.id,
 };
 
+bool attendancePermissionsReady(EventHubViewModel hub) {
+  final orgs = hub.organizations;
+  return !orgs.mine.loading &&
+      !orgs.managed.loading &&
+      orgs.mine.failure == null &&
+      orgs.managed.failure == null &&
+      orgs.associated.values.every((q) => !q.loading && q.failure == null);
+}
+
+class QRLandingScreen extends StatelessWidget {
+  const QRLandingScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final hub = context.watch<EventHubViewModel>();
+    return !attendancePermissionsReady(hub) ||
+            attendanceOrganizations(hub).isEmpty
+        ? const QRHubScreen()
+        : const ScannerScreen();
+  }
+}
+
 class QRHubScreen extends StatelessWidget {
   const QRHubScreen({super.key});
   @override
@@ -32,7 +60,10 @@ class QRHubScreen extends StatelessWidget {
     final permissions = attendanceOrganizations(hub);
     final orgs = hub.organizations;
     return Scaffold(
-      appBar: AppBar(title: const Text('QR Hub')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('QR Hub'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -46,7 +77,7 @@ class QRHubScreen extends StatelessWidget {
             label: const Text('My QR Code'),
           ),
           FilledButton.tonalIcon(
-            onPressed: permissions.isEmpty
+            onPressed: !attendancePermissionsReady(hub) || permissions.isEmpty
                 ? null
                 : () => context.go(AppRoutes.qrScan),
             icon: const Icon(Icons.qr_code_scanner),
@@ -56,9 +87,13 @@ class QRHubScreen extends StatelessWidget {
             const Text(
               'Scanning requires organization manager access or an active officer assignment with attendance permission.',
             ),
-          if (orgs.mine.loading || orgs.managed.loading)
+          if (orgs.mine.loading ||
+              orgs.managed.loading ||
+              orgs.associated.values.any((q) => q.loading))
             const LinearProgressIndicator(),
-          if (orgs.mine.failure != null || orgs.managed.failure != null)
+          if (orgs.mine.failure != null ||
+              orgs.managed.failure != null ||
+              orgs.associated.values.any((q) => q.failure != null))
             AppErrorView(
               message: 'Unable to load attendance permissions.',
               onRetry: orgs.retry,
@@ -91,6 +126,7 @@ class MyQRCodeScreen extends StatelessWidget {
     final record = model.records[selected];
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: const Text('My QR Code'),
         actions: [
           IconButton(
@@ -210,9 +246,13 @@ class ScannerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hub = context.watch<EventHubViewModel>();
-    if (attendanceOrganizations(hub).isEmpty) {
+    if (!attendancePermissionsReady(hub) ||
+        attendanceOrganizations(hub).isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Scan QR Code')),
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: const Text('Scan QR Code'),
+        ),
         body: Center(
           child:
               hub.organizations.mine.loading ||
@@ -242,29 +282,108 @@ class _CameraScanner extends StatefulWidget {
 }
 
 class _CameraScannerState extends State<_CameraScanner>
-    with WidgetsBindingObserver {
-  final camera = MobileScannerController(formats: [BarcodeFormat.qrCode]);
+    with WidgetsBindingObserver, RouteAware {
+  final camera = MobileScannerController(
+    autoStart: false,
+    formats: [BarcodeFormat.qrCode],
+  );
+  bool _disposing = false;
+  String? _cameraFailure;
+  ModalRoute<dynamic>? _route;
+  bool _covered = false;
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
+  bool get _shouldRun =>
+      !_disposing &&
+      !_covered &&
+      _route?.isCurrent == true &&
+      _lifecycle == AppLifecycleState.resumed &&
+      !context.read<ScannerViewModel>().paused;
+  void _syncCamera() {
+    // A permission/native start may outlive a route transition. Serialize camera
+    // work and recheck visibility after startup before allowing it to stay active.
+    _cameraOperations = _cameraOperations
+        .then((_) async {
+          if (_disposing) return;
+          if (_cameraFailure != null && mounted) {
+            setState(() => _cameraFailure = null);
+          }
+          if (_shouldRun) {
+            if (!camera.value.isRunning) await camera.start();
+          } else {
+            await camera.stop();
+          }
+          if (!_shouldRun) await camera.stop();
+        })
+        .catchError((Object error) {
+          if (mounted && !_disposing) {
+            setState(
+              () => _cameraFailure =
+                  'Camera access could not be updated. Retry camera access.',
+            );
+          }
+        });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _route) {
+      scannerRouteObserver.unsubscribe(this);
+      _route = route;
+      if (route != null) scannerRouteObserver.subscribe(this, route);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_disposing) _syncCamera();
+      });
+    }
+  }
+
+  @override
+  void didPushNext() {
+    _covered = true;
+    _syncCamera();
+  }
+
+  @override
+  void didPopNext() {
+    _covered = false;
+    _syncCamera();
+  }
+
+  @override
+  void didPop() {
+    _covered = true;
+    _syncCamera();
+  }
+
   @override
   void initState() {
     super.initState();
+    // Each platform implementation owns its own native session/operation queue.
+    if (!identical(_cameraPlatform, MobileScannerPlatform.instance)) {
+      _cameraPlatform = MobileScannerPlatform.instance;
+      _cameraOperations = Future<void>.value();
+    }
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!mounted || !camera.value.hasCameraPermission) return;
-    if (state == AppLifecycleState.resumed &&
-        !context.read<ScannerViewModel>().paused) {
-      unawaited(camera.start());
-    } else if (state != AppLifecycleState.resumed) {
-      unawaited(camera.stop());
-    }
+    _lifecycle = state;
+    if (mounted) _syncCamera();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(camera.dispose());
+    scannerRouteObserver.unsubscribe(this);
+    _disposing = true;
+    _cameraOperations = _cameraOperations.then((_) => camera.dispose()).catchError((
+      Object _,
+    ) {
+      // A failed native cleanup must not block the next session's recovery attempt.
+    });
+    unawaited(_cameraOperations);
     super.dispose();
   }
 
@@ -272,7 +391,10 @@ class _CameraScannerState extends State<_CameraScanner>
   Widget build(BuildContext context) {
     final model = context.watch<ScannerViewModel>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan QR Code')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Scan QR Code'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -291,7 +413,7 @@ class _CameraScannerState extends State<_CameraScanner>
                     final raw = barcode.rawValue;
                     if (raw != null && !model.paused) {
                       final verification = model.scan(raw);
-                      unawaited(camera.stop());
+                      _syncCamera();
                       unawaited(verification);
                       break;
                     }
@@ -308,10 +430,7 @@ class _CameraScannerState extends State<_CameraScanner>
                             : 'The camera is unavailable. Check camera access and retry.',
                       ),
                       TextButton(
-                        onPressed: () async {
-                          await camera.stop();
-                          if (mounted) await camera.start();
-                        },
+                        onPressed: _syncCamera,
                         child: const Text('Retry Camera'),
                       ),
                     ],
@@ -320,6 +439,8 @@ class _CameraScannerState extends State<_CameraScanner>
               ),
             ),
           ),
+          if (_cameraFailure != null)
+            AppErrorView(message: _cameraFailure!, onRetry: _syncCamera),
           if (model.paused && !model.busy) ...[
             if (model.result != null) ...[
               Text(
@@ -336,9 +457,9 @@ class _CameraScannerState extends State<_CameraScanner>
             ],
             if (model.failure != null) Text(model.failure!.message),
             FilledButton(
-              onPressed: () async {
+              onPressed: () {
                 model.next();
-                await camera.start();
+                _syncCamera();
               },
               child: const Text('Scan Next Participant'),
             ),
@@ -348,6 +469,23 @@ class _CameraScannerState extends State<_CameraScanner>
           TextButton(
             onPressed: () => context.go(AppRoutes.attendanceHub),
             child: const Text('Manual Lookup'),
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton(
+                onPressed: () => context.push(AppRoutes.myQRCode),
+                child: const Text('My QR Code'),
+              ),
+              TextButton(
+                onPressed: () => context.push(AppRoutes.myAttendance),
+                child: const Text('My Attendance'),
+              ),
+              TextButton(
+                onPressed: () => context.push(AppRoutes.qrActions),
+                child: const Text('QR Hub Actions'),
+              ),
+            ],
           ),
         ],
       ),

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -15,10 +16,7 @@ class MyOrganizationsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(requestsOnly ? 'Membership Requests' : 'My Organizations'),
-        leading: IconButton(
-          icon: const Icon(Icons.home),
-          onPressed: () => context.go(AppRoutes.home),
-        ),
+        leading: const AppBackButton(),
       ),
       bottomNavigationBar: OrganizationNavigation(requestsOnly ? 2 : 1),
       body: QueryContent(

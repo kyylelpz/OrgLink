@@ -66,12 +66,20 @@ class AppSurfaceCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.onTap,
   });
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => Card(
-    child: Padding(padding: padding, child: child),
+    child: onTap == null
+        ? Padding(padding: padding, child: child)
+        : InkWell(
+            onTap: onTap,
+            borderRadius: AppShape.card,
+            child: Padding(padding: padding, child: child),
+          ),
   );
 }
 

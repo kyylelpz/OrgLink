@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -21,11 +22,7 @@ class EventManagementScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Organization Event Management'),
-        leading: IconButton(
-          onPressed: () =>
-              context.go(AppRoutes.organization(model.organizationId)),
-          icon: const Icon(Icons.arrow_back),
-        ),
+        leading: const AppBackButton(),
       ),
       floatingActionButton: model.canCreate
           ? FloatingActionButton.extended(
@@ -169,12 +166,7 @@ class ParticipantsScreen extends StatelessWidget {
               ),
             ),
         ],
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () =>
-              context.go(AppRoutes.event(model.organizationId, model.eventId!)),
-        ),
+        leading: const AppBackButton(),
       ),
       body: EventAccessView(
         requireEvent: true,

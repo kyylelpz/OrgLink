@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -43,7 +44,10 @@ class AttendanceSelectionScreen extends StatelessWidget {
         )
         .toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Attendance Management')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Attendance Management'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -321,6 +325,7 @@ class AttendanceScreen extends StatelessWidget {
     }
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: Text(report ? 'Attendance Report' : 'Attendance Verification'),
         actions: [
           IconButton(
@@ -358,7 +363,10 @@ class MyAttendanceScreen extends StatelessWidget {
         .length;
     final pending = values.any((q) => q.loading || q.failure != null);
     return Scaffold(
-      appBar: AppBar(title: const Text('My Attendance')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('My Attendance'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
