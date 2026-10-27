@@ -104,22 +104,26 @@ only while the window is open. Firestore rules remain authoritative.
 
 No placeholder attendance documents are created. The first successful normal result is
 final for manual marking and QR redemption. Present/Absent and Manual/QR cannot be changed or deleted through ordinary
-Firestore clients. Corrections use the separate manager-only workflow below. Organizers cannot
+Firestore clients. Corrections use the separate authorized-organizer workflow below. Organizers cannot
 verify their own attendance. Registration/capacity documents are never mutated by
 attendance operations. Missing name projections show Unknown Participant.
 
-## Manager-only attendance corrections
+## Authorized organizer attendance corrections
 
 Open Attendance Verification, find an existing result, and select **Correct
-Attendance**. Only the assigned organization manager sees this action; officers,
-including manageAttendance officers, and platform admins gain no correction power.
+Attendance**. The assigned organization manager and active organization officers
+with permissions.manageAttendance=true see this action. It is hidden from officers
+without that permission, inactive officers and ordinary members. Platform-admin
+status alone grants no correction authority.
+
 The confirmation dialog displays the participant/current result, requires a new
 status and a nonempty reason (maximum 1000 characters), and submits only after
 **Confirm Correction**. Busy state prevents duplicate submissions. Server failures
 remain visible; a stale correction must be closed and reviewed again.
 
-Project policy: an eligible manager of an active organization may correct an
-existing result after an approved, published event has started, including after
+Project policy: an eligible attendance operator (assigned manager or securely
+provisioned active officer with manageAttendance=true) of an active organization
+may correct an existing result after an approved, published event has started, including after
 it is completed. Cancelled, archived, unapproved, or future events are excluded.
 Self-correction is prohibited. The registration must belong to the participant,
 organization and event; historical registered/cancelled registrations are allowed.
@@ -141,26 +145,28 @@ access as the existing endpoints. The Flutter client never sends an authoritativ
 role, previous status, operator identity, or server time.
 
 - Preview body: organizationId, eventId, participantUid, operation=preview.
-  The server authorizes the manager and returns previousStatus and the exact
+  The server authorizes the attendance operator and returns previousStatus and the exact
   Firestore document updateTime as an opaque revision (including submillisecond
   precision). No changes are written.
 - Apply body: the same identifiers, operation=apply, revision, newStatus
   (present/absent/pending), and reason. The transaction reauthorizes the current
-  manager and checks event/registration/attendance ownership and validity. The
+  attendance operator and checks event/registration/attendance ownership and validity. The
   requested revision must match the server-read document. Missing/replaced results
   or stale revisions return HTTP 409 / conflict; retries never silently change the
-  correction's expected revision. Same-status requests are rejected.
+  correction's expected revision. Same-status requests are rejected. Manager reassignment, officer
+  removal, role change or manageAttendance revocation are checked transactionally;
+  permission titles and client-provided roles never authorize a correction.
 - One atomic commit changes the seven-field attendance record, or deletes it for
   Pending; creates a new audit entry with exists=false; and revokes the currently
   issued credential/issuance slot if it belongs to this participant and event.
-  A changed result uses verificationMethod=manual, the manager UID and trusted
+  A changed result uses verificationMethod=manual, the authenticated operator UID and trusted
   Worker verification time; original provenance is preserved in the audit.
 - Audit path: organizations/{organizationId}/events/{eventId}/attendanceCorrections/{randomUuid}.
   Fields: eventId, participantUid, previousStatus, newStatus, reason, correctedBy,
   correctedAt, previousRecord (the original seven-field record). correctedAt uses
   Firestore's [REQUEST_TIME transform](https://firebase.google.com/docs/firestore/reference/rest/v1/Write).
   The application only creates audit entries and never edits/deletes them.
-  Assigned eligible managers can read history via Firestore; no audit history
+  Authorized attendance operators can read history via Firestore; no audit history
   viewer is included in Flutter yet. All client audit writes are denied.
 
 Normal attendance updates/deletes remain denied to every Firestore client,
@@ -180,7 +186,7 @@ Roster and My Attendance use existing server-confirmed listeners, so corrections
 and deletions update status/statistics automatically. The roster also refreshes its
 attendance query after confirmed correction success. No attendance schema,
 registration/capacity document, Firebase project, package or IAM change is needed.
-Preview needs one read-only transaction; apply uses at most seven document reads,
+Preview needs one read-only transaction; apply uses at most eight document reads,
 four writes and four REST calls per attempt, plus existing authentication/OAuth
 fetches. It requires neither Cloud Functions nor paid Workers bindings. Free-tier
 quotas and actual deployed CPU usage still need normal monitoring.
@@ -198,7 +204,7 @@ flutter analyze
 flutter test
 ```
 
-2. Publish the reviewed Rules to orglink-dev. This adds manager audit reads and
+2. Publish the reviewed Rules to orglink-dev. This permits authorized attendance-operator audit reads and
    retains denial of all client correction/audit writes:
 
 ```powershell
@@ -225,18 +231,19 @@ required. A Worker release is necessary for /correct even if QR already works.
 flutter run --dart-define=ATTENDANCE_API_URL=https://orglink-attendance.YOUR-SUBDOMAIN.workers.dev
 ```
 
-5. Using synthetic test accounts/events, verify manager correction Present to
-   Absent, reason validation, Pending reset, live student history, officer denial,
-   old-pass rejection, and two manager sessions submitting the same revision. One
+5. Using synthetic test accounts/events, verify manager and permitted-officer correction Present to
+   Absent, reason validation, Pending reset, live student history, denial for officers
+   without attendance permission and ordinary members, permission revocation,
+   old-pass rejection, and manager/officer sessions submitting the same revision. One
    correction must succeed and the other must report conflict. Review the retained
    audit in Firestore. These manual release/acceptance steps have not been run.
 
 ### Correction validation and changed files
 
-Local validation: 83 Flutter tests, 48 Worker unit/native-workerd tests, 38 Worker
+Local validation: 87 Flutter tests, 48 Worker unit/native-workerd tests, 45 Worker
 Firestore-emulator tests, and 126 Firestore Rules tests passed. Flutter analysis
 reported no issues; Dart formatting and Wrangler dry-run passed. Security tests
-cover officer/student/platform-admin denial, ownership/reason validation, direct
+cover permitted-officer access and unauthorized officer/student/platform-admin denial, ownership/reason validation, direct
 client correction/audit denial, manager reassignment, stale revisions, simultaneous
 corrections, failed commits and QR/reset races. UI tests cover reason/confirmation,
 duplicate submits, conflict errors and live personal-history resets.
@@ -365,7 +372,7 @@ credential approach; never fall back to privileged client writes.
 - POST /redeem: authenticates the scanner, verifies current organization
   permission, token binding/expiry, student eligibility/registration, event/window
   and existing attendance. Atomically creates Present and consumes the token.
-- POST /correct: manager-only preview/apply of an existing attendance correction,
+- POST /correct: authorized attendance-operator preview/apply of an existing correction,
   with a required reason, revision check and atomic append-only audit (see above).
 
 Requests use Authorization: Bearer <Firebase Authentication ID token> and JSON

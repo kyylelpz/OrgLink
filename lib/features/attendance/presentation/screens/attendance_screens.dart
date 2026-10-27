@@ -176,7 +176,7 @@ class AttendanceScreen extends StatelessWidget {
           ),
           if (!report)
             const Text(
-              'Normal verification cannot replace an existing result. Managers use Correct Attendance separately. Server time and current permissions determine whether marking is allowed.',
+              'Normal verification cannot replace an existing result. Authorized organizers use Correct Attendance separately. Server time and current permissions determine whether marking is allowed.',
             ),
           if (!report && model.manualUnavailableReason != null)
             Text(model.manualUnavailableReason!),
@@ -370,7 +370,7 @@ class MyAttendanceScreen extends StatelessWidget {
           if ((events.mine.value ?? []).isEmpty)
             const Text('You have no event registrations.'),
           const Text(
-            'Not Marked means Pending: no active attendance result. Manager corrections update this view automatically.',
+            'Not Marked means Pending: no active attendance result. Organizer corrections update this view automatically.',
           ),
           for (final reg in events.mine.value ?? [])
             Builder(

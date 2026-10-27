@@ -70,7 +70,6 @@ class AttendanceViewModel extends ChangeNotifier {
   bool canCorrect(EventRegistration registration) {
     final event = context.event?.value;
     return authorized &&
-        context.organization.value?.managerUid == context.uid &&
         !loading &&
         loadFailure == null &&
         registration.uid != context.uid &&
@@ -106,9 +105,7 @@ class AttendanceViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final value = await action();
-      if (_disposed ||
-          !authorized ||
-          context.organization.value?.managerUid != context.uid) {
+      if (_disposed || !authorized) {
         return null;
       }
       return value;

@@ -374,8 +374,8 @@ test("Worker HTTP endpoint authenticates signed Firebase-shaped JWT and uses rea
     reason: "Checked roster in person",
   };
   assert.equal((await post("/correct", null, correction)).status, 401);
-  assert.equal((await post("/correct", "scanner", correction)).status, 403);
-  assert.equal((await post("/correct", "manager", correction)).status, 200);
+  assert.equal((await post("/correct", "coordinator", correction)).status, 403);
+  assert.equal((await post("/correct", "scanner", correction)).status, 200);
   assert.equal((await post("/correct", "manager", correction)).status, 409);
 });
 
@@ -454,6 +454,61 @@ const applyCorrection = (preview, changes = {}, uid = "manager") =>
     }),
   );
 
+test("active attendance officer corrects both statuses and resets Pending with their own audit identity", async () => {
+  await seedAttendance();
+  for (const newStatus of ["absent", "present", "pending"]) {
+    const preview = await previewCorrection("scanner");
+    await applyCorrection(
+      preview,
+      { newStatus, correctedBy: "manager", role: "manager" },
+      "scanner",
+    );
+    const record = (await db.doc(`${base}/attendance/student`).get()).data();
+    assert.equal(record?.attendanceStatus ?? "pending", newStatus);
+    if (record) assert.equal(record.verifiedBy, "scanner");
+  }
+  const history = await db.collection(`${base}/attendanceCorrections`).get();
+  assert.equal(history.size, 3);
+  for (const audit of history.docs)
+    assert.equal(audit.data().correctedBy, "scanner");
+  await assert.rejects(
+    previewCorrection("scanner", "scanner"),
+    code("permission-denied"),
+  );
+});
+
+for (const membershipChange of [
+  { "permissions.manageAttendance": false },
+  { permissions: { manageEvents: true } },
+  { membershipStatus: "pending" },
+  { membershipStatus: "removed" },
+  { membershipRole: "member" },
+  { organizationId: "other" },
+  { uid: "other" },
+])
+  test(`correction rechecks officer assignment ${JSON.stringify(membershipChange)}`, async () => {
+    await seedAttendance();
+    const preview = await previewCorrection("scanner");
+    await update("organizations/public/memberships/scanner", membershipChange);
+    await assert.rejects(
+      previewCorrection("scanner"),
+      code("permission-denied"),
+    );
+    await assert.rejects(
+      applyCorrection(preview, {}, "scanner"),
+      code("permission-denied"),
+    );
+    assert.equal(
+      (await db.collection(`${base}/attendanceCorrections`).get()).size,
+      0,
+    );
+    assert.equal(
+      (await db.doc(`${base}/attendance/student`).get()).data()
+        .attendanceStatus,
+      "present",
+    );
+  });
+
 test("manager correction preserves seven-field schema and atomically appends a server-timestamped audit snapshot", async () => {
   await seedAttendance();
   const preview = await previewCorrection();
@@ -488,15 +543,8 @@ test("manager correction preserves seven-field schema and atomically appends a s
   );
 });
 
-for (const uid of [
-  null,
-  "student",
-  "scanner",
-  "coordinator",
-  "other",
-  "suspended",
-])
-  test(`correction rejects non-manager ${uid} without audit writes`, async () => {
+for (const uid of [null, "student", "coordinator", "other", "suspended"])
+  test(`correction rejects unauthorized operator ${uid} without audit writes`, async () => {
     await seedAttendance();
     await assert.rejects(
       previewCorrection(uid),
@@ -577,7 +625,7 @@ test("concurrent corrections from the same revision produce exactly one audit an
   const preview = await previewCorrection();
   const results = await Promise.allSettled([
     applyCorrection(preview),
-    applyCorrection(preview, { newStatus: "pending" }),
+    applyCorrection(preview, { newStatus: "pending" }, "scanner"),
   ]);
   assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
   assert.equal(

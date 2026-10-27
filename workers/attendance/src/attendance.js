@@ -280,18 +280,26 @@ function attendanceBackend(db, clock = Date.now) {
         `${base}/registrations/${participantUid}`,
         `${base}/attendance/${participantUid}`,
         `_attendanceIssuance/${participantUid}`,
+        `organizations/${org}/memberships/${uid}`,
       ];
       const snapshots = await t.getAll(...paths.map((p) => db.doc(p)));
-      const [profile, organization, target, registration, existing, slot] =
-        snapshots.map((d) => d.data());
+      const [
+        profile,
+        organization,
+        target,
+        registration,
+        existing,
+        slot,
+        membership,
+      ] = snapshots.map((d) => d.data());
       if (
         !eligible(profile) ||
-        organization?.managerUid !== uid ||
+        !operator(organization, membership, uid) ||
         organization?.status !== "active"
       )
         fail(
           "permission-denied",
-          "Only the assigned organization manager can correct attendance.",
+          "You are not authorized to correct attendance for this organization.",
         );
       if (participantUid === uid)
         fail("permission-denied", "You cannot correct your own attendance.");

@@ -24,128 +24,145 @@ const student = EventRegistration(
 );
 
 void main() {
-  testWidgets(
-    'manager confirms reason, prevents duplicate correction, resets Pending and updates personal history',
-    (tester) async {
-      final orgs = TestOrganizationRepository(),
-          events = TestEventRepository(),
-          repo = TestAttendanceRepository();
-      final now = DateTime.now();
-      events.change({
-        'startAt': now.subtract(const Duration(hours: 2)),
-        'endAt': now.subtract(const Duration(hours: 1)),
-        'eventStatus': 'completed',
-        'publishedAt': now.subtract(const Duration(hours: 3)),
-      });
-      events.registrations.emit([student]);
-      repo.feed.emit([attendanceRecord()]);
-      final event = EventContextViewModel(
-        events,
-        orgs,
-        'robotics',
-        'manager',
-        eventId: 'demo',
-      );
-      final model = AttendanceViewModel(repo, event);
-      final organizations = OrganizationHubViewModel(orgs, 'student');
-      final hub = EventHubViewModel(events, organizations);
-      final mine = MyAttendanceViewModel(repo, hub);
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: model,
-          child: const MaterialApp(home: AttendanceScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Mark Present'),
-        findsNothing,
-      ); // Correction does not reopen normal marking.
-      await tester.ensureVisible(
-        find.widgetWithText(TextButton, 'Correct Attendance'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Correct Attendance'));
-      await tester.pumpAndSettle();
-      expect(find.text('Confirm Attendance Correction'), findsOneWidget);
-      expect(repo.corrections, 0);
-      await tester.tap(find.text('Confirm Correction'));
-      await tester.pumpAndSettle();
-      expect(find.text('Enter a correction reason.'), findsOneWidget);
-      await tester.enterText(
-        find.byType(TextFormField),
-        'Checked signed roster.',
-      );
-      repo.gate = Completer<void>();
-      await tester.tap(find.text('Confirm Correction'));
-      await tester.pump();
-      expect(repo.corrections, 1);
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Confirm Correction'),
-            )
-            .onPressed,
-        isNull,
-      );
-      repo.gate!.complete();
-      repo.gate = null;
-      await tester.pumpAndSettle();
-      expect(model.recordFor('student')!.status, AttendanceStatus.absent);
-      expect(
-        mine.records['robotics/demo']!.value!.status,
-        AttendanceStatus.absent,
-      );
-      expect(repo.correctionReason, 'Checked signed roster.');
-      await tester.ensureVisible(
-        find.widgetWithText(TextButton, 'Correct Attendance'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Correct Attendance'));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byType(DropdownButtonFormField<AttendanceCorrectionStatus>),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Pending').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byType(TextFormField),
-        'Remove an incorrect verification.',
-      );
-      await tester.tap(find.text('Confirm Correction'));
-      await tester.pumpAndSettle();
-      expect(repo.corrections, 2);
-      expect(model.recordFor('student'), isNull);
-      expect(model.summary.notMarked, 1);
-      expect(mine.records['robotics/demo']!.value, isNull);
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: mine,
-          child: const MaterialApp(home: MyAttendanceScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Not Marked'), findsOneWidget);
-      expect(
-        find.textContaining('Present: 0 | Absent: 0 | Not Marked: 1'),
-        findsOneWidget,
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-      model.dispose();
-      event.dispose();
-      mine.dispose();
-      hub.dispose();
-      organizations.dispose();
-      await orgs.close();
-      await events.close();
-      await repo.close();
-    },
-  );
-
-  for (final uid in ['officer', 'student', 'manager']) {
+  for (final operatorUid in ['manager', 'officer']) {
     testWidgets(
-      '$uid cannot correct without independent manager authority or correct self',
+      '$operatorUid confirms reason, prevents duplicate correction, resets Pending and updates personal history',
+      (tester) async {
+        final orgs = TestOrganizationRepository(),
+            events = TestEventRepository(),
+            repo = TestAttendanceRepository();
+        orgs.allMemberships.emit([
+          Membership(
+            organizationId: 'robotics',
+            uid: 'officer',
+            role: 'officer',
+            status: 'active',
+            permissions: const {'manageAttendance': true},
+          ),
+        ]);
+        final now = DateTime.now();
+        events.change({
+          'startAt': now.subtract(const Duration(hours: 2)),
+          'endAt': now.subtract(const Duration(hours: 1)),
+          'eventStatus': 'completed',
+          'publishedAt': now.subtract(const Duration(hours: 3)),
+        });
+        events.registrations.emit([student]);
+        repo.feed.emit([attendanceRecord()]);
+        final event = EventContextViewModel(
+          events,
+          orgs,
+          'robotics',
+          operatorUid,
+          eventId: 'demo',
+        );
+        final model = AttendanceViewModel(repo, event);
+        final organizations = OrganizationHubViewModel(orgs, 'student');
+        final hub = EventHubViewModel(events, organizations);
+        final mine = MyAttendanceViewModel(repo, hub);
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: model,
+            child: const MaterialApp(home: AttendanceScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Mark Present'),
+          findsNothing,
+        ); // Correction does not reopen normal marking.
+        await tester.ensureVisible(
+          find.widgetWithText(TextButton, 'Correct Attendance'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Correct Attendance'));
+        await tester.pumpAndSettle();
+        expect(find.text('Confirm Attendance Correction'), findsOneWidget);
+        expect(repo.corrections, 0);
+        await tester.tap(find.text('Confirm Correction'));
+        await tester.pumpAndSettle();
+        expect(find.text('Enter a correction reason.'), findsOneWidget);
+        await tester.enterText(
+          find.byType(TextFormField),
+          'Checked signed roster.',
+        );
+        repo.gate = Completer<void>();
+        await tester.tap(find.text('Confirm Correction'));
+        await tester.pump();
+        expect(repo.corrections, 1);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Confirm Correction'),
+              )
+              .onPressed,
+          isNull,
+        );
+        repo.gate!.complete();
+        repo.gate = null;
+        await tester.pumpAndSettle();
+        expect(model.recordFor('student')!.status, AttendanceStatus.absent);
+        expect(
+          mine.records['robotics/demo']!.value!.status,
+          AttendanceStatus.absent,
+        );
+        expect(repo.correctionReason, 'Checked signed roster.');
+        await tester.ensureVisible(
+          find.widgetWithText(TextButton, 'Correct Attendance'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Correct Attendance'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byType(DropdownButtonFormField<AttendanceCorrectionStatus>),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Pending').last);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byType(TextFormField),
+          'Remove an incorrect verification.',
+        );
+        await tester.tap(find.text('Confirm Correction'));
+        await tester.pumpAndSettle();
+        expect(repo.corrections, 2);
+        expect(model.recordFor('student'), isNull);
+        expect(model.summary.notMarked, 1);
+        expect(mine.records['robotics/demo']!.value, isNull);
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: mine,
+            child: const MaterialApp(home: MyAttendanceScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Not Marked'), findsOneWidget);
+        expect(
+          find.textContaining('Present: 0 | Absent: 0 | Not Marked: 1'),
+          findsOneWidget,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        model.dispose();
+        event.dispose();
+        mine.dispose();
+        hub.dispose();
+        organizations.dispose();
+        await orgs.close();
+        await events.close();
+        await repo.close();
+      },
+    );
+  }
+  for (final uid in [
+    'no-permission',
+    'inactive',
+    'member',
+    'student',
+    'manager',
+    'self-officer',
+  ]) {
+    testWidgets(
+      '$uid cannot correct without attendance permission or correct self',
       (tester) async {
         final orgs = TestOrganizationRepository(),
             events = TestEventRepository(),
@@ -154,9 +171,9 @@ void main() {
           Membership(
             organizationId: 'robotics',
             uid: uid,
-            role: 'officer',
-            status: 'active',
-            permissions: const {'manageAttendance': true},
+            role: uid == 'member' ? 'member' : 'officer',
+            status: uid == 'inactive' ? 'removed' : 'active',
+            permissions: {'manageAttendance': uid != 'no-permission'},
           ),
         ]);
         final now = DateTime.now();
@@ -164,7 +181,9 @@ void main() {
           'startAt': now.subtract(const Duration(hours: 1)),
           'publishedAt': now.subtract(const Duration(hours: 2)),
         });
-        final target = uid == 'manager' ? 'manager' : 'student';
+        final target = ['manager', 'self-officer'].contains(uid)
+            ? uid
+            : 'student';
         final registration = EventRegistration(
           uid: target,
           eventId: 'demo',

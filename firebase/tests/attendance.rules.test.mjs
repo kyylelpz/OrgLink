@@ -46,7 +46,7 @@ const record = (changes = {}) => ({
   ...changes,
 });
 
-test("correction audit is manager-readable and no client can create, mutate or delete audit history", async () => {
+test("correction audit uses attendance read permissions and no client can change audit history", async () => {
   const path = `${base}/attendanceCorrections/audit-one`;
   const audit = {
     eventId: "demo",
@@ -58,17 +58,27 @@ test("correction audit is manager-readable and no client can create, mutate or d
     correctedAt: Timestamp.now(),
   };
   await seed(path, audit);
-  await assertSucceeds(getDoc(doc(db("manager"), path)));
-  await assertSucceeds(
-    getDocs(collection(db("manager"), `${base}/attendanceCorrections`)),
-  );
-  for (const uid of ["manager", "scanner", "student", "other", "suspended"]) {
+  for (const uid of ["manager", "scanner"]) {
+    await assertSucceeds(getDoc(doc(db(uid), path)));
+    await assertSucceeds(
+      getDocs(collection(db(uid), `${base}/attendanceCorrections`)),
+    );
+  }
+  for (const uid of [
+    "manager",
+    "scanner",
+    "coordinator",
+    "ordinary",
+    "student",
+    "other",
+    "suspended",
+  ]) {
     await assertFails(
       setDoc(doc(db(uid), `${base}/attendanceCorrections/new-audit`), audit),
     );
     await assertFails(updateDoc(doc(db(uid), path), { reason: "Forged" }));
     await assertFails(deleteDoc(doc(db(uid), path)));
-    if (uid !== "manager") {
+    if (!["manager", "scanner"].includes(uid)) {
       await assertFails(getDoc(doc(db(uid), path)));
       await assertFails(
         getDocs(collection(db(uid), `${base}/attendanceCorrections`)),
