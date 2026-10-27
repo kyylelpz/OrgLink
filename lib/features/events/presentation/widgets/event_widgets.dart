@@ -60,16 +60,20 @@ class EventNavigation extends StatelessWidget {
   const EventNavigation(this.index, {super.key});
   final int index;
   @override
-  Widget build(BuildContext context) => NavigationBar(
-    selectedIndex: index,
-    onDestinationSelected: (value) =>
-        context.go(value == 0 ? AppRoutes.events : AppRoutes.myEvents),
-    destinations: const [
-      NavigationDestination(icon: Icon(Icons.event), label: 'Discover Events'),
-      NavigationDestination(
-        icon: Icon(Icons.event_available),
-        label: 'My Events',
-      ),
-    ],
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Wrap(
+      alignment: WrapAlignment.center,
+      children: [
+        TextButton(
+          onPressed: () => context.go(AppRoutes.events),
+          child: const Text('Discover Events'),
+        ),
+        TextButton(
+          onPressed: () => context.go(AppRoutes.myEvents),
+          child: const Text('My Events'),
+        ),
+      ],
+    ),
   );
 }

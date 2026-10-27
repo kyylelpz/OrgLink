@@ -1,6 +1,11 @@
 /// Presentation labels only. Never use these values for persistence or queries.
 const _identifierLabels = <String, String>{
   'active': 'Active',
+  'present': 'Present',
+  'absent': 'Absent',
+  'notMarked': 'Not Marked',
+  'qr': 'QR',
+  'manual': 'Manual',
   'pending': 'Pending',
   'registered': 'Registered',
   'published': 'Published',

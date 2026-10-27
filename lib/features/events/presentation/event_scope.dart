@@ -12,6 +12,9 @@ class EventHubScope extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
+    key: ValueKey(
+      context.select<AuthViewModel, String?>((auth) => auth.user?.id),
+    ),
     create: (context) => EventHubViewModel(
       context.read<EventRepository>(),
       context.read<OrganizationHubViewModel>(),
