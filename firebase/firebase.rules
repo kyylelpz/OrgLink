@@ -193,10 +193,16 @@ service cloud.firestore {
         match /attendance/{uid} {
           function eventData() { return get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)).data; }
           function registrationData() { return get(/databases/$(database)/documents/organizations/$(orgId)/events/$(eventId)/registrations/$(uid)).data; }
+          function participantEligible() {
+            return exists(/databases/$(database)/documents/users/$(uid))
+              && get(/databases/$(database)/documents/users/$(uid)).data.accountStatus == 'active'
+              && validStudent(get(/databases/$(database)/documents/users/$(uid)).data);
+          }
           allow get: if eligible() && (owner(uid) || attendanceOperator(orgId));
           allow list: if attendanceOperator(orgId);
           allow create: if attendanceOperator(orgId) && organization(orgId).status == 'active'
             && uid != request.auth.uid
+            && participantEligible()
             && request.resource.data.keys().hasAll(['uid','eventId','organizationId','attendanceStatus','verifiedAt','verifiedBy','verificationMethod'])
             && request.resource.data.keys().hasOnly(['uid','eventId','organizationId','attendanceStatus','verifiedAt','verifiedBy','verificationMethod'])
             && request.resource.data.uid == uid && request.resource.data.eventId == eventId && request.resource.data.organizationId == orgId

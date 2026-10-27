@@ -170,6 +170,25 @@ beforeEach(async () => {
       permissions,
     });
 });
+for (const operatorUid of ["manager", "scanner"])
+  for (const condition of ["suspended", "incomplete", "missing"])
+    test(`manual-target-eligibility: ${operatorUid} cannot mark a ${condition} student`, async () => {
+      await env.withSecurityRulesDisabled(async (context) => {
+        const profile = doc(context.firestore(), "users/student");
+        if (condition === "missing") await deleteDoc(profile);
+        else
+          await updateDoc(
+            profile,
+            condition === "suspended"
+              ? { accountStatus: "suspended" }
+              : { studentNumber: "" },
+          );
+      });
+      await assertFails(
+        setDoc(ref(db(operatorUid)), record({ verifiedBy: operatorUid })),
+      );
+    });
+
 test("manager creates exact manual attendance; operator and student read; no capacity change", async () => {
   await assertSucceeds(setDoc(ref(db()), record()));
   const value = (await getDoc(ref(db("student")))).data();

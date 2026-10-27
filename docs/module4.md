@@ -8,8 +8,9 @@ passes and a universal camera scanner. The specification PDF attendance screens
 and exact seven-field schema were reviewed, together with Module 3 and the
 existing provisioning and permission model.
 
-No resources were deployed, billing changed, live records written, or new Firebase
-projects introduced. The application still uses orglink-dev and Android ID
+This implementation/audit work did not deploy resources, change billing, write live
+records, or introduce Firebase projects. The live deployment revision and configuration
+were not inspected. The application still uses orglink-dev and Android ID
 com.example.orglink. Manual attendance needs the reviewed Firestore rules deployed;
 it does not need a hosted QR backend. QR issuance/redemption now use Cloudflare
 Workers Free instead of Firebase Cloud Functions. No billing account is required
@@ -17,6 +18,69 @@ for the Worker or the existing Spark Firestore free quota. The Worker and its
 server-only secret must be configured manually. Until ATTENDANCE_API_URL is set,
 QR check-in reports that it is not configured. No insecure local credential or
 automatic paid fallback is generated.
+
+## Final completion audit — 27 October 2026
+
+**Result:** the documented Module 4 MVP implementation is complete locally, with
+automated checks passing and no remaining confirmed source-code blockers after
+the fix below. Deployment/device acceptance is still pending verification; this
+is not a claim that the current live Worker, Rules or installed APK match this
+revision. This audit did not deploy, access live attendance data, change IAM or
+billing, or inspect any service-account secret.
+
+| Area | Verified implementation and local evidence |
+| --- | --- |
+| QR issuance | Firebase RS256 signature/claims verification; eligible requesting UID, active registration, approved/published window, random short-lived hashed credential, regeneration and rate limit |
+| QR redemption | Organization-scoped manager/active manageAttendance officer, no self-verification, current student/event/registration checks, expiry, replay and concurrent-request protection; one atomic attendance/consumption commit |
+| Manual Present/Absent | Reachable from event/participant navigation and Attendance Management; confirmation, duplicate-submit guard, active participant profile/registration and server-time Rules checks; works independently of QR backend |
+| Ordinary immutability | Seven fields only; manual create-only and QR create-if-absent; duplicate scans preserve the current result; no client attendance update/delete privileges |
+| Corrections | Same manager/officer attendance permissions in UI and Worker; required reason/confirmation; Present ↔ Absent and reset to Pending; server-read ownership/lifecycle and exact revision checks; concurrent stale correction returns conflict |
+| Audit and reset | Append-only audit with prior record, actual operator and Firestore REQUEST_TIME; atomic correction/audit/credential revocation; Pending deletes only the active record; expired/used/pre-reset passes cannot restore it |
+| UI integration | Auth/profile/account route guards, QR Hub/scanner, automatic window refresh, roster/report, My Attendance live correction/reset updates, loading/error handling and account/permission-change handling |
+
+One confirmed security blocker was reproduced before fixing it: manual-create
+Rules accepted registered students with a suspended, incomplete or missing user
+profile. Six emulator regressions (manager and permitted officer for each case)
+all incorrectly succeeded on the old Rules. The attendance create rule now checks
+the participant's active account and valid student profile, matching QR student
+eligibility. This internal Rules lookup does not grant organizers private profile
+reads. Historical corrections intentionally retain their separate documented
+eligibility policy. No Worker or Flutter behavior was changed by this audit.
+
+Fresh validation results:
+
+- Full Flutter suite (including attendance/window/correction/navigation/transport
+  regressions): **87 passed**; `flutter analyze`: **no issues**.
+- Worker unit/native-workerd tests: **48 passed**.
+- Worker Firestore REST emulator tests: **45 passed**, including single-use QR,
+  expiry, permission/registration changes, manual/QR races, correction conflicts,
+  failed atomic commits and reset/replay races.
+- Full Firestore Rules suite: **132 passed**, including the six new participant
+  eligibility regressions and denial of client corrections/audit mutations.
+- Dart formatting, JavaScript test formatting, diff whitespace checks and Wrangler
+  dry-run passed. Dry-run bundled locally; it did not verify remote secrets or deploy.
+
+Files changed by this audit only: `firebase/firebase.rules`,
+`firebase/tests/attendance.rules.test.mjs`, and `docs/module4.md`.
+
+Remaining release/acceptance work:
+
+1. Review and manually publish the corrected Rules before accepting live manual
+   attendance: `firebase.cmd deploy --only firestore:rules --project orglink-dev`.
+   Verify deployed Worker/Flutter versions and ATTENDANCE_API_URL against the
+   existing setup; no new secret, IAM grant, project or billing change is required.
+2. Verify real Firebase Google sign-in, service-account OAuth/IAM, and /issue,
+   /redeem and /correct against the manually deployed Worker. These were tested
+   with synthetic fixtures/emulators, not live credentials/data, in this audit.
+3. Run the two-device Android checklist below, including camera denial/resume,
+   expiry, concurrent scans/corrections, officer revocation and live history reset.
+4. Measure actual Workers Free CPU/quota behavior, especially cold authentication
+   caches and contention. Local correctness tests do not prove deployed capacity.
+
+CSV export/date-range filtering, a Flutter correction-audit viewer, automatic
+expired-token cleanup, pagination and distributed scanner abuse limits remain
+documented follow-ups rather than blockers in the current MVP scope. Audit
+history is retained and readable by authorized attendance operators in Firestore.
 
 ## Architecture and affected files
 
@@ -92,7 +156,8 @@ resources are disposed on leaving their scope.
 4. Inspect registration, attendance, method and timestamp.
 5. During the attendance window, select Mark Present or Mark Absent and confirm.
 6. A Firestore transaction reads the authoritative UID attendance document and
-   writes only if it is absent. Rules enforce current permissions, registration,
+   writes only if it is absent. Rules enforce current operator permissions,
+   active/complete student profile, registration,
    event lifecycle and request.time. Existing results return Already Verified.
 7. A server read confirms the saved timestamp/result. The live roster updates.
 
@@ -276,7 +341,7 @@ All operators must have an active account and completed profile. Manager identit
 is the existing authoritative organization.managerUid. Officer assignments must
 be securely provisioned; no new role-assignment UI or self-assignment was added.
 
-| Identity | Own QR/history | Attendance roster/report, manual and QR verification |
+| Identity | Own QR/history | Attendance roster/report, manual/QR verification and corrections |
 | --- | --- | --- |
 | Eligible registered student | Own registration/history only | Denied |
 | Organization manager | Own history/pass if registered | Assigned organization only, other participants |
@@ -298,7 +363,7 @@ Exactly seven fields:
 
 | Field | Type and invariant |
 | --- | --- |
-| uid | String matching document ID and active registration owner |
+| uid | String matching document ID and participant registration |
 | eventId | String matching parent event |
 | organizationId | String matching parent organization |
 | attendanceStatus | present or absent |
@@ -313,8 +378,8 @@ existing event projection; its manual name-refresh operation is preserved.
 
 ## Lifecycle and attendance window
 
-Only legitimately published, approved events with publishedAt and no archivedAt
-are eligible. The organization must be active. Server time must satisfy
+Normal marking and QR verification require legitimately published, approved events
+with publishedAt and no archivedAt. The organization must be active. Server time must satisfy
 startAt <= now < endAt. Manual Rules use request.time; Worker handlers check the
 trusted Worker server clock inside every transaction attempt, after all required reads.
 Device time is only a UI hint and cannot authorize a write. QR expiration is also
@@ -489,7 +554,8 @@ private/readable. A failed attendance lookup is an error, never Not Marked.
 ## Security Rules and indexes
 
 Manual creates require the exact schema, matching path IDs, active registration,
-authorized operator, operator/request UID equality, server timestamp, open window,
+an existing active student account with a valid completed profile, authorized
+operator, operator/request UID equality, server timestamp, open window,
 published approved unarchived event and verificationMethod=manual. Updates/deletes
 and client QR assertions are denied. Students can get only their own attendance;
 organizers may query attendance only within an authorized organization.
@@ -686,6 +752,11 @@ network/unknown commit outcomes fail safely. No paid fallback is implemented.
 9. Inspect Firestore: exactly seven attendance fields, unchanged six registration
    fields/capacity and unchanged participant identities. Student clients must not
    read other attendance/profiles or credential storage; client QR writes fail.
+10. As manager and active manageAttendance officer, confirm reason-required
+    corrections and Pending reset, retained append-only audit history, old-pass
+    rejection and live roster/My Attendance updates. Submit the same revision
+    from two authorized sessions: only one correction may commit. Reject ordinary
+    members, unpermitted/inactive officers, self-correction and revoked permissions.
 
 ## Limitations and next steps
 
