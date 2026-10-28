@@ -8,7 +8,6 @@ import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/community_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_asset_icon.dart';
-import '../../../auth/presentation/screens/auth_screens.dart';
 import '../../../auth/presentation/viewmodels/auth_view_model.dart';
 import '../../../events/presentation/viewmodels/event_hub_view_model.dart';
 import '../../../events/presentation/widgets/event_widgets.dart';
@@ -82,6 +81,7 @@ class _DashboardState extends State<_Dashboard> {
                 CommunityDashboardHeader(
                   greeting: '$salutation,\n$firstName!',
                   initials: initials.isEmpty ? '?' : initials,
+                  imageUrl: auth.user?.photoURL,
                   onNotifications: () => context.push(AppRoutes.notifications),
                   onProfile: () => context.push(AppRoutes.completeProfile),
                   search: AppSearchField(

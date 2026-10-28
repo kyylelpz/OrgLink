@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {before, after, beforeEach, test} from 'node:test';
 import {initializeTestEnvironment, assertSucceeds, assertFails} from '@firebase/rules-unit-testing';
@@ -75,3 +76,29 @@ test('reject invalid edits, client timestamps, deletes and unrelated collections
   await assertFails(setDoc(doc(db(), 'organizations/test'), {name:'test'}));
   await assertFails(getDoc(doc(db(), 'organizations/test')));
 });
+
+
+test('optional academics accept new and legacy profiles without privilege changes', async () => {
+  const ref = doc(db(), 'users/alice');
+  await assertSucceeds(setDoc(ref, {...profile(), college:'College of Engineering', program:'IEEE / iOS Research'}));
+  await assertSucceeds(updateDoc(ref, {section:'B', updatedAt:serverTimestamp()}));
+  const data = (await getDoc(ref)).data();
+  assert.equal(data.college, 'College of Engineering');
+  assert.equal(data.program, 'IEEE / iOS Research');
+  assert.equal(data.platformRole, 'user');
+  await assertFails(updateDoc(ref, {program:'Valid Program', platformRole:'platformAdmin', updatedAt:serverTimestamp()}));
+});
+
+test('legacy profiles may add optional academics or leave them blank', async () => {
+  await seed();
+  const ref = doc(db(), 'users/alice');
+  await assertSucceeds(updateDoc(ref, {college:'Engineering', program:'Computer Engineering', updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref, {college:'', program:'', updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db('bob'), 'users/alice'), {college:'Other', updatedAt:serverTimestamp()}));
+});
+for (const value of [null, 42, 'x', 'a'.repeat(161), '  ', 'College\nName']) {
+  test(`reject invalid academic ${JSON.stringify(value)}`, async () => {
+    await seed();
+    await assertFails(updateDoc(doc(db(), 'users/alice'), {college:value, updatedAt:serverTimestamp()}));
+  });
+}

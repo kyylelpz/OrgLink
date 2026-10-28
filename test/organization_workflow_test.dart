@@ -42,8 +42,7 @@ void main() {
       await tester.pump();
       profileRepository.controller.add(profile());
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Discover Organizations'));
-      await tester.tap(find.text('Discover Organizations'));
+      await tester.tap(find.text('Organizations').last);
       await tester.pumpAndSettle();
       expect(find.widgetWithText(AppBar, 'Organizations'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsOneWidget);
@@ -125,7 +124,7 @@ void main() {
       );
       authRepository.controller.add(null);
       await tester.pumpAndSettle();
-      expect(find.text('Google Sign-In'), findsOneWidget);
+      expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       router.dispose();
       auth.dispose();

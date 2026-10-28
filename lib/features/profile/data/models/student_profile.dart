@@ -4,11 +4,33 @@ class StudentDetails {
     required this.studentNumber,
     required this.yearLevel,
     required this.section,
+    this.college,
+    this.program,
   });
   final String fullName;
   final String studentNumber;
   final int yearLevel;
   final String section;
+  // Null means not supplied by a caller; omit it from patches to retain data.
+  final String? college, program;
+
+  factory StudentDetails.fromMap(Map<String, dynamic> data) => StudentDetails(
+    fullName: data['fullName'] as String? ?? '',
+    studentNumber: data['studentNumber'] as String? ?? '',
+    yearLevel: data['yearLevel'] as int? ?? 0,
+    section: data['section'] as String? ?? '',
+    college: data['college'] is String ? data['college'] as String : null,
+    program: data['program'] is String ? data['program'] as String : null,
+  );
+
+  static String? validateAcademic(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return value.trim().length < 2 ||
+            value.trim().length > 160 ||
+            RegExp(r'[\x00-\x1F\x7F]').hasMatch(value)
+        ? 'Use 2–160 characters without control characters, or leave this blank.'
+        : null;
+  }
 
   static String? validateName(String? value) =>
       value == null || value.trim().length < 2 || value.trim().length > 100
@@ -24,17 +46,23 @@ class StudentDetails {
           !RegExp(r'^[A-Za-z0-9][A-Za-z0-9 -]{0,29}$').hasMatch(value.trim())
       ? 'Use 1?30 letters, digits, spaces or hyphens.'
       : null;
-  bool get isValid =>
+  bool get hasValidIdentity =>
       validateName(fullName) == null &&
       validateStudentNumber(studentNumber) == null &&
       yearLevel >= 1 &&
       yearLevel <= 6 &&
       validateSection(section) == null;
+  bool get isValid =>
+      hasValidIdentity &&
+      validateAcademic(college) == null &&
+      validateAcademic(program) == null;
   Map<String, dynamic> toMap() => {
     'fullName': fullName.trim(),
     'studentNumber': studentNumber.trim(),
     'yearLevel': yearLevel,
     'section': section.trim(),
+    if (college != null) 'college': college!.trim(),
+    if (program != null) 'program': program!.trim(),
   };
 }
 
@@ -57,7 +85,7 @@ class StudentProfile {
   final String accountStatus;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  bool get isComplete => email.isNotEmpty && details.isValid;
+  bool get isComplete => email.isNotEmpty && details.hasValidIdentity;
   // Role data never grants administrative access in this module.
   bool get isEligible => isComplete && accountStatus == 'active';
 }

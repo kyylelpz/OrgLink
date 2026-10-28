@@ -3,6 +3,7 @@ import '../theme/app_tokens.dart';
 import 'package:flutter/services.dart';
 import 'app_logo.dart';
 import 'app_asset_icon.dart';
+import '../../features/profile/presentation/widgets/profile_overview.dart';
 
 /// A shared introduction for community and participation destinations.
 class CommunityHeader extends StatelessWidget {
@@ -121,8 +122,11 @@ class CommunityDashboardHeader extends StatelessWidget {
     required this.search,
     required this.onNotifications,
     required this.onProfile,
+    this.imageUrl,
   });
+
   final String greeting, initials;
+  final String? imageUrl;
   final Widget search;
   final VoidCallback onNotifications, onProfile;
 
@@ -223,36 +227,24 @@ class CommunityDashboardHeader extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
+
+                      // Replaced the CircleAvatar with your ProfileIdentity widget
                       Semantics(
                         button: true,
                         label: 'Edit Student Profile',
-                        child: ExcludeSemantics(
-                          child: Material(
-                            color: AppColors.tonal,
-                            borderRadius: AppShape.card,
-                            child: InkWell(
-                              onTap: onProfile,
-                              borderRadius: AppShape.card,
-                              child: Padding(
-                                padding: const EdgeInsets.all(AppSpacing.md),
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    minWidth: 24,
-                                    minHeight: 24,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      initials,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            color: AppColors.brandBlue,
-                                          ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onProfile,
+                            customBorder: const RoundedRectangleBorder(
+                              borderRadius: AppShape.feature,
+                            ),
+                            child: ProfileIdentity(
+                              name: greeting
+                                  .split('\n')
+                                  .last, // extracts the first name for initials
+                              photo: imageUrl,
+                              size: 52, // Adjust size to fit the header
                             ),
                           ),
                         ),

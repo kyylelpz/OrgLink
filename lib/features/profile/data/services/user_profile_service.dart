@@ -31,12 +31,7 @@ class UserProfileService {
         return StudentProfile(
           uid: uid,
           email: data['email'] as String? ?? '',
-          details: StudentDetails(
-            fullName: data['fullName'] as String? ?? '',
-            studentNumber: data['studentNumber'] as String? ?? '',
-            yearLevel: data['yearLevel'] as int? ?? 0,
-            section: data['section'] as String? ?? '',
-          ),
+          details: StudentDetails.fromMap(data),
           photoURL: data['photoURL'] as String?,
           platformRole: data['platformRole'] as String? ?? '',
           accountStatus: data['accountStatus'] as String? ?? '',

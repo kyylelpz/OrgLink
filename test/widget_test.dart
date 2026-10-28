@@ -36,7 +36,7 @@ void main() {
       expect(find.text('Loading OrgLink...'), findsOneWidget);
       repository.controller.add(null);
       await tester.pumpAndSettle();
-      expect(find.text('Google Sign-In'), findsOneWidget);
+      expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
       repository.cancelSignIn = true;
       await tester.tap(find.text('Continue With Google'));
       await tester.pumpAndSettle();
@@ -69,9 +69,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('home-dashboard')), findsOneWidget);
       expect(profiles.saveCalls, 1);
-      await tester.ensureVisible(
-        find.widgetWithText(TextButton, 'Edit Student Profile'),
-      );
+      await tester.tap(find.text('Profile').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Edit Student Profile'));
       await tester.pumpAndSettle();
@@ -92,7 +90,7 @@ void main() {
       expect(find.byKey(const ValueKey('home-dashboard')), findsNothing);
       await tester.tap(find.text('Sign Out'));
       await tester.pumpAndSettle();
-      expect(find.text('Google Sign-In'), findsOneWidget);
+      expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       router.dispose();
       auth.dispose();

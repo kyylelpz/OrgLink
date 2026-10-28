@@ -313,7 +313,7 @@ void main() {
       expect(find.text('Find Your Community'), findsOneWidget);
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
-      expect(find.text('Student Profile'), findsOneWidget);
+      expect(find.text('Your Profile'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(
@@ -498,6 +498,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }
+    await tester.tap(find.text('Edit Student Profile'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Save Student Profile'),
     );
@@ -632,7 +634,7 @@ void main() {
       await tester.pumpAndSettle();
       app.accounts.controller.add(null);
       await tester.pumpAndSettle();
-      expect(find.text('Google Sign-In'), findsOneWidget);
+      expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
       expect(find.byType(OrgLinkNavigationBar), findsNothing);
     },
   );
