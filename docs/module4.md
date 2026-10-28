@@ -121,16 +121,22 @@ cross-account state retention through the nested router Navigator.
 
 ## Navigation and screens
 
-One authenticated shell supplies Home | Organizations | QR | Events | Profile.
-The center QR icon is emphasized and opens the hub; it does not request camera
-access. Existing organization/event navigation remains available as local links,
+Phase 2's authenticated shell supplies Home | Calendar | QR | Organizations | Profile.
+The center QR icon opens the scanner only for verified organization-scoped scan
+operators; other students retain the QR Hub with personal actions and no camera
+request. Scanner secondary actions retain My QR Code, My Attendance, Manual Lookup
+and QR Hub Actions. Camera operations stop on route cover/background and serialize
+startup/disposal across tab re-entry. See docs/ui-ux-design.md for the updated UI
+specification. Attendance authorization and backend behavior are unchanged.
+Existing organization/event navigation remains available as local links,
 including My Organizations, Requests and My Events. Home retains all prior actions
 and adds My Attendance and Attendance Management. Eligible event details link to
 My QR Code; organizers also get Attendance Verification.
 
 | Route | Purpose |
 | --- | --- |
-| /qr | QR Hub: My QR Code, permitted Scan QR Code, history and management |
+| /qr | Authorized scanner entry; student QR Hub/personal actions without scan permission |
+| /qr/actions | Secondary QR Hub with personal, scanner and management actions |
 | /qr/my-code | Select an active registration, generate/show/regenerate a pass |
 | /qr/scan | Universal scanner, with organization-specific permission guard |
 | /my-attendance | Own registration-linked attendance and participation summary |

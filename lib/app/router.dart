@@ -21,6 +21,8 @@ import '../core/widgets/placeholder_screen.dart';
 import '../features/auth/presentation/screens/auth_screens.dart';
 import '../features/auth/presentation/viewmodels/auth_view_model.dart';
 import '../features/home/presentation/screens/home_screen.dart';
+import '../features/home/presentation/screens/coming_soon_screen.dart';
+import '../features/attendance/presentation/scanner_route_observer.dart';
 import '../features/profile/presentation/screens/complete_profile_screen.dart';
 
 GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
@@ -41,7 +43,11 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     GoRoute(path: AppRoutes.signIn, builder: (_, _) => const SignInScreen()),
     ShellRoute(
       builder: (_, state, child) => auth.profile?.isEligible == true
-          ? AuthenticatedShell(path: state.uri.path, child: child)
+          ? AuthenticatedShell(
+              key: ValueKey(auth.user?.id),
+              path: state.uri.path,
+              child: child,
+            )
           : child,
       routes: [
         GoRoute(
@@ -52,15 +58,41 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
           path: AppRoutes.accountStatus,
           builder: (_, _) => const AccountStatusScreen(),
         ),
-        GoRoute(path: AppRoutes.home, builder: (_, _) => const HomeScreen()),
+        GoRoute(
+          path: AppRoutes.calendar,
+          builder: (_, _) => const ComingSoonScreen(
+            title: 'Calendar',
+            message:
+                'The event calendar is coming soon. Browse current events from Home.',
+            icon: Icons.calendar_month_outlined,
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.notifications,
+          builder: (_, _) => const ComingSoonScreen(
+            title: 'Notifications',
+            message:
+                'Notifications are coming soon. No notification feed is available yet.',
+            icon: Icons.notifications_outlined,
+          ),
+        ),
         ShellRoute(
           builder: (_, _, child) => OrganizationScope(child: child),
           routes: [
             ShellRoute(
+              observers: [scannerRouteObserver],
               builder: (_, _, child) => EventHubScope(child: child),
               routes: [
                 GoRoute(
+                  path: AppRoutes.home,
+                  builder: (_, _) => const HomeScreen(),
+                ),
+                GoRoute(
                   path: AppRoutes.qr,
+                  builder: (_, _) => const QRLandingScreen(),
+                ),
+                GoRoute(
+                  path: AppRoutes.qrActions,
                   builder: (_, _) => const QRHubScreen(),
                 ),
                 GoRoute(
@@ -247,6 +279,8 @@ String? authRedirect(
       path == AppRoutes.attendanceHub ||
       path == AppRoutes.completeProfile ||
       path == AppRoutes.home ||
+      path == AppRoutes.calendar ||
+      path == AppRoutes.notifications ||
       path == AppRoutes.events ||
       path == AppRoutes.myEvents ||
       path == AppRoutes.organizations ||

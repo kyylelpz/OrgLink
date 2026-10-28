@@ -9,23 +9,31 @@ service cloud.firestore {
         && data.yearLevel is int && data.yearLevel >= 1 && data.yearLevel <= 6
         && data.section is string && data.section.matches('^[A-Za-z0-9][A-Za-z0-9 -]{0,29}$');
     }
+    function validAcademicField(data, field) {
+      return !(field in data) || (data[field] is string && data[field].size() <= 160
+        && (data[field] == '' || (data[field].size() >= 2 && data[field].matches('.*[^ ].*')))
+        && data[field].matches('^[^\\n\\r\\t]*$'));
+    }
+    function validAcademic(data) {
+      return validAcademicField(data, 'college') && validAcademicField(data, 'program');
+    }
     match /users/{uid} {
       allow get: if owner(uid);
       allow create: if owner(uid)
         && request.auth.token.email is string
         && request.resource.data.keys().hasAll(['uid','email','fullName','studentNumber','yearLevel','section','photoURL','platformRole','accountStatus','createdAt','updatedAt'])
-        && request.resource.data.keys().hasOnly(['uid','email','fullName','studentNumber','yearLevel','section','photoURL','platformRole','accountStatus','createdAt','updatedAt'])
+        && request.resource.data.keys().hasOnly(['uid','email','fullName','studentNumber','yearLevel','section','college','program','photoURL','platformRole','accountStatus','createdAt','updatedAt'])
         && request.resource.data.uid == uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.platformRole == 'user'
         && request.resource.data.accountStatus == 'active'
         && (request.resource.data.photoURL == null || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048))
-        && validStudent(request.resource.data)
+        && validStudent(request.resource.data) && validAcademic(request.resource.data)
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
       allow update: if owner(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName','studentNumber','yearLevel','section','updatedAt'])
-        && validStudent(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName','studentNumber','yearLevel','section','college','program','updatedAt'])
+        && validStudent(request.resource.data) && validAcademic(request.resource.data)
         && request.resource.data.updatedAt == request.time;
       // Listing, deletion, privileged fields and other users' data are denied.
     }

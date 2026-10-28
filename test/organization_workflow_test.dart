@@ -1,3 +1,5 @@
+import 'package:orglink/features/events/data/repositories/event_repository.dart';
+import 'support/test_event_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -24,11 +26,13 @@ void main() {
       final auth = AuthViewModel(authRepository, profileRepository);
       final router = createAppRouter(auth);
       final organizations = TestOrganizationRepository();
+      final events = TestEventRepository();
       await tester.pumpWidget(
         MultiProvider(
           providers: [
             ChangeNotifierProvider.value(value: auth),
             Provider<GoRouter>.value(value: router),
+            Provider<EventRepository>.value(value: events),
             Provider<OrganizationRepository>.value(value: organizations),
           ],
           child: const OrgLinkApp(),
@@ -38,14 +42,13 @@ void main() {
       await tester.pump();
       profileRepository.controller.add(profile());
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Discover Organizations'));
-      await tester.tap(find.text('Discover Organizations'));
+      await tester.tap(find.text('Organizations').last);
       await tester.pumpAndSettle();
-      expect(find.text('Organization Discovery'), findsOneWidget);
+      expect(find.text('Find Your People'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'does not exist');
       await tester.pumpAndSettle();
-      expect(find.text('No organizations match your search.'), findsOneWidget);
+      expect(find.text('No Organizations Found'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'Robotics');
       await tester.pumpAndSettle();
       await tester.tap(find.text('Demo Robotics'));
@@ -55,6 +58,12 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).last,
       );
+      // Typography changes can leave the text visible behind the shell bar.
+      await Scrollable.ensureVisible(
+        tester.element(find.text('Request to Join')),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Request to Join'));
       await tester.pumpAndSettle();
       expect(find.text('Membership: Pending'), findsOneWidget);
@@ -115,11 +124,12 @@ void main() {
       );
       authRepository.controller.add(null);
       await tester.pumpAndSettle();
-      expect(find.text('Google Sign-In'), findsOneWidget);
+      expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       router.dispose();
       auth.dispose();
       await organizations.close();
+      await events.close();
       await authRepository.controller.close();
       await profileRepository.controller.close();
     },

@@ -1,3 +1,7 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
+import '../../../../core/widgets/app_feedback.dart';
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/utils/display_labels.dart';
 import '../../data/models/event_registration.dart';
 import 'package:flutter/material.dart';
@@ -21,29 +25,34 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     final model = context.watch<EventHubViewModel>();
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
         title: const Text('My Events'),
-        leading: IconButton(
-          onPressed: () => context.go(AppRoutes.home),
-          icon: const Icon(Icons.home),
-        ),
+        leading: const AppBackButton(),
       ),
       bottomNavigationBar: const EventNavigation(1),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: DropdownButtonFormField<String>(
-              initialValue: filter,
-              decoration: const InputDecoration(labelText: 'Show'),
-              items: [
-                for (final value in ['All', 'Upcoming', 'Past', 'Cancelled'])
-                  DropdownMenuItem(value: value, child: Text(value)),
-              ],
-              onChanged: (value) => setState(() => filter = value!),
+      body: AppPageBody(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AppSectionHeading(
+              title: "What's Next for You",
+              description: 'Your event registrations',
+              prominent: true,
             ),
-          ),
-          Expanded(
-            child: QueryContent(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+              child: DropdownButtonFormField<String>(
+                initialValue: filter,
+                decoration: const InputDecoration(labelText: 'Show'),
+                items: [
+                  for (final value in ['All', 'Upcoming', 'Past', 'Cancelled'])
+                    DropdownMenuItem(value: value, child: Text(value)),
+                ],
+                onChanged: (value) => setState(() => filter = value!),
+              ),
+            ),
+            QueryContent(
               query: model.mine,
               builder: (records) {
                 final matching = (records ?? []).where((record) {
@@ -61,12 +70,13 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                   };
                 }).toList();
                 if (matching.isEmpty) {
-                  return const Center(
-                    child: Text('No registrations match this view.'),
+                  return const AppEmptyView(
+                    title: 'No Registrations Found',
+                    message: 'No registrations match this view.',
                   );
                 }
-                return ListView(
-                  padding: const EdgeInsets.all(12),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final record in matching)
                       Builder(
@@ -110,6 +120,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                       ? null
                                       : IconButton(
                                           onPressed: lookup!.retry,
+                                          tooltip: 'Retry Event Details',
                                           icon: const Icon(Icons.refresh),
                                         ),
                                   onTap: () => context.go(
@@ -163,8 +174,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                 );
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

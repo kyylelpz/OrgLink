@@ -148,12 +148,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('McDonald'), findsOneWidget);
-      expect(
-        find.textContaining(
-          'Registered: 2 | Present: 0 | Absent: 0 | Not Marked: 2',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('2'), findsOneWidget); // Registered metric.
+      expect(find.text('0 Absent'), findsOneWidget);
+      expect(find.text('2 Not Marked'), findsOneWidget);
       await tester.ensureVisible(
         find.widgetWithText(OutlinedButton, 'Mark Absent').first,
       );

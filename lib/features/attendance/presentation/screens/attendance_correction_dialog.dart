@@ -1,3 +1,5 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/display_labels.dart';
 import '../../../events/data/models/event_registration.dart';
@@ -39,6 +41,10 @@ class _AttendanceCorrectionDialogState
     builder: (context, _) => PopScope(
       canPop: !widget.model.busy,
       child: AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        titleTextStyle: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(color: AppColors.brandMidnight),
         title: const Text('Confirm Attendance Correction'),
         content: SingleChildScrollView(
           child: Form(
@@ -47,15 +53,53 @@ class _AttendanceCorrectionDialogState
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.model.nameFor(widget.registration.uid)),
+                Text(
+                  widget.model.context.organization.value?.name ??
+                      'Organization Unavailable',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: AppColors.brandBlue),
+                ),
+                Text(
+                  widget.model.context.event?.value?.title ??
+                      'Event Unavailable',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppSurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        widget.model.nameFor(widget.registration.uid),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      const Text('Before'),
+                      const SizedBox(height: AppSpacing.xs),
+                      AppStatusChip(
+                        label: displayIdentifier(
+                          widget.preview.previousStatus.name,
+                        ),
+                        tone:
+                            widget.preview.previousStatus ==
+                                AttendanceStatus.present
+                            ? AppStatusTone.success
+                            : AppStatusTone.error,
+                      ),
+                    ],
+                  ),
+                ),
                 Text(
                   'Current status: ${displayIdentifier(widget.preview.previousStatus.name)}',
                 ),
+                const SizedBox(height: AppSpacing.md),
                 const Text(
                   'This replaces the active result and permanently records your reason and identity in the correction history. Pending removes the active result; old QR passes will not work.',
                 ),
                 DropdownButtonFormField<AttendanceCorrectionStatus>(
                   initialValue: _status,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'New Status'),
                   items: [
                     for (final status in AttendanceCorrectionStatus.values)
@@ -69,6 +113,16 @@ class _AttendanceCorrectionDialogState
                       ? null
                       : (value) => setState(() => _status = value!),
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                AppStatusChip(
+                  label: 'After: ${displayIdentifier(_status.name)}',
+                  tone: _status == AttendanceCorrectionStatus.present
+                      ? AppStatusTone.success
+                      : _status == AttendanceCorrectionStatus.absent
+                      ? AppStatusTone.error
+                      : AppStatusTone.warning,
+                ),
+                const SizedBox(height: AppSpacing.lg),
                 TextFormField(
                   controller: _reason,
                   enabled: !widget.model.busy,

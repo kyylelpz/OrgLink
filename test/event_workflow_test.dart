@@ -139,7 +139,7 @@ void main() {
       );
       authRepository.controller.add(null);
       await tester.pumpAndSettle();
-      expect(find.text('Google Sign-In'), findsOneWidget);
+      expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       router.dispose();
       auth.dispose();

@@ -1,68 +1,245 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../viewmodels/organization_hub_view_model.dart';
 import '../widgets/organization_widgets.dart';
 
-class OrganizationDiscoveryScreen extends StatelessWidget {
+class OrganizationDiscoveryScreen extends StatefulWidget {
   const OrganizationDiscoveryScreen({super.key});
+  @override
+  State<OrganizationDiscoveryScreen> createState() =>
+      _OrganizationDiscoveryScreenState();
+}
+
+class _OrganizationDiscoveryScreenState
+    extends State<OrganizationDiscoveryScreen> {
+  final _search = TextEditingController();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_search.text.isEmpty) {
+      _search.text = context.read<OrganizationHubViewModel>().search;
+    }
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final model = context.watch<OrganizationHubViewModel>();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Organization Discovery'),
-        leading: IconButton(
-          icon: const Icon(Icons.home),
-          onPressed: () => context.go(AppRoutes.home),
-        ),
+    final errors = [
+      model.discovery.failure,
+      model.mine.failure,
+      model.managed.failure,
+      ...model.associated.values.map((q) => q.failure),
+    ];
+    final failure = errors.where((e) => e != null).firstOrNull;
+    final loading =
+        model.discovery.loading ||
+        model.mine.loading ||
+        model.managed.loading ||
+        model.associated.values.any((q) => q.loading);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
       ),
-      bottomNavigationBar: const OrganizationNavigation(0),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              onChanged: model.searchFor,
-              decoration: const InputDecoration(
-                labelText: 'Search Organizations by Name',
-                prefixIcon: Icon(Icons.search),
+      child: Scaffold(
+        backgroundColor: AppColors.brandMist,
+        // 1. Remove the standard AppBar entirely
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 2. Recreate the dark board from the Home Screen
+            Container(
+              decoration: const BoxDecoration(
+                color: AppColors.brandMidnight,
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(AppShape.featureRadius),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: AppLayout.contentWidth,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xl,
+                        AppSpacing.md,
+                        AppSpacing.xl,
+                        AppSpacing.lg,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title
+                          Text(
+                            'Organizations',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: AppColors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+
+                          // Heading & Description
+                          Text(
+                            'Find Your People',
+                            style: Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(
+                                  color: AppColors.white,
+                                  fontSize: 28,
+                                  height: 1.15,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Explore organizations and keep track of your memberships.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppColors.border,
+                                  fontSize: 12,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+
+                          // Search Bar
+                          AppSearchField(
+                            controller: _search,
+                            onChanged: model.searchFor,
+                            label: 'Search Organizations',
+                            compact: true,
+                            hintText: 'Search organizations',
+                            leading: const Padding(
+                              padding: EdgeInsets.all(14),
+                              child: Icon(
+                                Icons.search,
+                                size: 19,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: QueryContent(
-              query: model.discovery,
-              builder: (_) {
-                if (model.results.isEmpty) {
-                  return Center(
-                    child: Text(
-                      model.search.trim().isEmpty
-                          ? 'No public organizations are available yet.'
-                          : 'No organizations match your search.',
+
+            // 3. The rest of the body content (White background)
+            Expanded(
+              child: AppPageBody(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: AppSpacing.md),
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        chipTheme: Theme.of(context).chipTheme.copyWith(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final filter
+                              in OrganizationBrowseFilter.values) ...[
+                            if (filter != OrganizationBrowseFilter.values.first)
+                              const SizedBox(width: 6),
+                            Expanded(
+                              child: AppFilterChip(
+                                expanded: true,
+                                label: displayIdentifier(filter.name),
+                                selected: model.browseFilter == filter,
+                                onSelected: (_) => model.browse(filter),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  );
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: model.results.length,
-                  itemBuilder: (context, index) {
-                    final org = model.results[index];
-                    final membership = model.membership(org.id);
-                    return OrganizationCard(
-                      organization: org,
-                      subtitle: membership == null
-                          ? null
-                          : 'Membership: ${displayMembershipStatus(membership.status)}',
-                    );
-                  },
-                );
-              },
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              context.push(AppRoutes.myOrganizations),
+                          child: const Text('My Organizations'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              context.push(AppRoutes.membershipRequests),
+                          child: const Text('Membership Requests'),
+                        ),
+                      ],
+                    ),
+                    if (failure != null)
+                      AppErrorView(
+                        message: failure.message,
+                        onRetry: model.retry,
+                      )
+                    else if (loading)
+                      const AppLoadingView(message: 'Loading organizations...')
+                    else if (model.browseResults.isEmpty)
+                      const AppEmptyView(
+                        title: 'No Organizations Found',
+                        message:
+                            'Try another search or filter. Membership requests remain available above.',
+                      )
+                    else
+                      for (final org in model.browseResults)
+                        OrganizationCard(
+                          organization: org,
+                          onTap: () =>
+                              context.push(AppRoutes.organization(org.id)),
+                          status: org.managerUid == model.uid
+                              ? const AppStatusChip(
+                                  label: 'Manager',
+                                  tone: AppStatusTone.info,
+                                )
+                              : model.membership(org.id) == null
+                              ? null
+                              : AppStatusChip(
+                                  label: displayMembershipStatus(
+                                    model.membership(org.id)!.status,
+                                  ),
+                                  tone: membershipStatusTone(
+                                    model.membership(org.id)!.status,
+                                  ),
+                                ),
+                          actionLabel:
+                              model.membership(org.id) == null &&
+                                  org.managerUid != model.uid &&
+                                  org.status == 'active' &&
+                                  org.visibility == 'public'
+                              ? 'Join'
+                              : 'View',
+                        ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
