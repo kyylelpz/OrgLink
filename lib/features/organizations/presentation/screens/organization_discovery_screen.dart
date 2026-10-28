@@ -56,11 +56,16 @@ class _OrganizationDiscoveryScreenState
       ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
-        // 1. Remove the standard AppBar entirely
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OrganizationNavigation(0),
+          ],
+        ),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 2. Recreate the dark board from the Home Screen
+            // DARK HEADER
             Container(
               decoration: const BoxDecoration(
                 color: AppColors.brandMidnight,
@@ -86,21 +91,22 @@ class _OrganizationDiscoveryScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Title
                           Text(
                             'Organizations',
-                            style: Theme.of(context).textTheme.titleLarge
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
                                 ?.copyWith(
                                   color: AppColors.white,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
                           const SizedBox(height: AppSpacing.md),
-
-                          // Heading & Description
                           Text(
                             'Find Your People',
-                            style: Theme.of(context).textTheme.headlineMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
                                 ?.copyWith(
                                   color: AppColors.white,
                                   fontSize: 28,
@@ -110,15 +116,15 @@ class _OrganizationDiscoveryScreenState
                           const SizedBox(height: 4),
                           Text(
                             'Explore organizations and keep track of your memberships.',
-                            style: Theme.of(context).textTheme.bodySmall
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
                                 ?.copyWith(
                                   color: AppColors.border,
                                   fontSize: 12,
                                 ),
                           ),
                           const SizedBox(height: AppSpacing.lg),
-
-                          // Search Bar
                           AppSearchField(
                             controller: _search,
                             onChanged: model.searchFor,
@@ -142,7 +148,7 @@ class _OrganizationDiscoveryScreenState
               ),
             ),
 
-            // 3. The rest of the body content (White background)
+            // MAIN CONTENT
             Expanded(
               child: AppPageBody(
                 child: Column(
@@ -163,7 +169,8 @@ class _OrganizationDiscoveryScreenState
                         children: [
                           for (final filter
                               in OrganizationBrowseFilter.values) ...[
-                            if (filter != OrganizationBrowseFilter.values.first)
+                            if (filter !=
+                                OrganizationBrowseFilter.values.first)
                               const SizedBox(width: 6),
                             Expanded(
                               child: AppFilterChip(
@@ -177,28 +184,15 @@ class _OrganizationDiscoveryScreenState
                         ],
                       ),
                     ),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      children: [
-                        TextButton(
-                          onPressed: () =>
-                              context.push(AppRoutes.myOrganizations),
-                          child: const Text('My Organizations'),
-                        ),
-                        TextButton(
-                          onPressed: () =>
-                              context.push(AppRoutes.membershipRequests),
-                          child: const Text('Membership Requests'),
-                        ),
-                      ],
-                    ),
                     if (failure != null)
                       AppErrorView(
                         message: failure.message,
                         onRetry: model.retry,
                       )
                     else if (loading)
-                      const AppLoadingView(message: 'Loading organizations...')
+                      const AppLoadingView(
+                        message: 'Loading organizations...',
+                      )
                     else if (model.browseResults.isEmpty)
                       const AppEmptyView(
                         title: 'No Organizations Found',

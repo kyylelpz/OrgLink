@@ -207,29 +207,41 @@ class OrganizationPageHeading extends StatelessWidget {
 class OrganizationNavigation extends StatelessWidget {
   const OrganizationNavigation(this.index, {super.key});
   final int index;
+
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
-    child: ColoredBox(
-      color: AppColors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          spacing: AppSpacing.sm,
-          children: [
-            for (final entry in [
-              ('Discover', AppRoutes.organizations),
-              ('My Organizations', AppRoutes.myOrganizations),
-              ('Requests', AppRoutes.membershipRequests),
-            ].indexed)
-              AppFilterChip(
-                label: entry.$2.$1,
-                selected: index == entry.$1,
-                onSelected: (_) => context.go(entry.$2.$2),
-              ),
-          ],
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F9), 
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(24), // Rounded top corners
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brandMidnight.withOpacity(0.05), // Subtle shadow to lift it up
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: AppSpacing.sm,
+        children: [
+          for (final entry in [
+            ('Discover', AppRoutes.organizations),
+            ('My Organizations', AppRoutes.myOrganizations),
+            ('Requests', AppRoutes.membershipRequests),
+          ].indexed)
+            AppFilterChip(
+              label: entry.$2.$1,
+              selected: index == entry.$1,
+              onSelected: (_) => context.go(entry.$2.$2),
+            ),
+        ],
       ),
     ),
   );
