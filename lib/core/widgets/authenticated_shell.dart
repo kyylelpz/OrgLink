@@ -142,10 +142,6 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
                   labelTextStyle: WidgetStatePropertyAll(
                     Theme.of(context).textTheme.labelMedium?.copyWith(
                       letterSpacing: 0,
-                      // The bundled font supports wdth 75-100; retain full labels on compact phones.
-                      fontVariations: MediaQuery.sizeOf(context).width < 380
-                          ? const [FontVariation('wdth', 75)]
-                          : null,
                       color: Theme.of(context).colorScheme.secondary,
                     ),
                   ),

@@ -20,11 +20,7 @@ class AppPageBody extends StatelessWidget {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Padding(
-              padding: EdgeInsets.all(
-                constraints.maxWidth < AppLayout.compactBreakpoint
-                    ? AppSpacing.lg
-                    : AppSpacing.xl,
-              ),
+              padding: EdgeInsets.all(AppSpacing.xl),
               child: child,
             ),
           ),
@@ -98,13 +94,13 @@ class AppStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (foreground, background, icon) = switch (tone) {
       AppStatusTone.neutral => (
-        AppColors.brandNavy,
+        AppColors.muted,
         AppColors.brandMist,
         Icons.circle_outlined,
       ),
       AppStatusTone.info => (
-        AppColors.brandNavy,
-        AppColors.brandMist,
+        AppColors.brandBlue,
+        AppColors.tonal,
         Icons.info_outline,
       ),
       AppStatusTone.success => (
@@ -130,24 +126,24 @@ class AppStatusChip extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: background,
-            borderRadius: AppShape.field,
+            borderRadius: AppShape.pill,
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
+              horizontal: AppSpacing.chipHorizontal,
+              vertical: AppSpacing.chipVertical,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, color: foreground, size: 20),
+                Icon(icon, color: foreground, size: AppIconSize.small),
                 const SizedBox(width: AppSpacing.sm),
                 Flexible(
                   child: Text(
                     label,
                     style: Theme.of(
                       context,
-                    ).textTheme.labelLarge?.copyWith(color: foreground),
+                    ).textTheme.labelMedium?.copyWith(color: foreground),
                   ),
                 ),
               ],
@@ -159,7 +155,8 @@ class AppStatusChip extends StatelessWidget {
   }
 }
 
-enum AppActionStyle { primary, secondary, destructive }
+// Keep secondary as the existing outlined contract; tonal is opt-in.
+enum AppActionStyle { primary, secondary, outlined, tonal, text, destructive }
 
 class AppActionButton extends StatelessWidget {
   const AppActionButton({
@@ -181,48 +178,78 @@ class AppActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final callback = busy ? null : onPressed;
     final colors = Theme.of(context).colorScheme;
+    final filled =
+        style == AppActionStyle.primary || style == AppActionStyle.destructive;
+    final foreground = style == AppActionStyle.destructive
+        ? colors.onError
+        : filled
+        ? colors.onPrimary
+        : colors.primary;
     final indicator = busy
-        ? SizedBox(
-            width: 18,
-            height: 18,
+        ? SizedBox.square(
+            dimension: AppIconSize.small,
             child: CircularProgressIndicator(
               strokeWidth: 2,
               semanticsLabel: busyLabel,
-              color: colors.onSurface.withValues(alpha: 0.6),
+              color: foreground,
             ),
           )
         : icon == null
         ? null
-        : Icon(icon);
-    final destructive = style == AppActionStyle.destructive
-        ? FilledButton.styleFrom(
-            backgroundColor: colors.error,
-            foregroundColor: colors.onError,
+        : Icon(icon, size: AppIconSize.small);
+    // Busy actions retain the Figma filled/tonal appearance while disabling taps.
+    final ButtonStyle? appearance = style == AppActionStyle.destructive || busy
+        ? ButtonStyle(
+            foregroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled) && !busy
+                  ? AppColors.muted
+                  : foreground,
+            ),
+            backgroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled) && !busy
+                  ? AppColors.border
+                  : style == AppActionStyle.destructive
+                  ? colors.error
+                  : filled
+                  ? colors.primary
+                  : style == AppActionStyle.tonal
+                  ? AppColors.tonal
+                  : colors.surface,
+            ),
           )
         : null;
-    final button = style == AppActionStyle.secondary
-        ? indicator == null
-              ? OutlinedButton(
-                  onPressed: callback,
-                  child: Text(label, textAlign: TextAlign.center),
-                )
-              : OutlinedButton.icon(
-                  onPressed: callback,
-                  icon: indicator,
-                  label: Text(label, textAlign: TextAlign.center),
-                )
-        : indicator == null
-        ? FilledButton(
-            onPressed: callback,
-            style: destructive,
-            child: Text(label, textAlign: TextAlign.center),
-          )
-        : FilledButton.icon(
-            onPressed: callback,
-            icon: indicator,
-            style: destructive,
-            label: Text(label, textAlign: TextAlign.center),
-          );
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (indicator != null) ...[
+          indicator,
+          const SizedBox(width: AppSpacing.sm),
+        ],
+        Flexible(child: Text(label, textAlign: TextAlign.center)),
+      ],
+    );
+    final button = switch (style) {
+      AppActionStyle.secondary || AppActionStyle.outlined => OutlinedButton(
+        onPressed: callback,
+        style: appearance,
+        child: content,
+      ),
+      AppActionStyle.tonal => FilledButton.tonal(
+        onPressed: callback,
+        style: appearance,
+        child: content,
+      ),
+      AppActionStyle.text => TextButton(
+        onPressed: callback,
+        style: appearance,
+        child: content,
+      ),
+      AppActionStyle.primary || AppActionStyle.destructive => FilledButton(
+        onPressed: callback,
+        style: appearance,
+        child: content,
+      ),
+    };
     return Semantics(liveRegion: busy, child: button);
   }
 }
@@ -253,14 +280,6 @@ class AppSearchField extends StatelessWidget {
           decoration: InputDecoration(
             labelText: label,
             hintText: hintText,
-            enabledBorder: const OutlineInputBorder(
-              borderRadius: AppShape.action,
-              borderSide: BorderSide.none,
-            ),
-            disabledBorder: const OutlineInputBorder(
-              borderRadius: AppShape.action,
-              borderSide: BorderSide.none,
-            ),
             prefixIcon: const Icon(Icons.search),
             suffixIcon: value.text.isEmpty
                 ? null
@@ -277,4 +296,31 @@ class AppSearchField extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Chip presentation only; selected values and filtering stay with callers.
+class AppFilterChip extends StatelessWidget {
+  const AppFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+  final String label;
+  final bool selected;
+  final ValueChanged<bool>? onSelected;
+  @override
+  Widget build(BuildContext context) => FilterChip(
+    label: Text(label, softWrap: true),
+    selected: selected,
+    onSelected: onSelected,
+    labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+      color: onSelected == null
+          ? AppColors.muted
+          : selected
+          ? AppColors.white
+          : AppColors.muted,
+    ),
+    materialTapTargetSize: MaterialTapTargetSize.padded,
+  );
 }

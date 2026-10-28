@@ -185,7 +185,7 @@ Future<void> _flush() async {
 void main() {
   setUpAll(() async {
     for (final (family, path) in [
-      ('Open Sans', 'assets/fonts/open_sans/OpenSans-Variable.ttf'),
+      ('Inter', 'assets/fonts/inter/Inter-Variable.ttf'),
       ('MaterialIcons', 'fonts/MaterialIcons-Regular.otf'),
     ]) {
       final loader = FontLoader(family)..addFont(rootBundle.load(path));

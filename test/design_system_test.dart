@@ -27,9 +27,8 @@ Widget app(Widget child, {double scale = 1}) => MaterialApp(
 void main() {
   setUpAll(() async {
     // Exercise the bundled production font, rather than Flutter test's Ahem font.
-    final loader = FontLoader(
-      AppTheme.fontFamily,
-    )..addFont(rootBundle.load('assets/fonts/open_sans/OpenSans-Variable.ttf'));
+    final loader = FontLoader(AppTheme.fontFamily)
+      ..addFont(rootBundle.load('assets/fonts/inter/Inter-Variable.ttf'));
     await loader.load();
     final icons = FontLoader('MaterialIcons')
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
@@ -101,7 +100,7 @@ void main() {
       const [
         Color(0xFF000246),
         Color(0xFF1E2A78),
-        Color(0xFF002BED),
+        Color(0xFF152D97),
         Color(0xFF8E75F7),
         Color(0xFFF0F2FA),
         Color(0xFF0A0A0A),
@@ -111,8 +110,8 @@ void main() {
     );
     final theme = AppTheme.light, colors = theme.colorScheme;
     expect(theme.useMaterial3, isTrue);
-    expect(theme.textTheme.bodyLarge!.fontFamily, 'Open Sans');
-    expect(theme.textTheme.bodyLarge!.height, 1.5);
+    expect(theme.textTheme.bodyLarge!.fontFamily, 'Inter');
+    expect(theme.textTheme.bodyLarge!.height, 1.4);
     for (final (foreground, background) in [
       (colors.onPrimary, colors.primary),
       (colors.onSecondary, colors.secondary),
@@ -124,6 +123,9 @@ void main() {
       (AppColors.warning, AppColors.warningSurface),
       (AppColors.error, AppColors.errorSurface),
       (AppColors.brandNavy, AppColors.brandMist),
+      (AppColors.muted, AppColors.brandMist),
+      (AppColors.brandBlue, AppColors.tonal),
+      (AppColors.error, AppColors.brandMist),
     ]) {
       expect(contrast(foreground, background), greaterThanOrEqualTo(4.5));
     }
@@ -138,14 +140,12 @@ void main() {
   testWidgets(
     'licensed font loads from local assets with its distributed notice',
     (tester) async {
-      final notice = await rootBundle.loadString(
-        'assets/fonts/open_sans/OFL.txt',
-      );
-      expect(notice, contains('Copyright 2020 The Open Sans Project Authors'));
+      final notice = await rootBundle.loadString('assets/fonts/inter/OFL.txt');
+      expect(notice, contains('Copyright 2020 The Inter Project Authors'));
       expect(notice, contains('SIL OPEN FONT LICENSE Version 1.1'));
       expect(
         (await rootBundle.load(
-          'assets/fonts/open_sans/OpenSans-Variable.ttf',
+          'assets/fonts/inter/Inter-Variable.ttf',
         )).lengthInBytes,
         greaterThan(100000),
       );
@@ -154,6 +154,9 @@ void main() {
 
   for (final size in [
     const Size(320, 640),
+    const Size(360, 800),
+    const Size(393, 852),
+    const Size(412, 915),
     const Size(430, 932),
     const Size(900, 700),
   ]) {

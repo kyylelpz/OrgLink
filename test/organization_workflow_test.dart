@@ -59,6 +59,12 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).last,
       );
+      // Typography changes can leave the text visible behind the shell bar.
+      await Scrollable.ensureVisible(
+        tester.element(find.text('Request to Join')),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Request to Join'));
       await tester.pumpAndSettle();
       expect(find.text('Membership: Pending'), findsOneWidget);

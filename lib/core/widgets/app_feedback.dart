@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_tokens.dart';
 import 'app_components.dart';
+import 'app_logo.dart';
 
 class AppLoadingView extends StatelessWidget {
   const AppLoadingView({super.key, this.message = 'Loading OrgLink...'});
@@ -12,6 +13,8 @@ class AppLoadingView extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        const AppLogo(),
+        const SizedBox(height: AppSpacing.lg),
         CircularProgressIndicator(semanticsLabel: message),
         const SizedBox(height: AppSpacing.lg),
         Semantics(
@@ -37,12 +40,18 @@ class AppErrorView extends StatelessWidget {
         Icon(
           Icons.error_outline,
           color: Theme.of(context).colorScheme.error,
-          size: 32,
+          size: AppIconSize.feedback,
         ),
         const SizedBox(height: AppSpacing.lg),
         Semantics(
           liveRegion: true,
-          child: Text(message, textAlign: TextAlign.center),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.error),
+          ),
         ),
         if (onRetry != null) ...[
           const SizedBox(height: AppSpacing.lg),
@@ -75,7 +84,20 @@ class AppEmptyView extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 40, color: Theme.of(context).colorScheme.secondary),
+        if (icon == Icons.inbox_outlined)
+          Image.asset(
+            'assets/illustrations/empty_state.png',
+            width: 110,
+            height: 110,
+            fit: BoxFit.contain,
+            excludeFromSemantics: true,
+          )
+        else
+          Icon(
+            icon,
+            size: AppIconSize.feedback,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
         const SizedBox(height: AppSpacing.lg),
         Semantics(
           header: true,
@@ -86,12 +108,70 @@ class AppEmptyView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(message, textAlign: TextAlign.center),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+        ),
         if (actionLabel != null) ...[
           const SizedBox(height: AppSpacing.lg),
           AppActionButton(label: actionLabel!, onPressed: onAction),
         ],
       ],
+    ),
+  );
+}
+
+/// Render only after the caller has received a confirmed successful result.
+class AppSuccessView extends StatelessWidget {
+  const AppSuccessView({
+    super.key,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  }) : assert((actionLabel == null) == (onAction == null));
+  final String title, message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) => _FeedbackPanel(
+    child: Semantics(
+      liveRegion: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            color: AppColors.success,
+            size: AppIconSize.feedback,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(color: AppColors.success),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (actionLabel != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            AppActionButton(label: actionLabel!, onPressed: onAction),
+          ],
+        ],
+      ),
     ),
   );
 }

@@ -67,11 +67,13 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/fonts/open_sans/OFL.txt
+    - assets/fonts/inter/OFL.txt
+    - assets/icons/
+    - assets/illustrations/
   fonts:
-    - family: Open Sans
+    - family: Inter
       fonts:
-        - asset: assets/fonts/open_sans/OpenSans-Variable.ttf
+        - asset: assets/fonts/inter/Inter-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:
