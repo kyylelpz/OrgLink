@@ -1,3 +1,5 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -45,30 +47,41 @@ class AttendanceSelectionScreen extends StatelessWidget {
         .toList();
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
         leading: const AppBackButton(),
         title: const Text('Attendance Management'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            'Select an organization, then choose an event for verification or reporting.',
-          ),
-          if (authorized.isEmpty)
-            const Text('You have no attendance management permissions.'),
-          for (final org in authorized)
-            ExpansionTile(
-              key: ValueKey(org.id),
-              initiallyExpanded: org.id == initialOrganization,
-              title: Text(org.name),
-              children: [
-                _AttendanceEvents(
-                  key: ValueKey('${org.id}/${orgs.uid}'),
-                  org: org.id,
-                ),
-              ],
+      body: AppPageBody(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AppSectionHeading(
+              title: 'Your Event Attendance',
+              prominent: true,
             ),
-        ],
+            const SizedBox(height: AppSpacing.lg),
+            const Text(
+              'Select an organization, then choose an event for verification or reporting.',
+            ),
+            if (authorized.isEmpty)
+              const Text('You have no attendance management permissions.'),
+            for (final org in authorized)
+              AppSurfaceCard(
+                child: ExpansionTile(
+                  key: ValueKey(org.id),
+                  initiallyExpanded: org.id == initialOrganization,
+                  title: Text(org.name),
+                  children: [
+                    _AttendanceEvents(
+                      key: ValueKey('${org.id}/${orgs.uid}'),
+                      org: org.id,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -161,100 +174,133 @@ class AttendanceScreen extends StatelessWidget {
       body = const Center(child: Text('Event no longer available.'));
     } else {
       final event = model.context.event!.value!, summary = model.summary;
-      body = ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(model.context.organization.value!.name),
-          Text(event.title, style: Theme.of(context).textTheme.titleLarge),
-          Text('${schedule(event.startAt)} - ${schedule(event.endAt)}'),
-          Text(
-            'Registered: ${summary.registered} | Present: ${summary.present} | Absent: ${summary.absent} | Not Marked: ${summary.notMarked}',
-          ),
-          Text(
-            summary.rate == null
-                ? 'No eligible registered participants.'
-                : 'Attendance Rate: ${summary.rate!.toStringAsFixed(1)}%',
-          ),
-          const Text(
-            'Statistics use active registrations. Absent requires an explicit verification; missing records remain Not Marked.',
-          ),
-          if (!report)
+      body = AppPageBody(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppSectionHeading(
+              title: report ? 'Attendance Overview' : 'Event Attendance',
+              description: model.context.organization.value!.name,
+              prominent: true,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppSurfaceCard(child: EventSummary(event: event)),
+            AppMetricTiles(
+              values: [
+                ('${summary.registered}', 'Registered'),
+                ('${summary.present}', 'Present'),
+                (
+                  summary.rate == null
+                      ? '—'
+                      : '${summary.rate!.toStringAsFixed(1)}%',
+                  'Attendance',
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                AppStatusChip(
+                  label: '${summary.absent} Absent',
+                  tone: AppStatusTone.error,
+                ),
+                AppStatusChip(
+                  label: '${summary.notMarked} Not Marked',
+                  tone: AppStatusTone.warning,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
             const Text(
-              'Normal verification cannot replace an existing result. Authorized organizers use Correct Attendance separately. Server time and current permissions determine whether marking is allowed.',
+              'Statistics use active registrations. Absent requires an explicit verification; missing records remain Not Marked.',
             ),
-          if (!report && model.manualUnavailableReason != null)
-            Text(model.manualUnavailableReason!),
-          Wrap(
-            spacing: 8,
-            children: [
-              TextButton(
-                onPressed: () => context.go(
-                  AppRoutes.attendanceManagement(model.context.organizationId),
-                ),
-                child: const Text('Select Event'),
+            if (!report)
+              const Text(
+                'Normal verification cannot replace an existing result. Authorized organizers use Correct Attendance separately. Server time and current permissions determine whether marking is allowed.',
               ),
-              TextButton(
-                onPressed: () => context.go(
-                  report
-                      ? AppRoutes.attendance(
-                          model.context.organizationId,
-                          event.id,
-                        )
-                      : AppRoutes.attendanceReport(
-                          model.context.organizationId,
-                          event.id,
-                        ),
-                ),
-                child: Text(
-                  report ? 'Attendance Verification' : 'Attendance Report',
-                ),
-              ),
-              if (!report)
+            if (!report && model.manualUnavailableReason != null)
+              Text(model.manualUnavailableReason!),
+            Wrap(
+              spacing: 8,
+              children: [
                 TextButton(
-                  onPressed: () => context.go(AppRoutes.qrScan),
-                  child: const Text('Scan QR Code'),
+                  onPressed: () => context.go(
+                    AppRoutes.attendanceManagement(
+                      model.context.organizationId,
+                    ),
+                  ),
+                  child: const Text('Select Event'),
                 ),
-            ],
-          ),
-          TextField(
-            decoration: const InputDecoration(
-              labelText: 'Manual Lookup',
-              hintText: 'Search participants by name',
+                TextButton(
+                  onPressed: () => context.go(
+                    report
+                        ? AppRoutes.attendance(
+                            model.context.organizationId,
+                            event.id,
+                          )
+                        : AppRoutes.attendanceReport(
+                            model.context.organizationId,
+                            event.id,
+                          ),
+                  ),
+                  child: Text(
+                    report ? 'Attendance Verification' : 'Attendance Report',
+                  ),
+                ),
+                if (!report)
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.qrScan),
+                    child: const Text('Scan QR Code'),
+                  ),
+              ],
             ),
-            onChanged: (v) => model.setFilter(text: v),
-          ),
-          DropdownButtonFormField<String>(
-            initialValue: model.filter,
-            decoration: const InputDecoration(labelText: 'Attendance Status'),
-            items: [
-              for (final entry in {
-                'All': 'All',
-                'present': 'Present',
-                'absent': 'Absent',
-                'notMarked': 'Not Marked',
-              }.entries)
-                DropdownMenuItem(value: entry.key, child: Text(entry.value)),
-            ],
-            onChanged: (v) => model.setFilter(status: v),
-          ),
-          if (model.busy) const LinearProgressIndicator(),
-          if (model.failure != null) Text(model.failure!.message),
-          if (model.correctionMessage != null) Text(model.correctionMessage!),
-          if (model.result != null)
-            Text(
-              model.result!.duplicate
-                  ? 'Already Verified: ${attendanceLabel(model.result!.record)} | ${verificationLabel(model.result!.record)}'
-                  : 'Attendance saved: ${attendanceLabel(model.result!.record)}.',
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Manual Lookup',
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Search participants by name',
+              ),
+              onChanged: (v) => model.setFilter(text: v),
             ),
-          if (model.participants.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No participants match this view.'),
+            const SizedBox(height: AppSpacing.md),
+            DropdownButtonFormField<String>(
+              initialValue: model.filter,
+              decoration: const InputDecoration(labelText: 'Attendance Status'),
+              items: [
+                for (final entry in {
+                  'All': 'All',
+                  'present': 'Present',
+                  'absent': 'Absent',
+                  'notMarked': 'Not Marked',
+                }.entries)
+                  DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+              ],
+              onChanged: (v) => model.setFilter(status: v),
             ),
-          for (final registration in model.participants)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
+            if (model.busy) const LinearProgressIndicator(),
+            if (model.failure != null) Text(model.failure!.message),
+            if (model.correctionMessage != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                child: AppStatusChip(
+                  label: model.correctionMessage!,
+                  tone: AppStatusTone.success,
+                ),
+              ),
+            if (model.result != null)
+              Text(
+                model.result!.duplicate
+                    ? 'Already Verified: ${attendanceLabel(model.result!.record)} | ${verificationLabel(model.result!.record)}'
+                    : 'Attendance saved: ${attendanceLabel(model.result!.record)}.',
+              ),
+            if (model.participants.isEmpty)
+              const AppEmptyView(
+                title: 'No Participants Found',
+                message: 'No participants match this view.',
+              ),
+            for (final registration in model.participants)
+              AppSurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -262,6 +308,9 @@ class AttendanceScreen extends StatelessWidget {
                       model.nameFor(registration.uid),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    AttendanceStatusBadge(model.recordFor(registration.uid)),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(
                       'Registration: ${displayIdentifier(registration.status)} | Attendance: ${attendanceLabel(model.recordFor(registration.uid))}',
                     ),
@@ -319,12 +368,14 @@ class AttendanceScreen extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       );
     }
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
         leading: const AppBackButton(),
         title: Text(report ? 'Attendance Report' : 'Attendance Verification'),
         actions: [
@@ -364,74 +415,102 @@ class MyAttendanceScreen extends StatelessWidget {
     final pending = values.any((q) => q.loading || q.failure != null);
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
         leading: const AppBackButton(),
         title: const Text('My Attendance'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            pending
-                ? 'Participation summary is unavailable until all attendance records load.'
-                : 'Present: $present | Absent: $absent | Not Marked: ${values.length - present - absent}',
-          ),
-          if ((events.mine.value ?? []).isEmpty)
-            const Text('You have no event registrations.'),
-          const Text(
-            'Not Marked means Pending: no active attendance result. Organizer corrections update this view automatically.',
-          ),
-          for (final reg in events.mine.value ?? [])
-            Builder(
-              builder: (context) {
-                final key = '${reg.organizationId}/${reg.eventId}',
-                    attendance = model.records[key],
-                    query = events.registeredEvents[key],
-                    event = query?.value;
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event?.title ?? 'Event Unavailable',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          events
-                                  .availableOrganizations[reg.organizationId]
-                                  ?.name ??
-                              'Organization Unavailable',
-                        ),
-                        Text(
-                          '${schedule(event?.startAt)} | Registration: ${displayIdentifier(reg.status)}',
-                        ),
-                        if (query?.loading == true)
-                          const LinearProgressIndicator(),
-                        if (query?.failure != null)
-                          TextButton(
-                            onPressed: query!.retry,
-                            child: const Text('Retry Event Details'),
-                          ),
-                        if (attendance?.loading == true)
-                          const LinearProgressIndicator()
-                        else if (attendance?.failure != null)
-                          AppErrorView(
-                            message: attendance!.failure!.message,
-                            onRetry: attendance.retry,
-                          )
-                        else ...[
-                          Text(attendanceLabel(attendance?.value)),
-                          Text(verificationLabel(attendance?.value)),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
+      body: AppPageBody(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AppSectionHeading(
+              title: 'Your Attendance',
+              description: 'Your event verification history',
+              prominent: true,
             ),
-        ],
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              pending
+                  ? 'Participation summary is unavailable until all attendance records load.'
+                  : 'Present: $present | Absent: $absent | Not Marked: ${values.length - present - absent}',
+            ),
+            if ((events.mine.value ?? []).isEmpty)
+              const Text('You have no event registrations.'),
+            const Text(
+              'Not Marked means Pending: no active attendance result. Organizer corrections update this view automatically.',
+            ),
+            for (final reg in events.mine.value ?? [])
+              Builder(
+                builder: (context) {
+                  final key = '${reg.organizationId}/${reg.eventId}',
+                      attendance = model.records[key],
+                      query = events.registeredEvents[key],
+                      event = query?.value;
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event?.title ?? 'Event Unavailable',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            events
+                                    .availableOrganizations[reg.organizationId]
+                                    ?.name ??
+                                'Organization Unavailable',
+                          ),
+                          Text(
+                            '${schedule(event?.startAt)} | Registration: ${displayIdentifier(reg.status)}',
+                          ),
+                          if (query?.loading == true)
+                            const LinearProgressIndicator(),
+                          if (query?.failure != null)
+                            TextButton(
+                              onPressed: query!.retry,
+                              child: const Text('Retry Event Details'),
+                            ),
+                          if (attendance?.loading == true)
+                            const LinearProgressIndicator()
+                          else if (attendance?.failure != null)
+                            AppErrorView(
+                              message: attendance!.failure!.message,
+                              onRetry: attendance.retry,
+                            )
+                          else ...[
+                            AttendanceStatusBadge(attendance?.value),
+                            Text(verificationLabel(attendance?.value)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Absence of a record is Not Marked, never inferred as Absent.
+class AttendanceStatusBadge extends StatelessWidget {
+  const AttendanceStatusBadge(this.record, {super.key});
+  final AttendanceRecord? record;
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: AppStatusChip(
+      label: attendanceLabel(record),
+      tone: record == null
+          ? AppStatusTone.warning
+          : record!.status == AttendanceStatus.present
+          ? AppStatusTone.success
+          : AppStatusTone.error,
+    ),
+  );
 }

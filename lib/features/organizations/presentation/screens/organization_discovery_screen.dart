@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/display_labels.dart';
@@ -48,107 +49,195 @@ class _OrganizationDiscoveryScreenState
         model.mine.loading ||
         model.managed.loading ||
         model.associated.values.any((q) => q.loading);
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight:
-            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
-        title: const Text('Organizations'),
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
       ),
-      body: AppPageBody(
-        child: Column(
+      child: Scaffold(
+        backgroundColor: AppColors.brandMist,
+        // 1. Remove the standard AppBar entirely
+        body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const OrganizationPageHeading(
-              title: 'Find Your People',
-              description:
-                  'Explore organizations and keep track of your memberships.',
-            ),
-            AppSearchField(
-              controller: _search,
-              onChanged: model.searchFor,
-              label: 'Search Organizations',
-              compact: true,
-              hintText: 'Search organizations',
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Theme(
-              data: Theme.of(context).copyWith(
-                chipTheme: Theme.of(context).chipTheme.copyWith(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 14,
+            // 2. Recreate the dark board from the Home Screen
+            Container(
+              decoration: const BoxDecoration(
+                color: AppColors.brandMidnight,
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(AppShape.featureRadius),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: AppLayout.contentWidth,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xl,
+                        AppSpacing.md,
+                        AppSpacing.xl,
+                        AppSpacing.lg,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title
+                          Text(
+                            'Organizations',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: AppColors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+
+                          // Heading & Description
+                          Text(
+                            'Find Your People',
+                            style: Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(
+                                  color: AppColors.white,
+                                  fontSize: 28,
+                                  height: 1.15,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Explore organizations and keep track of your memberships.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppColors.border,
+                                  fontSize: 12,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+
+                          // Search Bar
+                          AppSearchField(
+                            controller: _search,
+                            onChanged: model.searchFor,
+                            label: 'Search Organizations',
+                            compact: true,
+                            hintText: 'Search organizations',
+                            leading: const Padding(
+                              padding: EdgeInsets.all(14),
+                              child: Icon(
+                                Icons.search,
+                                size: 19,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final filter in OrganizationBrowseFilter.values) ...[
-                    if (filter != OrganizationBrowseFilter.values.first)
-                      const SizedBox(width: 6),
-                    Expanded(
-                      child: AppFilterChip(
-                        expanded: true,
-                        label: displayIdentifier(filter.name),
-                        selected: model.browseFilter == filter,
-                        onSelected: (_) => model.browse(filter),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
             ),
-            Wrap(
-              spacing: AppSpacing.sm,
-              children: [
-                TextButton(
-                  onPressed: () => context.push(AppRoutes.myOrganizations),
-                  child: const Text('My Organizations'),
-                ),
-                TextButton(
-                  onPressed: () => context.push(AppRoutes.membershipRequests),
-                  child: const Text('Membership Requests'),
-                ),
-              ],
-            ),
-            if (failure != null)
-              AppErrorView(message: failure.message, onRetry: model.retry)
-            else if (loading)
-              const AppLoadingView(message: 'Loading organizations...')
-            else if (model.browseResults.isEmpty)
-              const AppEmptyView(
-                title: 'No Organizations Found',
-                message:
-                    'Try another search or filter. Membership requests remain available above.',
-              )
-            else
-              for (final org in model.browseResults)
-                OrganizationCard(
-                  organization: org,
-                  onTap: () => context.push(AppRoutes.organization(org.id)),
-                  status: org.managerUid == model.uid
-                      ? const AppStatusChip(
-                          label: 'Manager',
-                          tone: AppStatusTone.info,
-                        )
-                      : model.membership(org.id) == null
-                      ? null
-                      : AppStatusChip(
-                          label: displayMembershipStatus(
-                            model.membership(org.id)!.status,
-                          ),
-                          tone: membershipStatusTone(
-                            model.membership(org.id)!.status,
+
+            // 3. The rest of the body content (White background)
+            Expanded(
+              child: AppPageBody(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: AppSpacing.md),
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        chipTheme: Theme.of(context).chipTheme.copyWith(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 14,
                           ),
                         ),
-                  actionLabel:
-                      model.membership(org.id) == null &&
-                          org.managerUid != model.uid &&
-                          org.status == 'active' &&
-                          org.visibility == 'public'
-                      ? 'Join'
-                      : 'View',
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final filter
+                              in OrganizationBrowseFilter.values) ...[
+                            if (filter != OrganizationBrowseFilter.values.first)
+                              const SizedBox(width: 6),
+                            Expanded(
+                              child: AppFilterChip(
+                                expanded: true,
+                                label: displayIdentifier(filter.name),
+                                selected: model.browseFilter == filter,
+                                onSelected: (_) => model.browse(filter),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              context.push(AppRoutes.myOrganizations),
+                          child: const Text('My Organizations'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              context.push(AppRoutes.membershipRequests),
+                          child: const Text('Membership Requests'),
+                        ),
+                      ],
+                    ),
+                    if (failure != null)
+                      AppErrorView(
+                        message: failure.message,
+                        onRetry: model.retry,
+                      )
+                    else if (loading)
+                      const AppLoadingView(message: 'Loading organizations...')
+                    else if (model.browseResults.isEmpty)
+                      const AppEmptyView(
+                        title: 'No Organizations Found',
+                        message:
+                            'Try another search or filter. Membership requests remain available above.',
+                      )
+                    else
+                      for (final org in model.browseResults)
+                        OrganizationCard(
+                          organization: org,
+                          onTap: () =>
+                              context.push(AppRoutes.organization(org.id)),
+                          status: org.managerUid == model.uid
+                              ? const AppStatusChip(
+                                  label: 'Manager',
+                                  tone: AppStatusTone.info,
+                                )
+                              : model.membership(org.id) == null
+                              ? null
+                              : AppStatusChip(
+                                  label: displayMembershipStatus(
+                                    model.membership(org.id)!.status,
+                                  ),
+                                  tone: membershipStatusTone(
+                                    model.membership(org.id)!.status,
+                                  ),
+                                ),
+                          actionLabel:
+                              model.membership(org.id) == null &&
+                                  org.managerUid != model.uid &&
+                                  org.status == 'active' &&
+                                  org.visibility == 'public'
+                              ? 'Join'
+                              : 'View',
+                        ),
+                  ],
                 ),
+              ),
+            ),
           ],
         ),
       ),

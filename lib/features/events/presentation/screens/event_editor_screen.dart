@@ -1,3 +1,5 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,8 @@ class EventEditorScreen extends StatelessWidget {
     final model = context.watch<EventContextViewModel>();
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
         leading: const AppBackButton(),
         title: Text(model.eventId == null ? 'Create Event' : 'Edit Event'),
       ),
@@ -133,19 +137,27 @@ class _EventFormState extends State<_EventForm> {
   @override
   Widget build(BuildContext context) {
     final model = context.watch<EventContextViewModel>();
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+    return AppPageBody(
       child: Form(
         key: form,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              model.organization.value!.name,
-              style: Theme.of(context).textTheme.titleLarge,
+            AppSectionHeading(
+              title: model.eventId == null
+                  ? 'Create Something Great'
+                  : 'Fine-tune Your Event',
+              description: model.organization.value!.name,
+              prominent: true,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
+            const Text(
+              'Save your event details as a draft. Approval and publication are separate actions.',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const AppSectionHeading(title: 'Event Details'),
+            const SizedBox(height: AppSpacing.md),
             TextFormField(
               controller: title,
               textCapitalization: TextCapitalization.words,
@@ -166,6 +178,8 @@ class _EventFormState extends State<_EventForm> {
                   EventDraft.requiredText(value, maximum: 5000),
             ),
             const SizedBox(height: 16),
+            const AppSectionHeading(title: 'Schedule and Capacity'),
+            const SizedBox(height: AppSpacing.md),
             TextFormField(
               controller: venue,
               enabled: !model.busy,
@@ -219,6 +233,7 @@ class _EventFormState extends State<_EventForm> {
             ),
             DropdownButtonFormField<String>(
               initialValue: visibility,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Event Visibility'),
               items: [
                 if (model.organization.value!.visibility == 'public')
@@ -251,7 +266,20 @@ class _EventFormState extends State<_EventForm> {
               },
             ),
             const SizedBox(height: 16),
-            if (model.failure != null) Text(model.failure!.message),
+            if (model.event?.value != null) ...[
+              const AppSectionHeading(title: 'Current Poster'),
+              const SizedBox(height: AppSpacing.md),
+              EventPoster(
+                event: model.event!.value!,
+                organizationName: model.organization.value!.name,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            if (model.failure != null)
+              Text(
+                model.failure!.message,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             if (model.busy) const LinearProgressIndicator(),
             FilledButton(
               onPressed: model.busy

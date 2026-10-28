@@ -1,3 +1,5 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -21,15 +23,29 @@ class EventManagementScreen extends StatelessWidget {
     final model = context.watch<EventContextViewModel>();
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
         title: const Text('Organization Event Management'),
         leading: const AppBackButton(),
       ),
-      floatingActionButton: model.canCreate
-          ? FloatingActionButton.extended(
-              onPressed: () =>
-                  context.go(AppRoutes.createEvent(model.organizationId)),
-              icon: const Icon(Icons.add),
-              label: const Text('Create Event'),
+      bottomNavigationBar: model.canCreate
+          ? SafeArea(
+              top: false,
+              child: ColoredBox(
+                color: AppColors.white,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                    vertical: AppSpacing.md,
+                  ),
+                  child: AppActionButton(
+                    label: 'Create Event',
+                    icon: Icons.add,
+                    onPressed: () =>
+                        context.go(AppRoutes.createEvent(model.organizationId)),
+                  ),
+                ),
+              ),
             )
           : null,
       body: EventAccessView(
@@ -69,43 +85,52 @@ class _ManagementListState extends State<_ManagementList> {
   Widget build(BuildContext context) {
     final query = context.watch<LiveQuery<List<OrgEvent>>>(),
         model = context.watch<EventContextViewModel>();
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              TextField(
-                onChanged: (value) => setState(() => search = value),
-                decoration: const InputDecoration(
-                  labelText: 'Search Organization Events',
+    return AppPageBody(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppSectionHeading(
+                  title: 'Manage Events',
+                  description: model.organization.value!.name,
+                  prominent: true,
                 ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: filter,
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: [
-                  for (final status in [
-                    'All',
-                    'draft',
-                    'published',
-                    'cancelled',
-                    'completed',
-                    'Archived',
-                  ])
-                    DropdownMenuItem(
-                      value: status,
-                      child: Text(displayIdentifier(status)),
-                    ),
-                ],
-                onChanged: (value) => setState(() => filter = value!),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  onChanged: (value) => setState(() => search = value),
+                  decoration: const InputDecoration(
+                    labelText: 'Search Organization Events',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: filter,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: [
+                    for (final status in [
+                      'All',
+                      'draft',
+                      'published',
+                      'cancelled',
+                      'completed',
+                      'Archived',
+                    ])
+                      DropdownMenuItem(
+                        value: status,
+                        child: Text(displayIdentifier(status)),
+                      ),
+                  ],
+                  onChanged: (value) => setState(() => filter = value!),
+                ),
+              ],
+            ),
           ),
-        ),
-        Expanded(
-          child: QueryContent(
+          QueryContent(
             query: query,
             builder: (values) {
               final events = (values ?? [])
@@ -122,22 +147,26 @@ class _ManagementListState extends State<_ManagementList> {
                   )
                   .toList();
               if (events.isEmpty) {
-                return const Center(child: Text('No events match this view.'));
+                return const AppEmptyView(
+                  title: 'No Events Found',
+                  message: 'No events match this view.',
+                );
               }
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (final event in events)
                     EventCard(
                       event: event,
+                      style: EventCardStyle.managed,
                       organizationName: model.organization.value!.name,
                     ),
                 ],
               );
             },
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -149,6 +178,8 @@ class ParticipantsScreen extends StatelessWidget {
     final model = context.watch<EventContextViewModel>();
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
         title: const Text('Event Participants'),
         actions: [
           if (model.organization.failure == null &&
@@ -202,20 +233,37 @@ class _ParticipantList extends StatelessWidget {
   Widget build(BuildContext context) {
     final participants = context.watch<ParticipantsViewModel>(),
         model = context.watch<EventContextViewModel>();
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            '${model.event!.value!.title} | Reserved: ${model.event!.value!.registrationCount}/${model.event!.value!.capacity}',
+    return AppPageBody(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppSectionHeading(
+            title: "Who's Joining?",
+            description: 'Private participant roster',
+            prominent: true,
           ),
-        ),
-        Expanded(
-          child: QueryContent(
+          const SizedBox(height: AppSpacing.lg),
+          AppSurfaceCard(
+            child: EventSummary(
+              event: model.event!.value!,
+              organizationName: model.organization.value!.name,
+            ),
+          ),
+          AppMetricTiles(
+            values: [
+              ('${model.event!.value!.registrationCount}', 'Reserved'),
+              ('${model.event!.value!.capacity}', 'Capacity'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          QueryContent(
             query: participants.registrations,
             builder: (records) {
               if ((records ?? []).isEmpty) {
-                return const Center(child: Text('No registrations yet.'));
+                return const AppEmptyView(
+                  title: 'No Participants Yet',
+                  message: 'No registrations yet.',
+                );
               }
               if (participants.identities.loading) {
                 return const AppLoadingView(
@@ -224,13 +272,23 @@ class _ParticipantList extends StatelessWidget {
               }
               return QueryContent(
                 query: participants.identities,
-                builder: (_) => ListView(
+                builder: (_) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final record in records!)
-                      ListTile(
-                        title: Text(participants.nameFor(record.uid)),
-                        subtitle: Text(
-                          '${displayIdentifier(record.status)} \u00b7 ${_timestamp(context, record.registeredAt)}\nUpdated: ${_timestamp(context, record.updatedAt)}',
+                      AppSurfaceCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              participants.nameFor(record.uid),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              '${displayIdentifier(record.status)} \u00b7 ${_timestamp(context, record.registeredAt)}\nUpdated: ${_timestamp(context, record.updatedAt)}',
+                            ),
+                          ],
                         ),
                       ),
                   ],
@@ -238,8 +296,8 @@ class _ParticipantList extends StatelessWidget {
               );
             },
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

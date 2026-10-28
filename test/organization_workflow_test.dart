@@ -44,7 +44,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Organizations').last);
       await tester.pumpAndSettle();
-      expect(find.widgetWithText(AppBar, 'Organizations'), findsOneWidget);
+      expect(find.text('Find Your People'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'does not exist');
       await tester.pumpAndSettle();

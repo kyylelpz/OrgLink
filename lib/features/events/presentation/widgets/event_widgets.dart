@@ -9,7 +9,7 @@ import '../../../../core/widgets/app_components.dart';
 import '../../data/models/event.dart';
 import '../../../../core/widgets/app_asset_icon.dart';
 
-enum EventCardStyle { standard, featured, compact }
+enum EventCardStyle { standard, featured, compact, managed }
 
 String schedule(DateTime? value) => value == null
     ? 'Not recorded'
@@ -28,102 +28,279 @@ class EventCard extends StatelessWidget {
   final String? registrationStatus;
   final EventCardStyle style;
   @override
-  Widget build(BuildContext context) => style != EventCardStyle.standard
+  Widget build(BuildContext context) => style == EventCardStyle.managed
+      ? AppSurfaceCard(
+          onTap: () =>
+              context.go(AppRoutes.event(event.organizationId, event.id)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              EventSummary(event: event, showDateBlock: false),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  AppStatusChip(
+                    label: displayIdentifier(event.eventStatus),
+                    tone: event.eventStatus == 'cancelled'
+                        ? AppStatusTone.error
+                        : event.eventStatus == 'published' ||
+                              event.eventStatus == 'completed'
+                        ? AppStatusTone.success
+                        : AppStatusTone.neutral,
+                  ),
+                  AppStatusChip(
+                    label: displayIdentifier(event.approvalStatus),
+                    tone: event.approvalStatus == 'rejected'
+                        ? AppStatusTone.error
+                        : event.approvalStatus == 'approved'
+                        ? AppStatusTone.success
+                        : AppStatusTone.warning,
+                  ),
+                  if (event.archivedAt != null)
+                    const AppStatusChip(label: 'Archived'),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'View Event',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: AppColors.brandBlue),
+              ),
+            ],
+          ),
+        )
+      : style != EventCardStyle.standard
       ? _EventPreview(
           event: event,
           organizationName: organizationName,
           featured: style == EventCardStyle.featured,
         )
-      : Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () =>
-                context.go(AppRoutes.event(event.organizationId, event.id)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (event.posterURL != null && event.posterURL!.isNotEmpty)
-                  Image.network(
-                    event.posterURL!,
-                    height: 148,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, error, stack) => const SizedBox.shrink(),
+      : AppSurfaceCard(
+          onTap: () =>
+              context.go(AppRoutes.event(event.organizationId, event.id)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (registrationStatus == null) ...[
+                EventPoster(event: event, organizationName: organizationName),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              EventSummary(
+                event: event,
+                organizationName: organizationName,
+                showDateBlock: registrationStatus != null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  AppStatusChip(
+                    label: event.visibility == 'private'
+                        ? 'Members Only'
+                        : 'Public',
+                    tone: AppStatusTone.info,
                   ),
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        organizationName,
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: AppColors.brandBlue,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        event.title,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      _EventDetail(
-                        icon: Icons.calendar_today_outlined,
-                        text: schedule(event.startAt),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _EventDetail(
-                        icon: Icons.location_on_outlined,
-                        text: event.venue,
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
-                        children: [
-                          AppStatusChip(
-                            label: event.registrationOpen(DateTime.now())
-                                ? 'Registration Open'
-                                : 'Registration Closed',
-                            tone: event.registrationOpen(DateTime.now())
-                                ? AppStatusTone.success
-                                : AppStatusTone.neutral,
-                          ),
-                          Text(
-                            '${event.availableSlots} slots',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        '${displayIdentifier(event.eventStatus)} / ${displayIdentifier(event.approvalStatus)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      if (registrationStatus != null)
-                        Text(
-                          'Registration: ${displayIdentifier(registrationStatus!)}',
-                        ),
-                    ],
+                  AppStatusChip(
+                    label: event.registrationOpen(DateTime.now())
+                        ? 'Registration Open'
+                        : 'Registration Closed',
+                    tone: event.registrationOpen(DateTime.now())
+                        ? AppStatusTone.success
+                        : AppStatusTone.neutral,
                   ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                '${event.availableSlots} slots',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              Text(
+                '${displayIdentifier(event.eventStatus)} / ${displayIdentifier(event.approvalStatus)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (registrationStatus != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                AppStatusChip(
+                  label:
+                      'Registration: ${displayIdentifier(registrationStatus!)}',
+                  tone: registrationStatus == 'registered'
+                      ? AppStatusTone.success
+                      : AppStatusTone.neutral,
                 ),
               ],
-            ),
+            ],
           ),
         );
 }
 
-class _EventDetail extends StatelessWidget {
-  const _EventDetail({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
+/// Shared dynamic poster for discovery, details, and the editor preview.
+class EventPoster extends StatelessWidget {
+  const EventPoster({
+    super.key,
+    required this.event,
+    required this.organizationName,
+  });
+  final OrgEvent event;
+  final String organizationName;
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 176),
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(
+        color: AppColors.brandBlue,
+        borderRadius: AppShape.action,
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -48,
+            top: 34,
+            child: Image.asset(
+              'assets/illustrations/event_orbit.png',
+              width: 196,
+              height: 196,
+              excludeFromSemantics: true,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Event',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: AppColors.white),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  organizationName,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.white,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  '${schedule(event.startAt)} · ${event.venue}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: AppColors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (event.posterURL?.trim().isNotEmpty != true) return fallback;
+    return ClipRRect(
+      borderRadius: AppShape.action,
+      child: Image.network(
+        event.posterURL!,
+        height: 184,
+        width: double.infinity,
+        fit: BoxFit.contain,
+        excludeFromSemantics: true,
+        loadingBuilder: (_, child, progress) =>
+            progress == null ? child : fallback,
+        errorBuilder: (_, _, _) => fallback,
+      ),
+    );
+  }
+}
+
+/// Date, title and venue are shared by registration and attendance screens.
+class EventSummary extends StatelessWidget {
+  const EventSummary({
+    super.key,
+    required this.event,
+    this.organizationName,
+    this.showDateBlock = true,
+  });
+  final OrgEvent event;
+  final String? organizationName;
+  final bool showDateBlock;
   @override
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Icon(icon, size: 18, color: AppColors.brandNavy),
-      const SizedBox(width: AppSpacing.sm),
+      if (showDateBlock) ...[
+        Container(
+          width: 48,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          decoration: const BoxDecoration(
+            color: AppColors.brandMist,
+            borderRadius: AppShape.field,
+          ),
+          child: Column(
+            children: [
+              Text(
+                event.startAt?.toLocal().day.toString().padLeft(2, '0') ?? '—',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: AppColors.brandBlue),
+              ),
+              Text(
+                event.startAt == null
+                    ? '—'
+                    : const [
+                        'Jan',
+                        'Feb',
+                        'Mar',
+                        'Apr',
+                        'May',
+                        'Jun',
+                        'Jul',
+                        'Aug',
+                        'Sep',
+                        'Oct',
+                        'Nov',
+                        'Dec',
+                      ][event.startAt!.toLocal().month - 1],
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: AppColors.brandBlue),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+      ],
       Expanded(
-        child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              event.title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppColors.brandMidnight),
+            ),
+            if (organizationName != null)
+              Text(
+                organizationName!,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: AppColors.brandBlue),
+              ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${schedule(event.startAt)} · ${event.venue}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+            ),
+          ],
+        ),
       ),
     ],
   );
@@ -137,6 +314,11 @@ Future<bool> confirmEventAction(
     await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        titleTextStyle: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(color: AppColors.brandMidnight),
         title: Text(title),
         content: Text(message),
         actions: [
@@ -159,18 +341,27 @@ class EventNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
-    child: Wrap(
-      alignment: WrapAlignment.center,
-      children: [
-        TextButton(
-          onPressed: () => context.go(AppRoutes.events),
-          child: const Text('Discover Events'),
+    child: ColoredBox(
+      color: AppColors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          spacing: AppSpacing.sm,
+          children: [
+            AppFilterChip(
+              label: 'Discover Events',
+              selected: index == 0,
+              onSelected: (_) => context.go(AppRoutes.events),
+            ),
+            AppFilterChip(
+              label: 'My Events',
+              selected: index == 1,
+              onSelected: (_) => context.go(AppRoutes.myEvents),
+            ),
+          ],
         ),
-        TextButton(
-          onPressed: () => context.go(AppRoutes.myEvents),
-          child: const Text('My Events'),
-        ),
-      ],
+      ),
     ),
   );
 }

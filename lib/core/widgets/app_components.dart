@@ -36,21 +36,40 @@ class AppSectionHeading extends StatelessWidget {
     required this.title,
     this.description,
     this.action,
+    this.prominent = false,
   });
   final String title;
   final String? description;
   final Widget? action;
+  final bool prominent;
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Semantics(
         header: true,
-        child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        child: Text(
+          title,
+          style: prominent
+              ? Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontSize: 26,
+                  height: 1.2,
+                  color: AppColors.brandMidnight,
+                  fontWeight: FontWeight.w700,
+                )
+              : Theme.of(context).textTheme.titleLarge,
+        ),
       ),
       if (description != null) ...[
         const SizedBox(height: AppSpacing.sm),
-        Text(description!),
+        Text(
+          description!,
+          style: prominent
+              ? Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.muted)
+              : null,
+        ),
       ],
       if (action != null) ...[const SizedBox(height: AppSpacing.sm), action!],
     ],
@@ -340,5 +359,58 @@ class AppFilterChip extends StatelessWidget {
           : AppColors.muted,
     ),
     materialTapTargetSize: MaterialTapTargetSize.padded,
+  );
+}
+
+/// Real, caller-supplied metrics; expands vertically for large text.
+class AppMetricTiles extends StatelessWidget {
+  const AppMetricTiles({super.key, required this.values});
+  final List<(String, String)> values;
+  @override
+  Widget build(BuildContext context) => AppSurfaceCard(
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = MediaQuery.textScalerOf(context).scale(1) > 1.4
+            ? 1
+            : values.length;
+        final width =
+            (constraints.maxWidth - AppSpacing.md * (columns - 1)) / columns;
+        return Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.lg,
+          children: [
+            for (final value in values)
+              SizedBox(
+                width: width,
+                child: Semantics(
+                  container: true,
+                  label: '${value.$2}: ${value.$1}',
+                  child: ExcludeSemantics(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          value.$1,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontSize: 26,
+                                color: AppColors.brandMidnight,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        Text(
+                          value.$2,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    ),
   );
 }

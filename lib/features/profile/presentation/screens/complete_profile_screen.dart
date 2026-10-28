@@ -96,7 +96,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Your Profile'),
-          leading: const AppBackButton(),
         ),
         body: ProfileOverview(
           auth: auth,
@@ -212,7 +211,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 decoration: const InputDecoration(labelText: 'Year Level'),
                 items: [
                   for (var year = 1; year <= 6; year++)
-                    DropdownMenuItem(value: year, child: Text('Year $year')),
+                    DropdownMenuItem(
+                      value: year,
+                      // ADD THIS STYLE TO REMOVE THE BOLD WEIGHT:
+                      child: Text(
+                        'Year $year',
+                        style: const TextStyle(fontWeight: FontWeight.normal),
+                      ),
+                    ),
                 ],
                 onChanged: busy
                     ? null
