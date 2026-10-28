@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:orglink/app/app.dart';
+import 'package:orglink/core/widgets/authenticated_shell.dart';
 import 'package:orglink/app/router.dart';
 import 'package:orglink/core/constants/app_routes.dart';
 import 'package:orglink/core/errors/app_failure.dart';
@@ -19,6 +20,9 @@ import 'package:orglink/features/events/data/models/event.dart';
 import 'package:orglink/features/events/data/repositories/event_repository.dart';
 import 'package:orglink/features/events/presentation/viewmodels/event_hub_view_model.dart';
 import 'package:orglink/features/home/presentation/viewmodels/home_view_model.dart';
+import 'package:orglink/features/profile/data/models/student_profile.dart';
+import 'package:orglink/features/organizations/data/models/organization.dart';
+import 'package:orglink/core/widgets/app_asset_icon.dart';
 import 'package:orglink/features/memberships/data/models/membership.dart';
 import 'package:orglink/features/organizations/data/repositories/organization_repository.dart';
 import 'package:orglink/features/organizations/presentation/viewmodels/organization_hub_view_model.dart';
@@ -271,13 +275,16 @@ void main() {
       await app.mount(tester);
       expect(
         tester
-            .widgetList<NavigationDestination>(
-              find.byType(NavigationDestination),
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byType(OrgLinkNavigationBar),
+                matching: find.byType(Text),
+              ),
             )
-            .map((d) => d.label),
+            .map((t) => t.data),
         ['Home', 'Calendar', 'QR', 'Organizations', 'Profile'],
       );
-      expect(find.text('Welcome, Student!'), findsOneWidget);
+      expect(find.textContaining('Student!'), findsOneWidget);
       expect(find.text('Event Soon'), findsOneWidget);
       expect(find.text('Event Middle'), findsOneWidget);
       expect(find.text('Event Late'), findsNothing);
@@ -318,7 +325,7 @@ void main() {
       expect(find.textContaining('No notification feed'), findsOneWidget);
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('See All'));
+      await tester.tap(find.text('Explore'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(AppBar, 'Event Discovery'), findsOneWidget);
       expect(app.router.canPop(), isTrue);
@@ -333,7 +340,7 @@ void main() {
       expect(find.text('Exit OrgLink?'), findsOneWidget);
       await tester.tap(find.text('Stay'));
       await tester.pumpAndSettle();
-      expect(find.text('Home Dashboard'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-dashboard')), findsOneWidget);
     },
   );
   testWidgets(
@@ -451,7 +458,7 @@ void main() {
       expect(app.router.canPop(), isFalse);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Home Dashboard'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-dashboard')), findsOneWidget);
       expect(exits, 0);
       unawaited(tester.binding.handlePopRoute());
       await tester.pumpAndSettle();
@@ -626,10 +633,15 @@ void main() {
       app.accounts.controller.add(null);
       await tester.pumpAndSettle();
       expect(find.text('Google Sign-In'), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.byType(OrgLinkNavigationBar), findsNothing);
     },
   );
-  for (final size in [const Size(320, 720), const Size(430, 932)]) {
+  for (final size in [
+    const Size(320, 720),
+    const Size(360, 800),
+    const Size(393, 852),
+    const Size(412, 915),
+  ]) {
     testWidgets('Phase 2 core layouts at $size', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
@@ -667,4 +679,168 @@ void main() {
       expect(find.text('Event catalog unavailable.'), findsOneWidget);
     });
   }
+
+  for (final width in [320.0, 360.0, 393.0, 412.0]) {
+    testWidgets(
+      'Home preserves long names and real content at ${width}dp and 200% text',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 852);
+        tester.view.devicePixelRatio = 1;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final app = _App();
+        addTearDown(() => app.close(tester));
+        await app.mount(tester);
+        const name = "Alexandria-McDonald de la Cruz O'Neil";
+        app.profiles.controller.add(
+          profile(
+            details: const StudentDetails(
+              fullName: name,
+              studentNumber: '2026-001',
+              yearLevel: 1,
+              section: 'A',
+            ),
+          ),
+        );
+        const orgName =
+            'IEEE and ACM Student Organization for Computing and Engineering';
+        app.orgs.organizations.emit([
+          Organization.fromMap('robotics', {
+            ...demoOrg.toMap(),
+            'name': orgName,
+          }),
+        ]);
+        const eventTitle =
+            'iOS and NASA Research: Engineering Together with IEEE and ACM';
+        app.events.catalog.emit([
+          OrgEvent.fromMap('long', 'robotics', {
+            ..._event('long', 2).toMap(),
+            'title': eventTitle,
+          }),
+        ]);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.textContaining('Alexandria-McDonald!'), findsOneWidget);
+        expect(app.auth.profile!.details.fullName, name);
+        expect(find.text(eventTitle), findsOneWidget);
+        await tester.ensureVisible(find.text(eventTitle));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.ensureVisible(find.text(orgName).last);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final raised = find.byKey(const ValueKey('raised-qr-action'));
+        expect(
+          tester.getTopLeft(raised).dy,
+          lessThan(tester.getTopLeft(find.byType(OrgLinkNavigationBar)).dy),
+        );
+        final semantics = tester.ensureSemantics();
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        semantics.dispose();
+        // The real Android keyboard must not collapse the scrollable header.
+        await tester.ensureVisible(find.byType(TextField));
+        tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.tap(find.byType(TextField));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'Home empty state, manager access, and selected navigation survive redesign',
+    (tester) async {
+      final app = _App();
+      addTearDown(() => app.close(tester));
+      await app.mount(tester);
+      app.events.catalog.emit([]);
+      await tester.pumpAndSettle();
+      expect(find.text('No Upcoming Events'), findsOneWidget);
+      expect(find.text('Organization Management'), findsNothing);
+      // Permission-derived management getter remains the source of visibility.
+      final managed = Organization.fromMap('robotics', {
+        ...demoOrg.toMap(),
+        'managerUid': 'student',
+      });
+      app.orgs.document.emit(managed);
+      app.orgs.organizations.emit([managed, otherOrg]);
+      await tester.pumpAndSettle();
+      expect(find.text('Manage Events: Demo Robotics'), findsOneWidget);
+      await tester.ensureVisible(find.text('Manage Events: Demo Robotics'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage Events: Demo Robotics'));
+      await tester.pumpAndSettle();
+      expect(
+        find.widgetWithText(AppBar, 'Organization Event Management'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<OrgLinkNavigationBar>(find.byType(OrgLinkNavigationBar))
+            .selectedIndex,
+        3,
+      );
+      await tester.tap(find.text('Profile').last);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<OrgLinkNavigationBar>(find.byType(OrgLinkNavigationBar))
+            .selectedIndex,
+        4,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Home Figma icons load as transparent high-resolution assets', (
+    tester,
+  ) async {
+    final app = _App();
+    addTearDown(() => app.close(tester));
+    await app.mount(tester);
+    final names = tester
+        .widgetList<AppAssetIcon>(find.byType(AppAssetIcon))
+        .map((icon) => icon.name)
+        .toSet();
+    expect(
+      names,
+      containsAll([
+        'home',
+        'calendar',
+        'qr',
+        'organizations',
+        'profile',
+        'search',
+        'bell',
+        'my_events',
+        'attendance',
+        'arrow',
+      ]),
+    );
+    await tester.runAsync(() async {
+      for (final name in names) {
+        final data = await rootBundle.load('assets/icons/figma_$name.png');
+        final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+        final frame = await codec.getNextFrame();
+        final pixels = await frame.image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        expect(
+          pixels!.getUint8(3),
+          0,
+          reason: '$name must have a transparent canvas',
+        );
+        expect(frame.image.width, greaterThanOrEqualTo(72));
+        frame.image.dispose();
+        codec.dispose();
+      }
+    });
+    expect(tester.takeException(), isNull);
+  });
 }

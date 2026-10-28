@@ -168,7 +168,7 @@ void main() {
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
       expect(profiles.savedDetails?.fullName, 'juan dela cruz');
-      expect(find.textContaining('Welcome, juan!'), findsOneWidget);
+      expect(find.textContaining('\njuan!'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       router.dispose();
       auth.dispose();

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../constants/app_routes.dart';
 import '../theme/app_tokens.dart';
 import 'app_back_button.dart';
+import 'app_asset_icon.dart';
 
 class AuthenticatedShell extends StatefulWidget {
   const AuthenticatedShell({
@@ -119,74 +120,135 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
           back: _back,
           child: Scaffold(
             body: widget.child,
-            bottomNavigationBar: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppShape.featureRadius),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 24,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppShape.featureRadius),
-                ),
-                child: NavigationBar(
-                  labelPadding: const EdgeInsets.symmetric(vertical: 2),
-                  labelTextStyle: WidgetStatePropertyAll(
-                    Theme.of(context).textTheme.labelMedium?.copyWith(
-                      letterSpacing: 0,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                  ),
-                  selectedIndex: index,
-                  onDestinationSelected: (index) {
-                    context.go(roots[index]);
-                  },
-                  destinations: [
-                    const NavigationDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home),
-                      label: 'Home',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.calendar_month_outlined),
-                      label: 'Calendar',
-                    ),
-                    NavigationDestination(
-                      icon: CircleAvatar(
-                        radius: 23,
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        child: Icon(
-                          Icons.qr_code_scanner,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                      ),
-                      label: 'QR',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.groups_outlined),
-                      selectedIcon: Icon(Icons.groups),
-                      label: 'Organizations',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.person_outline),
-                      selectedIcon: Icon(Icons.person),
-                      label: 'Profile',
-                    ),
-                  ],
-                ),
-              ),
+            bottomNavigationBar: OrgLinkNavigationBar(
+              selectedIndex: index,
+              onDestinationSelected: (index) => context.go(roots[index]),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// Figma 15:7293. Label height grows with text scaling; routes stay in the shell.
+class OrgLinkNavigationBar extends StatelessWidget {
+  const OrgLinkNavigationBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+  static const labels = ['Home', 'Calendar', 'QR', 'Organizations', 'Profile'];
+  static const _icons = ['home', 'calendar', 'qr', 'organizations', 'profile'];
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: AppColors.white,
+    child: SafeArea(
+      top: false,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < labels.length; i++)
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: i == selectedIndex,
+                    label: labels[i],
+                    child: ExcludeSemantics(
+                      child: InkWell(
+                        onTap: () => onDestinationSelected(i),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 96),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              2,
+                              0,
+                              2,
+                              AppSpacing.xl,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  height: 48,
+                                  child: Center(
+                                    child: i == 2
+                                        ? Transform.translate(
+                                            offset: const Offset(0, -7),
+                                            child: OverflowBox(
+                                              maxHeight: 56,
+                                              maxWidth: 56,
+                                              child: Container(
+                                                key: const ValueKey(
+                                                  'raised-qr-action',
+                                                ),
+                                                width: 56,
+                                                height: 56,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.brandBlue,
+                                                  borderRadius:
+                                                      BorderRadius.circular(18),
+                                                  border: Border.all(
+                                                    color: AppColors.white,
+                                                    width: 4,
+                                                  ),
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: const AppAssetIcon(
+                                                  'qr',
+                                                  size: 25,
+                                                  color: AppColors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                        : Transform.translate(
+                                            offset: const Offset(0, 4),
+                                            child: AppAssetIcon(
+                                              _icons[i],
+                                              size: 22,
+                                              color: i == selectedIndex
+                                                  ? AppColors.brandBlue
+                                                  : AppColors.muted,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  labels[i],
+                                  textAlign: TextAlign.center,
+                                  softWrap: true,
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: i == selectedIndex
+                                            ? AppColors.brandBlue
+                                            : AppColors.muted,
+                                        fontWeight: i == selectedIndex
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

@@ -262,37 +262,44 @@ class AppSearchField extends StatelessWidget {
     this.label = 'Search',
     this.hintText,
     this.enabled = true,
+    this.compact = false,
+    this.leading,
   });
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final String label;
   final String? hintText;
   final bool enabled;
+  final bool compact;
+  final Widget? leading;
   @override
   Widget build(BuildContext context) =>
       ValueListenableBuilder<TextEditingValue>(
         valueListenable: controller,
-        builder: (context, value, _) => TextField(
-          controller: controller,
-          enabled: enabled,
-          onChanged: onChanged,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            labelText: label,
-            hintText: hintText,
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: value.text.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Clear Search',
-                    onPressed: !enabled
-                        ? null
-                        : () {
-                            controller.clear();
-                            onChanged('');
-                          },
-                    icon: const Icon(Icons.close),
-                  ),
+        builder: (context, value, _) => Semantics(
+          label: compact ? label : null,
+          child: TextField(
+            controller: controller,
+            enabled: enabled,
+            onChanged: onChanged,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              labelText: compact ? null : label,
+              hintText: hintText,
+              prefixIcon: leading ?? const Icon(Icons.search),
+              suffixIcon: value.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear Search',
+                      onPressed: !enabled
+                          ? null
+                          : () {
+                              controller.clear();
+                              onChanged('');
+                            },
+                      icon: const Icon(Icons.close),
+                    ),
+            ),
           ),
         ),
       );

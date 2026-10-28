@@ -5,6 +5,8 @@ import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/utils/live_query.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../data/models/organization.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
 
 class QueryContent<T> extends StatelessWidget {
   const QueryContent({super.key, required this.query, required this.builder});
@@ -45,23 +47,69 @@ class OrganizationCard extends StatelessWidget {
     super.key,
     required this.organization,
     this.subtitle,
+    this.preview = false,
   });
   final Organization organization;
   final String? subtitle;
+  final bool preview;
   @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
-      contentPadding: const EdgeInsets.all(16),
-      leading: OrganizationLogo(organization.logoURL),
-      title: Text(organization.name),
-      subtitle: Text(
-        '${organization.description.isEmpty ? 'No description available.' : organization.description}\n${displayIdentifier(organization.visibility)} | ${displayIdentifier(organization.status)}${subtitle == null ? '' : '\n$subtitle'}',
-      ),
-      isThreeLine: true,
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => context.go(AppRoutes.organization(organization.id)),
-    ),
-  );
+  Widget build(BuildContext context) => preview
+      ? AppSurfaceCard(
+          onTap: () => context.push(AppRoutes.organization(organization.id)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: AppShape.card,
+                    child: OrganizationLogo(organization.logoURL),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      organization.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.brandMidnight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                organization.description.isEmpty
+                    ? 'No description available.'
+                    : organization.description,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'View Organization',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: AppColors.brandBlue),
+              ),
+            ],
+          ),
+        )
+      : Card(
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: OrganizationLogo(organization.logoURL),
+            title: Text(organization.name),
+            subtitle: Text(
+              '${organization.description.isEmpty ? 'No description available.' : organization.description}\n${displayIdentifier(organization.visibility)} | ${displayIdentifier(organization.status)}${subtitle == null ? '' : '\n$subtitle'}',
+            ),
+            isThreeLine: true,
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.organization(organization.id)),
+          ),
+        );
 }
 
 class OrganizationNavigation extends StatelessWidget {

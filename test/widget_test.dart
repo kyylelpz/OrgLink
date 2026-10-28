@@ -67,7 +67,7 @@ void main() {
       await tester.ensureVisible(find.text('Save Student Profile'));
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
-      expect(find.text('Home Dashboard'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-dashboard')), findsOneWidget);
       expect(profiles.saveCalls, 1);
       await tester.ensureVisible(
         find.widgetWithText(TextButton, 'Edit Student Profile'),
@@ -89,7 +89,7 @@ void main() {
       expect(find.text('Account Status'), findsOneWidget);
       router.go(AppRoutes.home);
       await tester.pumpAndSettle();
-      expect(find.text('Home Dashboard'), findsNothing);
+      expect(find.byKey(const ValueKey('home-dashboard')), findsNothing);
       await tester.tap(find.text('Sign Out'));
       await tester.pumpAndSettle();
       expect(find.text('Google Sign-In'), findsOneWidget);
