@@ -167,7 +167,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               const AppSectionHeading(
                 title: 'A Little About You',
                 description:
-                    'Your campus profile. Your Google email remains read-only.',
+                    'Your campus profile.',
               ),
               const SizedBox(height: AppSpacing.lg),
               Row(

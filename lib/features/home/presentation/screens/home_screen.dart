@@ -199,50 +199,70 @@ class _DashboardState extends State<_Dashboard> {
                                   organization: org,
                                   preview: true,
                                 ),
-                            ] else ...[
-                              CommunitySectionHeading(
-                                title: 'Make Your Next Move',
-                                actionLabel: 'Explore',
-                                onAction: () => context.push(AppRoutes.events),
-                              ),
-                              if (upcoming.isEmpty)
-                                const AppEmptyView(
-                                  title: 'No Upcoming Events',
-                                  message:
-                                      'Published upcoming events will appear here.',
-                                )
-                              else
+                              ] else ...[
+                              // 1. HAPPENING NOW (ONGOING EVENTS)
+                              if (model.ongoing.isNotEmpty) ...[
+                                CommunitySectionHeading(
+                                  title: 'Happening Now',
+                                  actionLabel: 'View All',
+                                  onAction: () => context.push(AppRoutes.events),
+                                ),
+                                for (final event in model.ongoing)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                    child: LiveEventCard(
+                                      event: event,
+                                      organizationName:
+                                          model.hub.availableOrganizations[event.organizationId]?.name ?? 'Organization',
+                                    ),
+                                  ),
+                                const SizedBox(height: AppSpacing.md),
+                              ],
+
+                              // 2. FEATURED EVENT (Only show if there is an upcoming event)
+                              if (upcoming.isNotEmpty) ...[
+                                CommunitySectionHeading(
+                                  title: 'Featured Event',
+                                  actionLabel: 'Explore',
+                                  onAction: () => context.push(AppRoutes.events),
+                                ),
                                 EventCard(
                                   event: upcoming.first,
                                   organizationName:
-                                      model
-                                          .hub
-                                          .availableOrganizations[upcoming
-                                              .first
-                                              .organizationId]
-                                          ?.name ??
-                                      'Organization',
+                                      model.hub.availableOrganizations[upcoming.first.organizationId]?.name ?? 'Organization',
                                   style: EventCardStyle.featured,
                                 ),
-                              const SizedBox(height: AppSpacing.sm),
-                              CommunitySectionHeading(
-                                title: 'Coming Up',
-                                actionLabel: 'My Events',
-                                onAction: () =>
-                                    context.push(AppRoutes.myEvents),
-                              ),
-                              for (final event in upcoming.skip(1))
-                                EventCard(
-                                  event: event,
-                                  organizationName:
-                                      model
-                                          .hub
-                                          .availableOrganizations[event
-                                              .organizationId]
-                                          ?.name ??
-                                      'Organization',
-                                  style: EventCardStyle.compact,
+                                const SizedBox(height: AppSpacing.sm),
+                              ],
+
+                              // 3. EMPTY STATE (Only show if BOTH are empty)
+                              if (upcoming.isEmpty && model.ongoing.isEmpty) ...[
+                                CommunitySectionHeading(
+                                  title: 'Featured Event',
+                                  actionLabel: 'Explore Orgs',
+                                  onAction: () => context.push(AppRoutes.organizations),
                                 ),
+                                const AppEmptyView(
+                                  title: 'No Events Right Now',
+                                  message: 'Check back later or explore organizations to get involved.',
+                                ),
+                              ],
+
+                              // 4. MORE EVENTS (Only show if there are 2 or more upcoming events)
+                              if (upcoming.length > 1) ...[
+                                CommunitySectionHeading(
+                                  title: 'More Events',
+                                  actionLabel: 'My Events',
+                                  onAction: () => context.push(AppRoutes.myEvents),
+                                ),
+                                for (final event in upcoming.skip(1))
+                                  EventCard(
+                                    event: event,
+                                    organizationName:
+                                        model.hub.availableOrganizations[event.organizationId]?.name ?? 'Organization',
+                                    style: EventCardStyle.compact,
+                                  ),
+                              ],
                               const SizedBox(height: AppSpacing.xl),
                               CommunitySectionHeading(
                                 title: 'Your Organizations',

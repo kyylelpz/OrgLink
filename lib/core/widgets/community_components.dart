@@ -216,7 +216,7 @@ class CommunityDashboardHeader extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'A good day to get involved.',
+                              'Connect. Participate. Grow.',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: AppColors.border,

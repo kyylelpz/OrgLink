@@ -59,6 +59,13 @@ class HomeViewModel extends ChangeNotifier {
 
   List<OrgEvent> get upcoming =>
       _events.where((e) => e.startAt?.isAfter(_now()) == true).take(2).toList();
+  List<OrgEvent> get ongoing => _events.where((e) {
+    final start = e.startAt;
+    final end = e.endAt;
+    if (start == null || end == null) return false;
+    final now = _now();
+    return !start.isAfter(now) && end.isAfter(now);
+  }).toList();
   List<OrgEvent> get matchingEvents => _events
       .where((e) => e.title.toLowerCase().contains(search.trim().toLowerCase()))
       .toList();
