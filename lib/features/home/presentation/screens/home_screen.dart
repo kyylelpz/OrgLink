@@ -283,21 +283,62 @@ class _DashboardState extends State<_Dashboard> {
                                 ),
                             ],
                             const SizedBox(height: AppSpacing.xl),
-                            if (model
-                                .hub
-                                .managementOrganizations
-                                .isNotEmpty) ...[
+                            // IMPROVED ORGANIZATION MANAGEMENT
+                            if (model.hub.managementOrganizations.isNotEmpty) ...[
                               const AppSectionHeading(
                                 title: 'Organization Management',
+                                description: 'Tools for your organizations',
+                                prominent: true,
                               ),
-                              for (final org
-                                  in model.hub.managementOrganizations)
-                                AppActionButton(
-                                  label: 'Manage Events: ${org.name}',
-                                  onPressed: () => context.push(
-                                    AppRoutes.manageEvents(org.id),
+                              const SizedBox(height: AppSpacing.md),
+                              for (final org in model.hub.managementOrganizations)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                  child: AppSurfaceCard(
+                                    onTap: () => context.push(AppRoutes.manageEvents(org.id)),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.brandMidnight.withOpacity(0.05),
+                                            borderRadius: AppShape.button,
+                                          ),
+                                          child: const Icon(
+                                            Icons.admin_panel_settings_outlined,
+                                            color: AppColors.brandMidnight,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: AppSpacing.md),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                org.name,
+                                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppColors.brandMidnight,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Manage Events',
+                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                  color: AppColors.brandBlue,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(Icons.chevron_right, color: AppColors.muted),
+                                      ],
+                                    ),
                                   ),
-                                  style: AppActionStyle.tonal,
                                 ),
                               const SizedBox(height: AppSpacing.lg),
                             ],

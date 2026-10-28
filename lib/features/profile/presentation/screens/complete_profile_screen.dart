@@ -2,6 +2,7 @@ import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <-- ADDED
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/widgets/capitalization_suggestion.dart';
@@ -92,192 +93,231 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         }
       });
     }
+    
+    // VIEW STATE
     if (!_editing && auth.profile?.isEligible == true) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Your Profile'),
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
         ),
-        body: ProfileOverview(
-          auth: auth,
-          onEdit: () {
-            _seed(auth);
-            setState(() => _editing = true);
-          },
+        child: Scaffold(
+          backgroundColor: AppColors.brandMist,
+          appBar: AppBar(
+            title: const Text('Your Profile'),
+            backgroundColor: AppColors.brandMidnight,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: AppColors.white),
+            titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: AppColors.white,
+              fontWeight: FontWeight.w600,
+            ),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(AppShape.featureRadius),
+              ),
+            ),
+            automaticallyImplyLeading: false,
+          ),
+          body: ProfileOverview(
+            auth: auth,
+            onEdit: () {
+              _seed(auth);
+              setState(() => _editing = true);
+            },
+          ),
         ),
       );
     }
+
+    // EDIT STATE
     final photo = auth.user?.photoURL;
     final busy = auth.isBusy || _saved;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Student Profile'),
-        leading: auth.profile?.isEligible == true
-            ? const AppBackButton()
-            : null,
-        actions: const [SignOutButton(compact: true)],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.md,
-              AppSpacing.xl,
-              AppSpacing.md + MediaQuery.viewInsetsOf(context).bottom,
+      child: Scaffold(
+        backgroundColor: AppColors.brandMist,
+        appBar: AppBar(
+          title: const Text('Student Profile'),
+          backgroundColor: AppColors.brandMidnight,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppColors.white),
+          titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: AppColors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(AppShape.featureRadius),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FilledButton(
-                  onPressed: busy ? null : _save,
-                  child: const Text('Save Student Profile'),
-                ),
-                if (auth.profileStatus == ProfileStatus.ready)
-                  TextButton(
-                    onPressed: busy
-                        ? null
-                        : () {
-                            if (auth.profile?.isEligible == true) {
-                              setState(() => _editing = false);
-                            } else {
-                              context.go(AppRoutes.accountStatus);
-                            }
-                          },
-                    child: const Text('Cancel'),
+          ),
+          leading: auth.profile?.isEligible == true
+              ? const AppBackButton()
+              : null,
+          actions: const [SignOutButton(compact: true)],
+        ),
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            border: Border(top: BorderSide(color: AppColors.border)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.md,
+                AppSpacing.xl,
+                AppSpacing.md + MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton(
+                    onPressed: busy ? null : _save,
+                    child: const Text('Save Student Profile'),
                   ),
-              ],
+                  if (auth.profileStatus == ProfileStatus.ready)
+                    TextButton(
+                      onPressed: busy
+                          ? null
+                          : () {
+                              if (auth.profile?.isEligible == true) {
+                                setState(() => _editing = false);
+                              } else {
+                                context.go(AppRoutes.accountStatus);
+                              }
+                            },
+                      child: const Text('Cancel'),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      body: AppPageBody(
-        maxWidth: AppLayout.formWidth,
-        child: Form(
-          key: _form,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const AppSectionHeading(
-                title: 'A Little About You',
-                description:
-                    'Your campus profile.',
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
-                children: [
-                  ProfileIdentity(name: _name.text, photo: photo, size: 60),
-                  const SizedBox(width: AppSpacing.lg),
-                  const Expanded(
-                    child: Text(
-                      'Profile photo · optional\nYour Google avatar is used when available.',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              TextFormField(
-                initialValue: auth.user?.email ?? '',
-                readOnly: true,
-                decoration: const InputDecoration(labelText: 'Google Email'),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _name,
-                enabled: !busy,
-                maxLength: 100,
-                textCapitalization: TextCapitalization.words,
-                validator: StudentDetails.validateName,
-                decoration: const InputDecoration(labelText: 'Full Name'),
-              ),
-              CapitalizationSuggestion(controller: _name, enabled: !busy),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _number,
-                enabled: !busy,
-                maxLength: 30,
-                validator: StudentDetails.validateStudentNumber,
-                decoration: const InputDecoration(labelText: 'Student Number'),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                initialValue: _year,
-                decoration: const InputDecoration(labelText: 'Year Level'),
-                items: [
-                  for (var year = 1; year <= 6; year++)
-                    DropdownMenuItem(
-                      value: year,
-                      // ADD THIS STYLE TO REMOVE THE BOLD WEIGHT:
+        body: AppPageBody(
+          maxWidth: AppLayout.formWidth,
+          child: Form(
+            key: _form,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const AppSectionHeading(
+                  title: 'A Little About You',
+                  description: 'Your campus profile.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    ProfileIdentity(name: _name.text, photo: photo, size: 60),
+                    const SizedBox(width: AppSpacing.lg),
+                    const Expanded(
                       child: Text(
-                        'Year $year',
-                        style: const TextStyle(fontWeight: FontWeight.normal),
+                        'Profile photo',
                       ),
                     ),
-                ],
-                onChanged: busy
-                    ? null
-                    : (value) => setState(() => _year = value),
-                validator: (value) =>
-                    value == null ? 'Select a year level.' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _section,
-                enabled: !busy,
-                maxLength: 30,
-                validator: StudentDetails.validateSection,
-                decoration: const InputDecoration(labelText: 'Section'),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                key: const ValueKey('college-field'),
-                controller: _college,
-                enabled: !busy,
-                maxLength: 160,
-                validator: StudentDetails.validateAcademic,
-                decoration: const InputDecoration(
-                  labelText: 'College',
-                  helperText: 'Optional. Enter your college name.',
+                  ],
                 ),
-              ),
-              CapitalizationSuggestion(controller: _college, enabled: !busy),
-              const SizedBox(height: AppSpacing.lg),
-              TextFormField(
-                key: const ValueKey('program-field'),
-                controller: _program,
-                enabled: !busy,
-                maxLength: 160,
-                validator: StudentDetails.validateAcademic,
-                decoration: const InputDecoration(
-                  labelText: 'Program',
-                  helperText: 'Optional. Enter your program name.',
+                const SizedBox(height: AppSpacing.lg),
+                TextFormField(
+                  initialValue: auth.user?.email ?? '',
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Google Email'),
                 ),
-              ),
-              CapitalizationSuggestion(controller: _program, enabled: !busy),
-              const SizedBox(height: AppSpacing.lg),
-              const Text(
-                'You can update permitted profile fields later. Roles are never selected during sign-up.',
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              if (auth.failure != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    auth.failure!.message,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _name,
+                  enabled: !busy,
+                  maxLength: 100,
+                  textCapitalization: TextCapitalization.words,
+                  validator: StudentDetails.validateName,
+                  decoration: const InputDecoration(labelText: 'Full Name'),
+                ),
+                CapitalizationSuggestion(controller: _name, enabled: !busy),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _number,
+                  enabled: !busy,
+                  maxLength: 30,
+                  validator: StudentDetails.validateStudentNumber,
+                  decoration: const InputDecoration(labelText: 'Student Number'),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  initialValue: _year,
+                  decoration: const InputDecoration(labelText: 'Year Level'),
+                  items: [
+                    for (var year = 1; year <= 6; year++)
+                      DropdownMenuItem(
+                        value: year,
+                        child: Text(
+                          'Year $year',
+                          style: const TextStyle(fontWeight: FontWeight.normal),
+                        ),
+                      ),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (value) => setState(() => _year = value),
+                  validator: (value) =>
+                      value == null ? 'Select a year level.' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _section,
+                  enabled: !busy,
+                  maxLength: 30,
+                  validator: StudentDetails.validateSection,
+                  decoration: const InputDecoration(labelText: 'Section'),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const ValueKey('college-field'),
+                  controller: _college,
+                  enabled: !busy,
+                  maxLength: 160,
+                  validator: StudentDetails.validateAcademic,
+                  decoration: const InputDecoration(
+                    labelText: 'College',
+                    helperText: 'Optional. Enter your college name.',
                   ),
                 ),
-              if (busy) const Center(child: CircularProgressIndicator()),
-              const SizedBox(height: 16),
-            ],
+                CapitalizationSuggestion(controller: _college, enabled: !busy),
+                const SizedBox(height: AppSpacing.lg),
+                TextFormField(
+                  key: const ValueKey('program-field'),
+                  controller: _program,
+                  enabled: !busy,
+                  maxLength: 160,
+                  validator: StudentDetails.validateAcademic,
+                  decoration: const InputDecoration(
+                    labelText: 'Program',
+                    helperText: 'Optional. Enter your program name.',
+                  ),
+                ),
+                CapitalizationSuggestion(controller: _program, enabled: !busy),
+                const SizedBox(height: AppSpacing.lg),
+                const Text(
+                  'You can update permitted profile fields later. Roles are never selected during sign-up.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (auth.failure != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      auth.failure!.message,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                if (busy) const Center(child: CircularProgressIndicator()),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),

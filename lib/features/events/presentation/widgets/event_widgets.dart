@@ -11,9 +11,15 @@ import '../../../../core/widgets/app_asset_icon.dart';
 
 enum EventCardStyle { standard, featured, compact, managed }
 
-String schedule(DateTime? value) => value == null
-    ? 'Not recorded'
-    : '${displayDate(value)} ${value.toLocal().hour.toString().padLeft(2, '0')}:${value.toLocal().minute.toString().padLeft(2, '0')}';
+String schedule(DateTime? value) {
+  if (value == null) return 'Not recorded';
+  final local = value.toLocal();
+  final timeOfDay = TimeOfDay.fromDateTime(local);
+  final period = timeOfDay.period == DayPeriod.am ? 'AM' : 'PM';
+  final hour = timeOfDay.hourOfPeriod == 0 ? 12 : timeOfDay.hourOfPeriod;
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${displayDate(value)} $hour:$minute $period';
+}
 
 class EventCard extends StatelessWidget {
   const EventCard({

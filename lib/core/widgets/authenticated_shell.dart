@@ -22,7 +22,7 @@ class AuthenticatedShell extends StatefulWidget {
 class _AuthenticatedShellState extends State<AuthenticatedShell> {
   static const roots = [
     AppRoutes.home,
-    AppRoutes.calendar,
+    AppRoutes.events, // Changed from AppRoutes.calendar
     AppRoutes.qr,
     AppRoutes.organizations,
     AppRoutes.completeProfile,
@@ -100,8 +100,8 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
             path == AppRoutes.myAttendance ||
             path == AppRoutes.attendanceHub
         ? 2
-        : path == AppRoutes.calendar
-        ? 1
+        : path == AppRoutes.events || path == AppRoutes.myEvents
+        ? 1 // Changed from AppRoutes.calendar
         : path == AppRoutes.completeProfile
         ? 4
         : path.startsWith('/organizations') ||
@@ -140,7 +140,11 @@ class OrgLinkNavigationBar extends StatelessWidget {
   });
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
-  static const labels = ['Home', 'Calendar', 'QR', 'Organizations', 'Profile'];
+  
+  // Changed 'Calendar' to 'Events'
+  static const labels = ['Home', 'Events', 'QR', 'Organizations', 'Profile'];
+  
+  // Changed 'calendar' to 'calendar' (reusing the same icon, or change to 'event' if you have it)
   static const _icons = ['home', 'calendar', 'qr', 'organizations', 'profile'];
 
   @override

@@ -16,7 +16,7 @@ abstract final class AppRoutes {
   static const completeProfile = '/complete-profile';
   static const accountStatus = '/account-status';
   static const home = '/home';
-  static const calendar = '/calendar';
+  //static const calendar = '/calendar';
   static const notifications = '/notifications';
   static const qrActions = '/qr/actions';
   static const organizations = '/organizations';

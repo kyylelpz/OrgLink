@@ -77,7 +77,6 @@ class SplashScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-              if (auth.user != null) const SignOutButton(),
             ],
           ),
         ),
@@ -249,13 +248,20 @@ class SignOutButton extends StatelessWidget {
       return IconButton(
         tooltip: auth.isSigningOut ? 'Signing Out...' : 'Sign Out',
         onPressed: auth.isBusy ? null : auth.signOut,
-        icon: const Icon(Icons.logout_outlined),
+        // Made the icon red to indicate a destructive action
+        icon: const Icon(Icons.logout_outlined, color: AppColors.error), 
       );
     }
     return Padding(
       padding: const EdgeInsets.all(8),
       child: OutlinedButton(
         onPressed: auth.isBusy ? null : auth.signOut,
+        style: OutlinedButton.styleFrom(
+          // Dark red border and text
+          foregroundColor: AppColors.error,
+          side: const BorderSide(color: AppColors.error),
+          minimumSize: const Size(double.infinity, 48), // Full width for better tapping
+        ),
         child: Text(auth.isSigningOut ? 'Signing Out...' : 'Sign Out'),
       ),
     );
