@@ -1,3 +1,6 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -15,23 +18,29 @@ class MemberListScreen extends StatelessWidget {
     final details = context.watch<OrganizationDetailsViewModel>();
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          pending ? 'Membership Request Management' : 'Member Roster',
-        ),
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+        title: Text(pending ? 'Membership Requests' : 'Member Roster'),
         leading: const AppBackButton(),
       ),
       body: QueryContent(
         query: details.organization,
         builder: (org) {
           if (org == null) {
-            return const Center(child: Text('Organization not found.'));
+            return const AppEmptyView(
+              title: 'Organization Unavailable',
+              message: 'Organization not found.',
+            );
           }
           if (details.membership.loading) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingView(
+              message: 'Loading membership access...',
+            );
           }
           if (!(pending ? details.isManager : details.canViewRoster)) {
-            return const Center(
-              child: Text('You do not have permission to access this page.'),
+            return const AppEmptyView(
+              title: 'Access Unavailable',
+              message: 'You do not have permission to access this page.',
             );
           }
           return ChangeNotifierProvider(
@@ -41,7 +50,7 @@ class MemberListScreen extends StatelessWidget {
               details.uid,
               pending: pending,
             ),
-            child: _MemberList(pending: pending),
+            child: _MemberList(pending: pending, organizationName: org.name),
           );
         },
       ),
@@ -50,8 +59,9 @@ class MemberListScreen extends StatelessWidget {
 }
 
 class _MemberList extends StatelessWidget {
-  const _MemberList({required this.pending});
+  const _MemberList({required this.pending, required this.organizationName});
   final bool pending;
+  final String organizationName;
   Future<void> _review(
     BuildContext context,
     MemberListViewModel model,
@@ -62,18 +72,48 @@ class _MemberList extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        titleTextStyle: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(color: AppColors.brandMidnight),
+        icon: Icon(
+          approve ? Icons.person_add_alt : Icons.person_remove_outlined,
+          color: approve ? AppColors.brandBlue : AppColors.error,
+        ),
         title: Text('$decision Membership Request?'),
-        content: Text(
-          '$decision the request from ${member.applicantName.isEmpty ? member.uid : member.applicantName}?',
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              organizationName,
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: AppColors.brandBlue),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              '$decision the request from ${member.applicantName.isEmpty ? member.uid : member.applicantName}?',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              approve
+                  ? 'Approval changes the membership from pending to active with the member role. It does not assign officer permissions.'
+                  : 'Rejection closes this membership request. Reapplication is not currently available.',
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
+          AppActionButton(
+            label: decision,
+            style: approve
+                ? AppActionStyle.primary
+                : AppActionStyle.destructive,
             onPressed: () => Navigator.pop(context, true),
-            child: Text(decision),
           ),
         ],
       ),
@@ -99,69 +139,147 @@ class _MemberList extends StatelessWidget {
     return QueryContent(
       query: model.records,
       builder: (members) {
-        if ((members ?? []).isEmpty) {
-          return Center(
-            child: Text(
-              pending ? 'No pending requests.' : 'No active members.',
-            ),
-          );
-        }
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (model.failure != null) Text(model.failure!.message),
-            for (final member in members!)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        member.applicantName.isEmpty
-                            ? member.uid
-                            : member.applicantName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(
-                        'Role: ${displayIdentifier(member.role)} | Status: ${displayMembershipStatus(member.status)}',
-                      ),
-                      Text(
-                        'Position: ${member.positionTitle ?? 'Not Assigned'}',
-                      ),
-                      Text(
-                        pending
-                            ? 'Requested: ${displayDate(member.requestedAt)}'
-                            : 'Joined: ${displayDate(member.joinedAt)}',
-                      ),
-                      if (pending && member.uid != model.uid)
-                        Wrap(
-                          spacing: 12,
+        return AppPageBody(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrganizationPageHeading(
+                title: pending ? 'Review Memberships' : 'Your Community',
+                description: organizationName,
+              ),
+              if (model.failure != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  child: Text(
+                    model.failure!.message,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              if ((members ?? []).isEmpty)
+                AppEmptyView(
+                  title: pending ? 'Requests Reviewed' : 'No Members Yet',
+                  message: pending
+                      ? 'No pending requests.'
+                      : 'No active members.',
+                ),
+              for (final member in members ?? <Membership>[])
+                MembershipMemberCard(
+                  member: member,
+                  pending: pending,
+                  actions: pending && member.uid != model.uid
+                      ? Wrap(
+                          spacing: AppSpacing.md,
+                          runSpacing: AppSpacing.sm,
                           children: [
-                            FilledButton(
-                              onPressed: model.processing.contains(member.uid)
-                                  ? null
-                                  : () => _review(context, model, member, true),
-                              child: const Text('Approve'),
+                            AppActionButton(
+                              label: 'Approve',
+                              style: AppActionStyle.tonal,
+                              busy: model.processing.contains(member.uid),
+                              onPressed: () =>
+                                  _review(context, model, member, true),
                             ),
-                            OutlinedButton(
+                            AppActionButton(
+                              label: 'Reject',
+                              style: AppActionStyle.outlined,
                               onPressed: model.processing.contains(member.uid)
                                   ? null
                                   : () =>
                                         _review(context, model, member, false),
-                              child: const Text('Reject'),
                             ),
                           ],
-                        ),
-                      if (pending && member.uid == model.uid)
-                        const Text('You cannot review your own request.'),
-                    ],
-                  ),
+                        )
+                      : pending
+                      ? const Text('You cannot review your own request.')
+                      : null,
                 ),
-              ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
+}
+
+/// One adaptive member identity for both the roster and request queue.
+class MembershipMemberCard extends StatelessWidget {
+  const MembershipMemberCard({
+    super.key,
+    required this.member,
+    required this.pending,
+    this.actions,
+  });
+  final Membership member;
+  final bool pending;
+  final Widget? actions;
+  @override
+  Widget build(BuildContext context) => AppSurfaceCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.tonal,
+                  borderRadius: AppShape.card,
+                ),
+                child: const Icon(
+                  Icons.person_outline,
+                  color: AppColors.brandBlue,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                member.applicantName.isEmpty
+                    ? member.uid
+                    : member.applicantName,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.brandMidnight,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: AppStatusChip(
+            label: displayMembershipStatus(member.status),
+            tone: membershipStatusTone(member.status),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Role: ${displayIdentifier(member.role)} | Status: ${displayMembershipStatus(member.status)}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Position: ${member.positionTitle ?? 'Not Assigned'}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          pending
+              ? 'Requested: ${displayDate(member.requestedAt)}'
+              : 'Joined: ${displayDate(member.joinedAt)}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+        ),
+        if (actions != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          actions!,
+        ],
+      ],
+    ),
+  );
 }

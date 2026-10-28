@@ -310,7 +310,7 @@ void main() {
       expect(app.router.routeInformationProvider.value.uri.path, AppRoutes.qr);
       await tester.tap(find.text('Organizations').last);
       await tester.pumpAndSettle();
-      expect(find.text('Find Your Community'), findsOneWidget);
+      expect(find.text('Find Your People'), findsOneWidget);
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
       expect(find.text('Your Profile'), findsOneWidget);

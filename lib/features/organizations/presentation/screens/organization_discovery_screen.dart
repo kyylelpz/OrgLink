@@ -5,7 +5,6 @@ import '../../../../core/utils/display_labels.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
-import '../../../../core/widgets/community_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../viewmodels/organization_hub_view_model.dart';
 import '../widgets/organization_widgets.dart';
@@ -50,48 +49,54 @@ class _OrganizationDiscoveryScreenState
         model.managed.loading ||
         model.associated.values.any((q) => q.loading);
     return Scaffold(
-      appBar: AppBar(title: const Text('Organizations')),
+      appBar: AppBar(
+        toolbarHeight:
+            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+        title: const Text('Organizations'),
+      ),
       body: AppPageBody(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const CommunityHeader(
-              icon: Icons.diversity_3_outlined,
-              title: 'Find Your Community',
+            const OrganizationPageHeading(
+              title: 'Find Your People',
               description:
                   'Explore organizations and keep track of your memberships.',
             ),
-            const SizedBox(height: AppSpacing.lg),
             AppSearchField(
               controller: _search,
               onChanged: model.searchFor,
               label: 'Search Organizations',
+              compact: true,
               hintText: 'Search organizations',
             ),
             const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                for (final filter in OrganizationBrowseFilter.values)
-                  FilterChip(
-                    label: Text(displayIdentifier(filter.name)),
-                    selected: model.browseFilter == filter,
-                    showCheckmark: false,
-                    backgroundColor: Colors.white,
-                    selectedColor: AppColors.brandNavy,
-                    side: BorderSide.none,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppShape.feature,
-                    ),
-                    labelStyle: TextStyle(
-                      color: model.browseFilter == filter
-                          ? Colors.white
-                          : AppColors.brandNavy,
-                    ),
-                    onSelected: (_) => model.browse(filter),
+            Theme(
+              data: Theme.of(context).copyWith(
+                chipTheme: Theme.of(context).chipTheme.copyWith(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 14,
                   ),
-              ],
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final filter in OrganizationBrowseFilter.values) ...[
+                    if (filter != OrganizationBrowseFilter.values.first)
+                      const SizedBox(width: 6),
+                    Expanded(
+                      child: AppFilterChip(
+                        expanded: true,
+                        label: displayIdentifier(filter.name),
+                        selected: model.browseFilter == filter,
+                        onSelected: (_) => model.browse(filter),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
             Wrap(
               spacing: AppSpacing.sm,
@@ -118,75 +123,31 @@ class _OrganizationDiscoveryScreenState
               )
             else
               for (final org in model.browseResults)
-                AppSurfaceCard(
+                OrganizationCard(
+                  organization: org,
                   onTap: () => context.push(AppRoutes.organization(org.id)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.sm),
-                            decoration: BoxDecoration(
-                              color: AppColors.brandMist,
-                              borderRadius: AppShape.action,
-                            ),
-                            child: OrganizationLogo(org.logoURL),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Text(
-                              org.name,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        org.description.isEmpty
-                            ? 'No description available.'
-                            : org.description,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        '${displayIdentifier(org.visibility)} | ${displayIdentifier(org.status)}',
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      if (org.managerUid == model.uid)
-                        const AppStatusChip(
+                  status: org.managerUid == model.uid
+                      ? const AppStatusChip(
                           label: 'Manager',
                           tone: AppStatusTone.info,
                         )
-                      else if (model.membership(org.id) != null)
-                        AppStatusChip(
+                      : model.membership(org.id) == null
+                      ? null
+                      : AppStatusChip(
                           label: displayMembershipStatus(
                             model.membership(org.id)!.status,
                           ),
-                          tone: model.membership(org.id)!.status == 'active'
-                              ? AppStatusTone.success
-                              : AppStatusTone.neutral,
+                          tone: membershipStatusTone(
+                            model.membership(org.id)!.status,
+                          ),
                         ),
-                      const SizedBox(height: AppSpacing.sm),
-                      FilledButton.tonalIcon(
-                        icon: const Icon(Icons.arrow_forward, size: 18),
-                        onPressed: () =>
-                            context.push(AppRoutes.organization(org.id)),
-                        label: Text(
-                          model.membership(org.id) == null &&
-                                  org.managerUid != model.uid &&
-                                  org.status == 'active' &&
-                                  org.visibility == 'public'
-                              ? 'Join'
-                              : 'View',
-                        ),
-                      ),
-                    ],
-                  ),
+                  actionLabel:
+                      model.membership(org.id) == null &&
+                          org.managerUid != model.uid &&
+                          org.status == 'active' &&
+                          org.visibility == 'public'
+                      ? 'Join'
+                      : 'View',
                 ),
           ],
         ),
