@@ -38,7 +38,9 @@ class StudentDetails {
 
   factory StudentDetails.fromMap(Map<String, dynamic> data) => StudentDetails(
     fullName: data['fullName'] as String? ?? '',
-    studentNumber: data['studentNumber'] as String? ?? '',
+    studentNumber: data['studentNumber'] is String
+        ? data['studentNumber'] as String
+        : '',
     yearLevel: data['yearLevel'] as int? ?? 0,
     section: data['section'] as String? ?? '',
     college: data['college'] is String ? data['college'] as String : null,
@@ -58,11 +60,14 @@ class StudentDetails {
       value == null || value.trim().length < 2 || value.trim().length > 100
       ? 'Enter a full name (2?100 characters).'
       : null;
+
+  /// New/edited IDs are strings of exactly 10 ASCII digits; never trim or infer them.
   static String? validateStudentNumber(String? value) =>
-      value == null ||
-          !RegExp(r'^[A-Za-z0-9][A-Za-z0-9-]{2,29}$').hasMatch(value.trim())
-      ? 'Use 3?30 letters, digits or hyphens.'
-      : null;
+      value != null &&
+          value.length == 10 &&
+          RegExp(r'^[0-9]{10}$').hasMatch(value)
+      ? null
+      : 'Enter exactly 10 numeric digits (e.g. 2026000001).';
   static String? validateSection(String? value) =>
       value == null ||
           !RegExp(r'^[A-Za-z0-9][A-Za-z0-9 -]{0,29}$').hasMatch(value.trim())
@@ -70,7 +75,8 @@ class StudentDetails {
       : null;
   bool get hasValidIdentity =>
       validateName(fullName) == null &&
-      validateStudentNumber(studentNumber) == null &&
+      // Preserve previously valid stored profiles during the operator-led migration.
+      RegExp(r'^[A-Za-z0-9][A-Za-z0-9-]{2,29}$').hasMatch(studentNumber) &&
       yearLevel >= 1 &&
       yearLevel <= 6 &&
       validateSection(section) == null;
@@ -79,11 +85,12 @@ class StudentDetails {
       AcademicOptions.validateProgram(college, program) == null;
   bool get isValid =>
       hasValidIdentity &&
+      validateStudentNumber(studentNumber) == null &&
       validateAcademic(college) == null &&
       validateAcademic(program) == null;
   Map<String, dynamic> toMap() => {
     'fullName': fullName.trim(),
-    'studentNumber': studentNumber.trim(),
+    'studentNumber': studentNumber,
     'yearLevel': yearLevel,
     'section': section.trim(),
     if (college != null) 'college': college!.trim(),

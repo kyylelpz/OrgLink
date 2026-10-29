@@ -3,6 +3,7 @@ import '../services/admin_service.dart';
 
 abstract interface class AdminRepository {
   Future<AdminStats> stats();
+  Future<AdminManager> manager(String studentId);
   Future<AdminPage<AdminAccount>> accounts(
     String field,
     String search,
@@ -19,6 +20,10 @@ abstract interface class AdminRepository {
 class WorkerAdminRepository implements AdminRepository {
   WorkerAdminRepository(this.service);
   final AdminService service;
+  @override
+  Future<AdminManager> manager(String studentId) async => AdminManager.fromMap(
+    await service.call('manager', {'studentId': studentId}),
+  );
   @override
   Future<AdminStats> stats() async =>
       AdminStats.fromMap(await service.call('stats', {}));

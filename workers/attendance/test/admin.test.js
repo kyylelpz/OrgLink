@@ -1,42 +1,14 @@
+import {MemoryDb} from './support/memory_db.js';
 import {test,before} from 'node:test';
 import assert from 'node:assert/strict';
 import {adminBackend} from '../src/admin.js';
 import {createHandler} from '../src/index.js';
 import {encode} from '../src/firestore.js';
 import {tokenFixture} from './token-fixture.js';
-export const profile=(uid,status='active',role='user')=>({uid,email:`${uid}@example.edu`,fullName:'Synthetic Student',studentNumber:'2026-001',yearLevel:1,section:'A',accountStatus:status,platformRole:role});
-export class MemoryDb {
-  records=new Map();version=0;tail=Promise.resolve();failAudit=false;
-  doc(path){return path;}
-  seed(path,value){this.records.set(path,{value:structuredClone(value),version:`v${++this.version}`});}
-  get(path){return this.records.get(path)?.value;}
-  v(path){return this.records.get(path)?.version;}
-  async runTransaction(fn){
-    const previous=this.tail;let release;this.tail=new Promise(resolve=>release=resolve);await previous;
-    const writes=[];
-    const query=async q=>{
-      const collection=q.from[0].collectionId;
-      let rows=[...this.records].filter(([p])=>p.startsWith(collection+'/')&&p.split('/').length===2)
-        .map(([p,r])=>({...structuredClone(r.value),id:p.split('/').at(-1),version:r.version}));
-      const value=(row,field)=>field==='__name__'?`${collection}/${row.id}`:row[field];
-      const matches=(row,f)=>{if(f.compositeFilter)return f.compositeFilter.filters.every(x=>matches(row,x));
-        const x=f.fieldFilter,a=value(row,x.field.fieldPath),b=x.value.stringValue??x.value.referenceValue;
-        return x.op==='EQUAL'?a===b:x.op==='GREATER_THAN_OR_EQUAL'?a>=b:a<b;};
-      if(q.where)rows=rows.filter(row=>matches(row,q.where));
-      const orders=q.orderBy??[];
-      rows=rows.filter(row=>orders.every(o=>value(row,o.field.fieldPath)!==undefined));
-      rows.sort((a,b)=>{for(const o of orders){const x=value(a,o.field.fieldPath),y=value(b,o.field.fieldPath);if(x!==y)return x<y?-1:1;}return 0;});
-      if(q.startAt) rows=rows.filter(row=>{for(let i=0;i<orders.length;i++){const a=value(row,orders[i].field.fieldPath),b=q.startAt.values[i].stringValue??q.startAt.values[i].referenceValue;if(a!==b)return a>b;}return false;});
-      return rows.slice(0,q.limit??rows.length);
-    };
-    const t={getAll:async(...paths)=>paths.map(path=>({data:()=>structuredClone(this.get(path)),updateTime:this.v(path)})),query,
-      count:async q=>(await query(q)).length,
-      create:(path,data)=>{if(this.get(path))throw Error('Already exists');if(this.failAudit&&path.startsWith('activityLogs/'))throw Error('Audit failed');writes.push([path,data]);},
-      update:(path,data)=>writes.push([path,{...this.get(path),...data}]),set:(path,data)=>writes.push([path,data])};
-    try{const result=await fn(t);for(const [path,data] of writes)this.seed(path,data);return result;}finally{release();}
-  }
-}
-function fixture(){const db=new MemoryDb();db.seed('users/admin',profile('admin','active','platformAdmin'));db.seed('users/student',profile('student','pending'));db.seed('users/manager',profile('manager'));return {db,api:adminBackend(db,()=>1700000000000)};}
+export const profile=(uid,status='active',role='user')=>({uid,email:`${uid}@example.edu`,fullName:'Synthetic Student',studentNumber:({admin:'2026000001',student:'2026000002',manager:'2026000003',newManager:'2026000004'})[uid]??'2026999999',yearLevel:1,section:'A',accountStatus:status,platformRole:role});
+
+function fixture(){const db=new MemoryDb();db.seed('users/admin',profile('admin','active','platformAdmin'));db.seed('users/student',profile('student','pending'));db.seed('users/manager',profile('manager'));for(const uid of ['admin','student','manager'])db.seed('studentIds/'+profile(uid).studentNumber,{uid,state:'active'});return {db,api:adminBackend(db,()=>1700000000000)};}
+function managerInput(db,uid){const sid=profile(uid).studentNumber;return {managerStudentId:sid,managerProfileVersion:db.v('users/'+uid),managerRegistryVersion:db.v('studentIds/'+sid)};}
 const command=(db,extra={})=>({requestId:'request_0001',operation:'accountStatus',targetId:'student',version:db.v('users/student'),action:'approve',...extra});
 const as=(uid,data)=>({auth:{uid},data});
 const denied=e=>e.code==='permission-denied';
@@ -73,12 +45,12 @@ test('competing approval/rejection has exactly one winner and one audit',async()
   assert.equal([...db.records.keys()].filter(k=>k.startsWith('activityLogs/')).length,1);
 });
 test('organization create/edit/reassign retains children and membership data and checks expected ownership',async()=>{
-  const {db,api}=fixture();const create={requestId:'create_0001',operation:'createOrganization',targetId:'org',changes:{name:'IEEE iOS Society',managerUid:'manager',visibility:'private',status:'active',acceptsRequests:false}};
+  const {db,api}=fixture();const create={requestId:'create_0001',operation:'createOrganization',targetId:'org',changes:{name:'IEEE iOS Society',...managerInput(db,'manager'),visibility:'private',status:'active',acceptsRequests:false}};
   await api.mutate(as('admin',create));assert.equal(db.get('organizations/org').name,'IEEE iOS Society');assert.equal(db.get('organizations/org').approvalSettings.mode,'manual');
   assert.equal((await api.mutate(as('admin',create))).duplicate,true);
   db.seed('organizations/org/events/event',{title:'keep'});db.seed('organizations/org/memberships/manager',{membershipRole:'manager',membershipStatus:'active'});
-  db.seed('users/newManager',profile('newManager'));
-  const update={requestId:'update_0001',operation:'updateOrganization',targetId:'org',version:db.v('organizations/org'),expectedManagerUid:'manager',changes:{managerUid:'newManager',description:'Updated'}};
+  db.seed('users/newManager',profile('newManager'));db.seed('studentIds/'+profile('newManager').studentNumber,{uid:'newManager',state:'active'});
+  const update={requestId:'update_0001',operation:'updateOrganization',targetId:'org',version:db.v('organizations/org'),expectedManagerUid:'manager',changes:{...managerInput(db,'newManager'),description:'Updated'}};
   await api.mutate(as('admin',update));assert.equal(db.get('organizations/org').managerUid,'newManager');assert.equal(db.get('organizations/org').name,'IEEE iOS Society');
   assert.equal(db.get('organizations/org/events/event').title,'keep');assert.equal(db.get('organizations/org/memberships/manager').membershipRole,'manager');
   await assert.rejects(api.mutate(as('admin',{...update,requestId:'update_0002',version:db.v('organizations/org')})),e=>e.code==='conflict');
@@ -87,7 +59,7 @@ test('organization create/edit/reassign retains children and membership data and
 test('ineligible manager, arbitrary fields, invalid logo/protocol and oversized text cannot write',async()=>{
   const {db,api}=fixture();
   for(const changes of [{managerUid:'student'},{managerUid:'missing'},{platformRole:'platformAdmin'},{logoURL:'http://example.edu/logo'},{name:'x'.repeat(101)},{status:'deleted'}]){
-    await assert.rejects(api.mutate(as('admin',{requestId:'create_0001',operation:'createOrganization',targetId:'org',changes:{name:'Society',managerUid:'manager',visibility:'public',status:'active',...changes}})));
+    await assert.rejects(api.mutate(as('admin',{requestId:'create_0001',operation:'createOrganization',targetId:'org',changes:{name:'Society',...managerInput(db,'manager'),visibility:'public',status:'active',...changes}})));
     assert.equal(db.get('organizations/org'),undefined);
   }
 });
@@ -122,7 +94,7 @@ test('malformed typed student identity cannot be approved or assigned as manager
     const {db,api}=fixture();db.seed('users/student',{...profile('student','pending'),...patch});
     await assert.rejects(api.mutate(as('admin',command(db))),e=>e.code==='failed-precondition');
     db.seed('users/manager',{...profile('manager'),...patch});
-    await assert.rejects(api.mutate(as('admin',{requestId:'invalid_0001',operation:'createOrganization',targetId:'invalid-org',changes:{name:'Society',managerUid:'manager',visibility:'public',status:'active'}})),e=>e.code==='failed-precondition');
+    await assert.rejects(api.mutate(as('admin',{requestId:'invalid_0001',operation:'createOrganization',targetId:'invalid-org',changes:{name:'Society',...managerInput(db,'manager'),visibility:'public',status:'active'}})),e=>e.code==='failed-precondition');
   }
 });
 

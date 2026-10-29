@@ -1,3 +1,4 @@
+import { profileBackend } from "./student_ids.js";
 import { adminBackend } from "./admin.js";
 import { attendanceBackend, AttendanceError } from "./attendance.js";
 import { firebaseVerifier, googleAccessToken } from "./auth.js";
@@ -68,11 +69,11 @@ export function createHandler({
   clock = Date.now,
   logFailure = (entry) => console.error(JSON.stringify(entry)),
 } = {}) {
-  const verify = firebaseVerifier({ fetchImpl, clock }),
+  const verify = firebaseVerifier({ fetchImpl, clock, returnClaims: true }),
     oauth = googleAccessToken({ fetchImpl, clock });
   return async (request, env) => {
     const path = new URL(request.url).pathname;
-    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate"].includes(path))
+    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate", "/admin/manager", "/profile/save"].includes(path))
       return response(
         { error: { code: "not-found", message: "Endpoint not found." } },
         404,
@@ -89,7 +90,8 @@ export function createHandler({
       );
     let stage = "firebase-auth";
     try {
-      const uid = await verify(request.headers.get("Authorization"));
+      const identity = await verify(request.headers.get("Authorization"));
+      const uid = identity.sub;
       stage = "request-json";
       const data = await readJSON(request, path.startsWith("/admin/") ? 65536 : 8192);
       stage = "configuration";
@@ -107,11 +109,12 @@ export function createHandler({
         { fetchImpl, origin },
       );
       const isAdmin = path.startsWith("/admin/");
-      const backend = isAdmin ? adminBackend(db, clock) : attendanceBackend(db, clock);
-      const operation = isAdmin ? path.slice(7) : path.slice(1);
-      stage = `${isAdmin ? "platform-admin" : "attendance"}.${operation}`;
+      const isProfile = path.startsWith("/profile/");
+      const backend = isAdmin ? adminBackend(db, clock) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
+      const operation = isAdmin ? path.slice(7) : isProfile ? path.slice(9) : path.slice(1);
+      stage = `${isAdmin ? "platform-admin" : isProfile ? "profile" : "attendance"}.${operation}`;
       const result = await backend[operation]({
-        auth: { uid },
+        auth: { uid, email: identity.email, photoURL: identity.picture },
         data,
       });
       stage = "response";
@@ -119,12 +122,12 @@ export function createHandler({
     } catch (error) {
       if (error instanceof AttendanceError)
         return response(
-          { error: { code: error.code, message: path.startsWith("/admin/") && error.code === "unauthenticated" ? "Sign in again to open administration." : error.message } },
+          { error: { code: error.code, message: path.startsWith("/admin/") && error.code === "unauthenticated" ? "Sign in again to open administration." : path.startsWith("/profile/") && error.code === "unauthenticated" ? "Sign in again before saving your profile." : error.message } },
           status[error.code] ?? 400,
         );
       // Never return upstream Google errors, token contents or service-account details.
       const diagnostic = {
-        event: path.startsWith("/admin/") ? "platform_admin_backend_failure" : "attendance_backend_failure",
+        event: path.startsWith("/admin/") ? "platform_admin_backend_failure" : path.startsWith("/profile/") ? "profile_backend_failure" : "attendance_backend_failure",
         endpoint: path.slice(1),
         stage: error instanceof BackendError ? error.stage : stage,
         code: "unavailable",
@@ -151,7 +154,7 @@ export function createHandler({
           error: {
             code: "unavailable",
             message:
-              path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
+              path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : path.startsWith("/profile/") ? "Your profile save could not be confirmed. Refresh your profile before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
           },
         },
         503,

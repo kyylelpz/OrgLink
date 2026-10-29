@@ -48,6 +48,9 @@ class AdminViewModel extends ChangeNotifier {
     }
   }
 
+  Future<AdminManager> manager(String studentId) =>
+      repository.manager(studentId);
+
   Future<void> load() async {
     if (busy || disposed) return;
     busy = true;
@@ -67,7 +70,7 @@ class AdminViewModel extends ChangeNotifier {
   Future<void> find(String field, String value) async {
     if (busy) return;
     this.field = field;
-    search = value.trim();
+    search = field == 'studentNumber' ? value : value.trim();
     cursor = null;
     nextCursor = null;
     _previous.clear();

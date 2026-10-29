@@ -15,7 +15,10 @@ active and no existing document is migrated.
 
 The existing View → AuthViewModel → AuthRepository → FirebaseAuthService →
 Firebase Auth identity flow is retained. Profile saves continue through the
-existing ProfileRepository → UserProfileService → Firestore transaction.
+existing ProfileRepository → UserProfileService → authenticated WorkerApiService
+→ `/profile/save` → Firestore transaction. Profile reads retain the existing
+server-confirmed Firestore stream. The save transport is shared with admin HTTP
+operations; no Flutter package was added.
 No dependencies, projects, credentials, collection names or privileged roles
 were added. Existing organization/event/navigation/attendance workflows remain.
 
@@ -91,11 +94,11 @@ not forced through onboarding merely because they lack these newer fields.
 
 ## Authorization and data integrity
 
-- Profiles remain `users/{auth.uid}`. Creation requires verified password identity,
+- Profiles remain `users/{auth.uid}`. The Worker creates them using verified password identity,
   canonical academics, `platformRole: user`, `accountStatus: pending`, matching
-  Auth UID/email and server timestamps. No profile is written during sign-in,
+  signed Auth UID/email and server timestamps. Direct client creation is denied. No profile is written during sign-in,
   verification, linking or password reset.
-- Existing profile transactions verify identity and update only student details
+- Worker profile transactions verify signed identity and update only student details
   and updatedAt. Role/status/creation metadata/memberships remain unchanged.
 - Rules gate protected data on verified password identity plus existing active
   profile and student validity; email verification alone grants nothing.
@@ -167,7 +170,7 @@ Google email during linking before checking the same UID (firebase-tools
 keeps that known failure visible as TODO; it is not counted as a passing link test.
 Dart tests verify fresh reauthentication, same-UID SDK calls and failure safety.
 
-## Changed files and validation
+## Historical email-authentication implementation and validation
 
 Production: auth model/repository/service/ViewModel/screens/branding;
 profile model/repository/service/completion/overview; app router/routes and error
@@ -246,3 +249,174 @@ The separately implemented [Platform Administration MVP](platform-admin.md) now
 provides trusted account approval/rejection/deactivation. It preserves this
 module's email-verification and pending defaults. The initial administrator must
 be explicitly provisioned by an operator; an email address alone grants nothing.
+
+## BulSU Student ID enforcement
+
+`studentNumber` is intentionally retained as the stored field name. The visible
+label is **Student ID**. New profile creation and every profile save require a
+string containing exactly **10 ASCII digits**, `YYYYNNNNNN`, for example
+`2026000001`. Spaces, hyphens, letters, symbols, Unicode lookalike digits, integer
+JSON values and incorrect lengths are invalid. Sequence zeros are retained. No
+ID is generated/incremented, and entry year is not derived from Year Level.
+
+The existing email/Google registration layout is unchanged: Student ID is
+collected in the existing profile-completion step after authentication and email
+verification. A Firebase Auth identity can exist without a saved profile; only a
+successful atomic profile/claim transaction accepts its student profile. All
+other identity/academic fields and the pending-approval requirement remain.
+
+The profile field uses a numeric keyboard, 10-character limit and inline format
+validation. The server repeats validation and returns a clear duplicate-ID error.
+`StudentDetails.isValid` is strict for saves; persisted-profile eligibility keeps
+the prior readable identity rules so a previously valid legacy ID does not
+suddenly lock out its owner during operator-led correction. Legacy records are
+not silently rewritten. Numeric malformed legacy values are reported for manual
+correction; the Flutter parser does not convert them to strings or guess zeros.
+
+### Trusted registry and atomic writes
+
+`studentIds/{10-digit-string}` stores `uid`, `state: active | retired`, createdAt
+and updatedAt. UID remains the identity; this registry is not a replacement for
+users, memberships, events, attendance, document IDs or audit actor UIDs.
+
+`POST /profile/save` accepts only `{details: {fullName,studentNumber,yearLevel,
+section,college,program}}`. The existing Worker verifies the Firebase ID token
+against fixed orglink-dev issuer/audience/keys and verified password claims. UID,
+email and initial photo come from signed identity claims, never client fields.
+Clients cannot submit roles, statuses, another UID or email overrides. The Worker
+rechecks any existing profile identity before preserving all privileged fields.
+
+The transaction reads the current profile, target registry claim, target-profile
+matches and, on an ID change, the old claim/matches before any write. It then
+atomically creates/activates the claim and creates/updates the UID-keyed profile.
+A registry document is the uniqueness lock: competing different UIDs cannot both
+claim it. The limited legacy-profile query is an additional safety guard during
+backfill, not the uniqueness mechanism. A valid legacy ID already on another
+profile cannot be stolen just because its registry entry is not backfilled.
+Duplicate legacy owners fail closed for review.
+
+An ID change retires the old mapping owned by that UID and claims the new one in
+the same transaction. Retired IDs remain reserved to the original UID; another
+student cannot reuse them. The original owner may explicitly restore their own
+retired ID. No automatic mapping release/UID transfer exists. When a missing old
+mapping is ambiguous, the save does not invent an owner for it. Registry conflicts
+with another owner fail rather than overwrite. Student ID changes create a
+server-only audit with actor UID and before/after IDs. Failure, aborted transaction
+or lost HTTP response cannot leave a half-created reservation/profile. Retrying
+an already successful identical profile save does not create a second ID-change
+audit. No client-side fallback writes bypass the backend on failure.
+
+Firestore Rules now deny **all direct profile creation**, all direct changes to
+studentNumber, and all client reads/writes of studentIds (including admins).
+Existing authorized self-updates of other student fields remain compatible with
+old clients; identity/role/status immutability and Modules 2–4 eligibility checks
+remain. Administrative manager lookup is protected, not a public registry search.
+Authenticated profile-save duplicate feedback does not reveal another student's
+name, UID or account data.
+
+### Operator audit, backfill and consistency
+
+No live-data audit, migration or correction was run during implementation.
+`tools/admin/backfill-student-ids.mjs` uses the existing firebase-admin operator
+dependency and only orglink-dev. Its default is read-only. Scan results distinguish
+missing, invalid (including integers), duplicate IDs, UID mismatches, missing
+claims, conflicting claims and stale active registry entries. It never pads,
+normalizes, generates, infers an entry year or overwrites a profile Student ID.
+Keep reports private and outside source control: they contain student identifiers.
+
+Use trusted Firebase Admin ADC credentials outside the repository; unset emulator
+variables. First run the audit without apply:
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS = 'C:\Secure\orglink-dev-admin.json'
+node tools/admin/backfill-student-ids.mjs --project orglink-dev
+```
+
+Review records against BulSU-assigned IDs. Invalid/missing/duplicate values need
+explicit owner/operator correction supported by school records, not invented
+replacement numbers or automatic integer conversion. A duplicate group is never
+chosen arbitrarily. Existing users keep their UID, role/status and history.
+Resolve ambiguous or mismatched mappings with a separately reviewed trusted
+operator transaction; the tool does not overwrite them or delete tombstones.
+
+After direct ID writes are frozen, an operator may explicitly apply the reviewed
+backfill:
+
+```powershell
+node tools/admin/backfill-student-ids.mjs --project orglink-dev --apply
+```
+
+An interactive terminal must type **BACKFILL STUDENT IDS IN orglink-dev**.
+For each unique valid candidate, the tool verifies the existing Firebase Auth UID
+and email, rereads the exact profile and registry, and checks duplicate matches
+inside a transaction. It creates only an absent mapping; correct active mappings
+are no-ops. Changed profiles, Auth identity mismatches, duplicates, conflicting or
+retired registry entries are reported for review instead of overwritten. Each
+candidate is atomic and independent; interruption is safely resumable and reruns
+are idempotent. Profiles and approval states are never changed by the backfill.
+
+Verify after corrections/backfill using a read-only pass:
+
+```powershell
+node tools/admin/backfill-student-ids.mjs --project orglink-dev --verify
+```
+
+Exit code 2 means unresolved missing/invalid/duplicate/identity/claim/stale-registry
+issues; zero means the scanned profile/registry representation is consistent.
+Verify commands use a paginated scan, not a lifetime consistent snapshot: freeze
+ID writes during final reconciliation, retain the report and repeat after any
+manual correction. Normal Worker claims remain atomic during concurrent saves;
+client/other operator writes must not bypass that mechanism. Backfill application
+also checks the real Auth identity; separately review deleted-user retention.
+
+### Deployment order, indexes and rollback
+
+Nothing has been deployed. Review and schedule the cutover:
+
+1. Take an operator-controlled backup/report of profiles and registry. Audit first
+   and plan manual correction of invalid/missing/duplicate IDs from BulSU records.
+2. Freeze profile creation/ID changes for the cutover. Deploy the reviewed Rules
+   that deny direct creation and studentNumber changes/registry access. Existing
+   signed-in eligibility remains compatible with readable legacy IDs, so modules
+   and existing student access do not depend on a completed backfill. Old clients
+   can temporarily receive profile-save denial; announce this maintenance window.
+3. Release the updated existing Worker (including signed identity claims,
+   `/profile/save` and `/admin/manager`) and updated Flutter together. New Flutter
+   must never fall back to direct writes. Keep ID-changing traffic paused while
+   reviewing conflicts and applying the backfill; correct old IDs via explicitly
+   verified owner saves/trusted operator transactions. Open normal registration
+   and ID-changing traffic after reconciliation, not before invalid legacy data
+   has been reviewed. The legacy query protects canonical unclaimed IDs meanwhile.
+4. Apply the separately confirmed backfill, repeat read-only verify, then test
+   concurrent claims, profile edits, duplicate feedback, approval/reactivation and
+   manager assignment using synthetic accounts. No existing roles/managers change
+   automatically. Existing Google accounts and linking keep their UID/claims.
+5. Keep default single-field indexes on `users.studentNumber` (ascending) enabled.
+   Equality/duplicate checks and exact-ID search use that index and document-ID
+   tie breaking; no new composite index definition is required. Registry reads
+   use exact document paths. Existing disabled index overrides need review.
+
+Rollback: pause profile/ID-changing traffic first; keep registry records,
+retired mappings and audit history. Do not restore permissive creation/Student ID
+Rules while clients can write, and do not delete registry entries to make an old
+client work. A Flutter rollback may leave profile saves unavailable; existing
+Modules 1–4 and read-compatible account access remain. Reconcile any restored
+profile snapshot against registry/audit changes before reopening writes. Never
+restore profiles and mappings independently or replace UIDs. No automatic
+rollback, database export or paid infrastructure was introduced.
+
+The existing Spark/Workers Free architecture is retained. Profile claims add a
+small bounded transaction/query cost and registry/audit writes. Backfill reads
+all profiles/claims and Auth candidates; run it deliberately on the demo dataset
+within existing quotas. No Firebase Cloud Function or new package was added.
+
+Student ID validation/test evidence and changed-file manifest are recorded in
+[Platform Administration](platform-admin.md), including remaining device and
+operator acceptance. Earlier validation counts above describe the prior auth
+implementation, not this registry migration.
+
+Student ID final validation: analysis clean; 212 Flutter tests, 73 Worker tests,
+11 operator-tool tests and 2 real Worker/emulator workflows passed. The Rules/Auth
+emulator suite passed 146 tests with the existing Google-linking TODO retained.
+See Platform Administration for the full changed-file manifest and manual release
+requirements. No live audit, migration or deployment was run.

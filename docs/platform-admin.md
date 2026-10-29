@@ -65,7 +65,7 @@ analytics collection or polling feed.
 
 Lists fetch 26 records to display **25 per page**, with Next/Previous cursors.
 Queries order by name then document ID for deterministic ties. Search supports a
-case-sensitive name prefix or exact ID; accounts also support exact email. No
+case-sensitive name prefix; accounts also support exact Student ID and exact email. Organization IDs remain exact-searchable. No
 normalized values are written back, and no unbounded client filtering is used.
 Refreshing/new searches reset or reload pages; concurrent inserts may require a
 new search/refresh to appear before an existing cursor.
@@ -106,9 +106,9 @@ membershipRequirements, approvalSettings, positions, publicOfficers, createdAt,
 updatedAt. Creation supplies empty optional lists and manual approval defaults.
 The UI can edit name, description, HTTPS logo URL, mission/vision, goals,
 requirements, public/private visibility, active/inactive status, request acceptance
-and manager UID. Other existing fields are preserved.
+and manager Student ID (resolved to managerUid by the server). Other existing fields are preserved.
 
-Manager selection uses the exact UID visible in Account Management. The server
+Manager selection uses the exact 10-digit Student ID shown in Account Management. The protected Worker resolves it through the registry to the existing UID. The server
 requires an existing active account with valid student identity and a recognized
 platform role; pending, disabled, missing and malformed profiles are rejected.
 An update must match both the current document version and expected manager UID.
@@ -231,7 +231,7 @@ test doubles only; **this provisioning procedure has not been executed**.
    (existing Wrangler dry-run script). When authorized, release this extension
    through the existing Worker deployment process. The new routes must be live
    before the new Flutter admin screens can load. **No deployment was run here.**
-3. Existing Firestore Rules stay unchanged: do not add client admin write bypasses.
+3. Deploy the Student ID Rules cutover described in Module 1; do not add client admin write bypasses.
    Keep the existing Module 1 verification/eligibility guards reviewed and deployed
    as required by that module. Automatic single-field indexes support these
    simple searches/counts; disabled custom index configurations need review.
@@ -313,9 +313,9 @@ name is restored to lowercase `orglink`; the displayed application name and
 Firebase Android identity are unchanged. No Flutter or Node dependency was added.
 
 No live data, provisioning, Firebase Console settings, Rules or Worker deployment
-changed. Firestore Rules remain byte-for-byte unchanged by this task.
+changed. The original admin feature did not alter Rules. The later Student ID cutover below intentionally tightens profile and registry writes.
 
-## Account reactivation validation
+## Account reactivation validation (before Student ID cutover)
 
 Reactivation is an extension of the existing accountStatus operation, not a new
 route, schema, role, service or permission bypass. Tests cover eligibility-derived
@@ -336,7 +336,7 @@ Current validation results:
   reactivation with real persisted version/audit/eligibility checks.
 - Touched Dart files formatted; `git diff --check` clean.
 
-No configuration or schema change is needed. When a release is authorized, update
+Reactivation alone needed no configuration or schema change. When its release is authorized, update
 the existing Worker before expecting Reactivate in Flutter: older list responses
 omit canReactivate and the client safely hides the action. Verify the confirmed
 disabled → active flow on Android against the development backend after release.
@@ -382,3 +382,121 @@ Reactivation-specific changed files:
 - `workers/attendance/src/index.js`
 - `workers/attendance/test/admin.emulator.test.js`
 - `workers/attendance/test/admin.test.js`
+
+## Student IDs for account identification and manager assignment
+
+Accounts show **Student ID** prominently and in the read-only Account Details
+dialog. Firebase UID remains the hidden internal target for status operations,
+self checks, document paths and audit actor references. No reference migration or
+UID replacement occurred. Names/email/status remain visible under admin-only
+access. Missing/invalid legacy Student IDs require operator correction; no display
+padding or guessed value is persisted. Exact ID search uses stored studentNumber,
+accepts precisely 10 numeric digits and retains existing cursor pagination.
+
+Organization cards show manager name/Student ID instead of manager UID. The editor
+uses a numeric 10-character **Manager Student ID** field and **Find Manager**.
+`POST /admin/manager {studentId}` requires the same authoritative active admin
+check as other operations. There is no public/student lookup endpoint. It reads
+an active registry mapping, verifies exactly one matching UID-keyed profile,
+checks ownership consistency and returns name, Student ID, account status,
+eligibility, profile version and registry version. Disabled/pending/incomplete
+accounts are shown as ineligible; missing, duplicated, retired and stale mappings
+fail closed for manual review. Resolve errors are not treated as matched users.
+
+The confirmation includes the matched name, Student ID and status. Changing the
+field clears the preview; save requires a current eligible preview. The existing
+mutation is extended with `changes.managerStudentId`, managerProfileVersion and
+managerRegistryVersion. It **rejects a client managerUid field**. The transaction
+resolves the registry again, verifies both preview versions, validates the active
+candidate, and uses the resolved Firebase UID for the existing managerUid field.
+Existing expectedManagerUid checks refer to the old stored owner and remain an
+ownership/concurrency check, never a proof for selecting the new manager. An API
+partial detail edit without assignment can retain the server's existing owner;
+the UI requires explicit Student ID resolution for its editor save.
+
+Audit entries keep actor UID and resolved managerUid before/after; normalized
+request context includes the Student ID/version choices. Idempotency, account
+approval/rejection/reactivation, self/admin protection and history retention are
+unchanged. A stale profile or registry mapping after confirmation returns conflict
+and requires Find Manager again. No owner or membership grant is inferred from a
+name, email, role label or client UID. Existing organization memberships, events,
+attendance and role scopes remain intact.
+
+See [Module 1](module1.md#bulsu-student-id-enforcement) for registry ownership,
+backfill/audit commands, privacy, deployment freeze/order, read compatibility,
+indexes and rollback. The operator must reconcile existing data before enabling
+ordinary ID-changing traffic. The new Worker and Rules must accompany Flutter;
+old manager-UID clients intentionally cannot bypass the new assignment contract.
+No administrator provisioning, live migration, account correction or deployment
+was performed for this change.
+
+### Student ID code audit and validation
+
+Audited studentNumber in the profile model/repository/service/completion/overview,
+Auth profile-completion routing, admin cards/search/organization editor,
+Firestore profile/eligibility Rules, Worker admin/attendance eligibility and
+operator demo/provisioning tools. The field name and all UID-based references
+remain. Legacy-read eligibility checks in Flutter, Rules and attendance/admin
+remain intentionally compatible during the migration; new profile/ID writes are
+strict and can only claim IDs through the trusted registry transaction. Existing
+operator provisioning tools still preserve UIDs and never manufacture Student IDs.
+
+Validation performed locally:
+
+- `flutter analyze`: **no issues**.
+- Full Flutter suite: **212 passed**; final focused Student ID/admin rerun:
+  **21 passed** (including the updated width/text-scale admin matrices).
+- Worker unit/runtime suite: **73 passed**.
+- Operator tooling suite: **11 passed** (audit classification, idempotency,
+  identity checks, conflicts, stale plans and existing provisioning safeguards).
+- Real Worker Firestore REST/Auth emulator workflows: **2 passed**, including
+  racing claims, profile changes/retired mappings, real Auth-backed backfill,
+  versioned manager resolution, status/reactivation and preserved history.
+- Firestore Rules/Auth emulator suite: **146 passed, 0 failed, 1 existing TODO**.
+  The TODO is the previously documented local Google password-linking emulator
+  limitation, not a passing account-link test or a Student ID regression.
+- Wrangler bundle dry run passed without deploying. Touched Dart files formatted;
+  diff checks clean. No new Dart/Node packages or paid infrastructure.
+
+Manual work remains: live read-only audit, school-verified legacy correction,
+planned Rules/Worker/Flutter cutover, separately confirmed backfill and read-only
+verify, followed by Android/email/IAM acceptance. No live audit/migration,
+operator provisioning, deployment or live-account change ran during this task.
+
+### Student ID changed-file manifest
+
+- `docs/module1.md`
+- `docs/platform-admin.md`
+- `firebase/firebase.rules`
+- `firebase/tests/email-auth.integration.test.mjs`
+- `firebase/tests/profile.rules.test.mjs`
+- `lib/app/dependency_injection.dart`
+- `lib/core/services/worker_api_service.dart`
+- `lib/features/admin/data/models/admin_models.dart`
+- `lib/features/admin/data/repositories/admin_repository.dart`
+- `lib/features/admin/data/services/admin_service.dart`
+- `lib/features/admin/presentation/screens/admin_screen.dart`
+- `lib/features/admin/presentation/viewmodels/admin_view_model.dart`
+- `lib/features/profile/data/models/student_profile.dart`
+- `lib/features/profile/data/services/user_profile_service.dart`
+- `lib/features/profile/presentation/screens/complete_profile_screen.dart`
+- `test/phase2_navigation_test.dart`
+- `test/platform_admin_test.dart`
+- `test/student_id_test.dart`
+- `test/support/test_auth_repository.dart`
+- `test/text_formatting_test.dart`
+- `test/widget_test.dart`
+- `tools/admin/backfill-student-ids.mjs`
+- `tools/admin/backfill-student-ids.test.mjs`
+- `tools/admin/package.json`
+- `workers/attendance/package.json`
+- `workers/attendance/src/admin.js`
+- `workers/attendance/src/auth.js`
+- `workers/attendance/src/index.js`
+- `workers/attendance/src/student_ids.js`
+- `workers/attendance/test/admin.emulator.test.js`
+- `workers/attendance/test/admin.test.js`
+- `workers/attendance/test/student_ids.emulator.test.js`
+- `workers/attendance/test/student_ids.test.js`
+- `workers/attendance/test/support/memory_db.js`
+

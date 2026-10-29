@@ -21,9 +21,10 @@ async function seed(overrides = {}) {
     await setDoc(doc(context.firestore(), 'users/alice'), {...profile(), ...overrides});
   });
 }
-test('owner can create pending user profile and read it', async () => {
+test('direct profile creation is denied; owner can read a trusted-created pending profile', async () => {
   const ref = doc(db(), 'users/alice');
-  await assertSucceeds(setDoc(ref, profile()));
+  await assertFails(setDoc(ref, profile()));
+  await seed();
   await assertSucceeds(getDoc(ref));
 });
 test('unauthenticated and other students cannot read private profiles', async () => {
@@ -53,7 +54,7 @@ test('required fields cannot be omitted', async () => {
 test('owner can edit permitted fields with server timestamp', async () => {
   await seed({platformRole: 'platformAdmin', accountStatus: 'suspended'});
   await assertSucceeds(updateDoc(doc(db(), 'users/alice'), {
-    fullName: 'Alice Updated', studentNumber: '2026-002', yearLevel: 2, section: 'B', updatedAt: serverTimestamp(),
+    fullName: 'Alice Updated', yearLevel: 2, section: 'B', updatedAt: serverTimestamp(),
   }));
 });
 for (const change of [{platformRole:'platformAdmin'}, {accountStatus:'suspended'},
@@ -80,7 +81,7 @@ test('reject invalid edits, client timestamps, deletes and unrelated collections
 
 test('optional academics accept new and legacy profiles without privilege changes', async () => {
   const ref = doc(db(), 'users/alice');
-  await assertSucceeds(setDoc(ref, {...profile(), college:'College of Engineering', program:'Bachelor of Science in Computer Engineering'}));
+  await seed();
   await assertSucceeds(updateDoc(ref, {section:'B', updatedAt:serverTimestamp()}));
   const data = (await getDoc(ref)).data();
   assert.equal(data.college, 'College of Engineering');
@@ -107,7 +108,7 @@ for (const verified of [false, true]) {
   test(`password identity verification=${verified} gates profile creation without approval bypass`, async () => {
     const password = env.authenticatedContext('alice', {email:'alice@example.edu', email_verified:verified, firebase:{sign_in_provider:'password'}}).firestore();
     const ref = doc(password, 'users/alice');
-    await (verified ? assertSucceeds : assertFails)(setDoc(ref, profile()));
+    await assertFails(setDoc(ref, profile()));
     await assertFails(setDoc(ref, {...profile(), accountStatus:'active'}));
     await env.withSecurityRulesDisabled(async c => setDoc(doc(c.firestore(), 'users/alice'), {...profile(),accountStatus:'active'}));
     await (verified ? assertSucceeds : assertFails)(updateDoc(ref, {section:'B',updatedAt:serverTimestamp()}));
@@ -116,7 +117,7 @@ for (const verified of [false, true]) {
   });
 }
 test('pending account cannot access organizations and cannot approve itself', async () => {
-  await assertSucceeds(setDoc(doc(db(),'users/alice'),profile()));
+  await seed();
   await assertFails(getDoc(doc(db(),'organizations/missing')));
   await assertFails(updateDoc(doc(db(),'users/alice'),{accountStatus:'active',updatedAt:serverTimestamp()}));
 });
@@ -127,4 +128,11 @@ test('legacy academic values remain readable and unchanged until an explicit con
   assert.equal((await getDoc(ref)).data().program,'iOS Research');
   await assertFails(updateDoc(ref,{program:'Unlisted Program',updatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(ref,{college:'College of Engineering',program:'Bachelor of Science in Civil Engineering',updatedAt:serverTimestamp()}));
+});
+
+test('direct Student ID changes and registry enumeration/claims are denied even to a platform admin',async()=>{
+  await seed({platformRole:'platformAdmin',accountStatus:'active'});
+  await assertFails(updateDoc(doc(db(),'users/alice'),{studentNumber:'2026000001',updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(db(),'studentIds/2026000001'),{uid:'alice',state:'active'}));
+  await assertFails(getDoc(doc(db(),'studentIds/2026000001')));
 });

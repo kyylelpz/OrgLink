@@ -29,6 +29,15 @@ class FakeAdminRepository implements AdminRepository {
   AdminFailure? failure;
   List<AdminAccount>? accountItems;
   @override
+  Future<AdminManager> manager(String studentId) async => AdminManager.fromMap({
+    'studentId': studentId,
+    'name': 'Synthetic Manager',
+    'status': 'active',
+    'eligible': true,
+    'version': 'manager-v1',
+    'registryVersion': 'registry-v1',
+  });
+  @override
   Future<AdminStats> stats() async {
     reads++;
     await readGate?.future;
@@ -332,12 +341,20 @@ void main() {
             'IEEE iOS New Organization',
           );
           await tester.ensureVisible(
-            find.byKey(const ValueKey('admin-managerUid')),
+            find.byKey(const ValueKey('admin-managerStudentId')),
           );
           await tester.enterText(
-            find.byKey(const ValueKey('admin-managerUid')),
-            'manager',
+            find.byKey(const ValueKey('admin-managerStudentId')),
+            '2026000003',
           );
+          FocusManager.instance.primaryFocus?.unfocus();
+          tester.testTextInput.hide();
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Find Manager'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Find Manager'));
+          await tester.pumpAndSettle();
+          expect(find.text('Synthetic Manager'), findsOneWidget);
           tester.view.viewInsets = const FakeViewPadding(bottom: 250);
           addTearDown(tester.view.resetViewInsets);
           await tester.pumpAndSettle();

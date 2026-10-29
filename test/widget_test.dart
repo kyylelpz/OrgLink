@@ -54,7 +54,7 @@ void main() {
       await tester.ensureVisible(find.text('Save Student Profile'));
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
-      expect(find.text('Use 3?30 letters, digits or hyphens.'), findsOneWidget);
+      expect(find.text('Enter exactly 10 numeric digits (e.g. 2026000001).'), findsOneWidget);
       expect(find.text('Select a year level.'), findsOneWidget);
       expect(find.text('Select a college.'), findsOneWidget);
       expect(find.text('Select a program.'), findsOneWidget);
@@ -63,7 +63,7 @@ void main() {
         tester.widget<TextFormField>(fields.at(0)).initialValue,
         student.email,
       );
-      await tester.enterText(fields.at(2), '2026-001');
+      await tester.enterText(fields.at(2), '2026000001');
       await tester.ensureVisible(find.byType(DropdownButtonFormField<int>));
       await tester.tap(find.byType(DropdownButtonFormField<int>));
       await tester.pumpAndSettle();
@@ -97,7 +97,7 @@ void main() {
             .widget<TextFormField>(find.byType(TextFormField).at(2))
             .controller
             ?.text,
-        '2026-001',
+        '2026000001',
       );
       router.go(AppRoutes.home);
       await tester.pumpAndSettle();

@@ -157,7 +157,7 @@ void main() {
         find.text('Suggested capitalization: Juan Dela Cruz'),
         findsOneWidget,
       );
-      await tester.enterText(fields.at(2), '2026-001');
+      await tester.enterText(fields.at(2), '2026000001');
       await tester.ensureVisible(find.byType(DropdownButtonFormField<int>));
       await tester.tap(find.byType(DropdownButtonFormField<int>));
       await tester.pumpAndSettle();

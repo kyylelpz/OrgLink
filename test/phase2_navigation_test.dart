@@ -705,7 +705,7 @@ void main() {
           profile(
             details: const StudentDetails(
               fullName: name,
-              studentNumber: '2026-001',
+              studentNumber: '2026000001',
               yearLevel: 1,
               section: 'A',
             ),

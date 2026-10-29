@@ -235,10 +235,13 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 TextFormField(
                   controller: _number,
                   enabled: !busy,
-                  maxLength: 30,
+                  maxLength: 10,
+                  keyboardType: TextInputType.number,
                   validator: StudentDetails.validateStudentNumber,
                   decoration: const InputDecoration(
-                    labelText: 'Student Number',
+                    labelText: 'Student ID',
+                    helperText: 'BulSU-assigned ID: YYYYNNNNNN',
+                    helperMaxLines: 2,
                   ),
                 ),
                 const SizedBox(height: 16),

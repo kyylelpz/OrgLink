@@ -12,7 +12,7 @@ if(!/^(127\.0\.0\.1|localhost):\d+$/.test(host??''))throw Error('A loopback Fire
 const db=new RestFirestore(async()=> 'owner',{origin:`http://${host}`});
 const api=adminBackend(db);
 const suffix=Date.now().toString(36),admin=`pa-admin-${suffix}`,pending=`pa-pending-${suffix}`,manager=`pa-manager-${suffix}`,replacement=`pa-replacement-${suffix}`,org=`pa-org-${suffix}`;
-const p=(uid,status='active',role='user')=>({uid,email:`${uid}@example.edu`,fullName:`Platform Test ${suffix} ${uid}`,studentNumber:'2026-001',yearLevel:1,section:'A',platformRole:role,accountStatus:status,
+const p=(uid,status='active',role='user')=>({uid,email:`${uid}@example.edu`,fullName:`Platform Test ${suffix} ${uid}`,studentNumber:uid===admin?'2026000001':uid===pending?'2026000002':uid===manager?'2026000003':uid===replacement?'2026000004':'2026999999',yearLevel:1,section:'A',platformRole:role,accountStatus:status,
   college:'College of Engineering',program:'Bachelor of Science in Computer Engineering',createdAt:Timestamp.fromMillis(Date.now()),updatedAt:Timestamp.fromMillis(Date.now())});
 const as=(uid,data)=>({auth:{uid},data});
 async function snapshot(path){return db.runTransaction(async t=>(await t.getAll(db.doc(path)))[0]);}
@@ -22,6 +22,7 @@ test('Firestore REST admin MVP: real queries/counts, concurrent decisions, manag
     await db.runTransaction(async t=>{
       t.set(db.doc('users/'+admin),p(admin,'active','platformAdmin'));t.set(db.doc('users/'+pending),p(pending,'pending'));
       t.set(db.doc('users/'+manager),p(manager));t.set(db.doc('users/'+replacement),p(replacement));
+      t.set(db.doc('studentIds/2026000003'),{uid:manager,state:'active'});t.set(db.doc('studentIds/2026000004'),{uid:replacement,state:'active'});
       for(let i=0;i<28;i++)t.set(db.doc(`users/pa-page-${suffix}-${i}`),{...p(`pa-page-${suffix}-${i}`),fullName:`Page ${suffix} ${String(i).padStart(2,'0')}`});
     });
     await assert.rejects(api.stats(as(manager,{})),e=>e.code==='permission-denied');
@@ -34,7 +35,7 @@ test('Firestore REST admin MVP: real queries/counts, concurrent decisions, manag
     assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'conflict');
     const audits=await db.query({from:[{collectionId:'activityLogs'}],where:{fieldFilter:{field:{fieldPath:'actorUid'},op:'EQUAL',value:{stringValue:admin}}}});assert.equal(audits.length,1);
     const winner=results[0].status==='fulfilled'?data:{...data,requestId:'reject_'+suffix,action:'reject'};assert.equal((await api.mutate(as(admin,winner))).duplicate,true);
-    await api.mutate(as(admin,{operation:'createOrganization',targetId:org,requestId:'create_'+suffix,changes:{name:'IEEE iOS Society',description:'Synthetic integration organization',managerUid:manager,visibility:'public',status:'active'}}));
+    await api.mutate(as(admin,{operation:'createOrganization',targetId:org,requestId:'create_'+suffix,changes:{name:'IEEE iOS Society',description:'Synthetic integration organization',managerStudentId:'2026000003',managerProfileVersion:(await api.manager(as(admin,{studentId:'2026000003'}))).version,managerRegistryVersion:(await api.manager(as(admin,{studentId:'2026000003'}))).registryVersion,visibility:'public',status:'active'}}));
     await db.runTransaction(async t=>{t.set(db.doc(`organizations/${org}/events/event`),{title:'Existing Event'});t.set(db.doc(`organizations/${org}/events/event/attendance/participant`),{attendanceStatus:'present'});t.set(db.doc(`organizations/${org}/memberships/${manager}`),{membershipRole:'manager',membershipStatus:'active'});});
     const managerBefore=(await snapshot('users/'+manager)).data();
     await api.mutate(as(admin,{operation:'accountStatus',targetId:manager,requestId:'disable_'+suffix,version:(await snapshot('users/'+manager)).updateTime,action:'deactivate'}));
@@ -50,7 +51,7 @@ test('Firestore REST admin MVP: real queries/counts, concurrent decisions, manag
     assert.equal(reactivationLog.before.accountStatus,'disabled');assert.equal(reactivationLog.after.accountStatus,'active');
     assert.equal((await api.list(as(admin,{collection:'users',field:'__name__',search:manager}))).items[0].canReactivate,false);
     const version=(await snapshot('organizations/'+org)).updateTime;
-    const update={operation:'updateOrganization',targetId:org,requestId:'replace_'+suffix,version,expectedManagerUid:manager,changes:{managerUid:replacement,description:'Changed'}};
+    const update={operation:'updateOrganization',targetId:org,requestId:'replace_'+suffix,version,expectedManagerUid:manager,changes:{managerStudentId:'2026000004',managerProfileVersion:(await api.manager(as(admin,{studentId:'2026000004'}))).version,managerRegistryVersion:(await api.manager(as(admin,{studentId:'2026000004'}))).registryVersion,description:'Changed'}};
     await api.mutate(as(admin,update));assert.equal((await snapshot('organizations/'+org)).data().managerUid,replacement);
     assert.equal((await snapshot(`organizations/${org}/events/event`)).data().title,'Existing Event');
     assert.equal((await snapshot(`organizations/${org}/events/event/attendance/participant`)).data().attendanceStatus,'present');

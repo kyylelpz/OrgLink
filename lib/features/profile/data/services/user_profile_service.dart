@@ -1,10 +1,12 @@
+import '../../../../core/services/worker_api_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../auth/data/models/auth_user.dart';
 import '../models/student_profile.dart';
 
 class UserProfileService {
-  UserProfileService(this._service);
+  UserProfileService(this._service, {required this.api});
+  final WorkerApiService api;
   final FirestoreService _service;
   DocumentReference<Map<String, dynamic>> _document(String uid) => _service
       .collection<Map<String, dynamic>>(
@@ -40,30 +42,13 @@ class UserProfileService {
         );
       });
 
-  Future<void> save(AuthUser user, StudentDetails details) =>
-      _service.runTransaction((transaction) async {
-        final reference = _document(user.id);
-        final snapshot = await transaction.get(reference);
-        final fields = {
-          ...details.toMap(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        };
-        if (snapshot.exists) {
-          if (snapshot.data()?['uid'] != user.id ||
-              snapshot.data()?['email'] != user.email) {
-            throw const FormatException('Profile identity mismatch');
-          }
-          transaction.update(reference, fields);
-        } else {
-          transaction.set(reference, {
-            ...fields,
-            'uid': user.id,
-            'email': user.email,
-            'photoURL': user.photoURL,
-            'platformRole': 'user',
-            'accountStatus': 'pending',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
-      });
+  Future<void> save(AuthUser user, StudentDetails details) async {
+    if (api.auth.currentUser?.uid != user.id) {
+      throw const WorkerFailure(
+        'Your session changed. Reopen your profile.',
+        'unauthenticated',
+      );
+    }
+    await api.call('/profile/save', {'details': details.toMap()});
+  }
 }

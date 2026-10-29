@@ -1,3 +1,4 @@
+import { validStudentId, resolveStudentId } from './student_ids.js';
 // Platform operations use the existing trusted Firestore transport, never client role claims.
 import { AttendanceError } from './attendance.js';
 import { Timestamp } from './firestore.js';
@@ -28,7 +29,7 @@ function text(value, max, required = false) {
 }
 function organizationInput(input, creating) {
   fields(input, ['name','description','logoURL','mission','vision','goals','membershipRequirements',
-    'visibility','status','managerUid','acceptsRequests']);
+    'visibility','status','managerStudentId','managerProfileVersion','managerRegistryVersion','acceptsRequests']);
   const patch = {};
   for (const [key,max] of [['name',100],['description',1500],['mission',1000],['vision',1000]]) {
     if (key in input) patch[key] = text(input[key],max,key === 'name');
@@ -54,15 +55,18 @@ function organizationInput(input, creating) {
       patch[key] = input[key];
     }
   }
-  if ('managerUid' in input) {
-    if (!validId(input.managerUid)) invalid();
-    patch.managerUid = input.managerUid;
-  }
+  if ('managerStudentId' in input) {
+    if (!validStudentId(input.managerStudentId)) fail('invalid-argument','Enter a manager Student ID with exactly 10 numeric digits.');
+    for(const key of ['managerStudentId','managerProfileVersion','managerRegistryVersion']) {
+      if(typeof input[key]!=='string' || !input[key] || input[key].length>128) fail('failed-precondition','Resolve and review the manager Student ID before saving.');
+      patch[key]=input[key];
+    }
+  } else if ('managerProfileVersion' in input || 'managerRegistryVersion' in input) invalid();
   if ('acceptsRequests' in input) {
     if (typeof input.acceptsRequests !== 'boolean') invalid();
     patch.acceptsRequests = input.acceptsRequests;
   }
-  if (creating && (!patch.name || !patch.managerUid || !patch.visibility || !patch.status)) invalid();
+  if (creating && (!patch.name || !patch.managerStudentId || !patch.visibility || !patch.status)) invalid();
   if (!Object.keys(patch).length) invalid();
   return patch;
 }
@@ -89,10 +93,18 @@ export function adminBackend(db, clock = Date.now) {
       pending: await t.count({from:[{collectionId:'users'}],where:{fieldFilter:{field:{fieldPath:'accountStatus'},op:'EQUAL',value:{stringValue:'pending'}}}}),
       organizations: await t.count({from:[{collectionId:'organizations'}]}),
     })),
+    manager: ({auth,data}) => read(auth.uid, async t => {
+      fields(data,['studentId']);
+      const matched=await resolveStudentId(t,db,data.studentId);
+      const p=matched.profile;
+      return {studentId:data.studentId,name:p.fullName,status:p.accountStatus,
+        eligible:p.accountStatus==='active' && completeProfile(p) && ['user','platformAdmin'].includes(p.platformRole),
+        version:matched.version,registryVersion:matched.registryVersion};
+    }),
     list: ({auth,data}) => read(auth.uid, async t => {
       fields(data,['collection','field','search','cursor']);
       const collection = data.collection;
-      const allowed = collection === 'users' ? ['fullName','email','__name__'] : collection === 'organizations' ? ['name','__name__'] : [];
+      const allowed = collection === 'users' ? ['fullName','email','studentNumber','__name__'] : collection === 'organizations' ? ['name','__name__'] : [];
       const field = data.field ?? allowed[0], search = data.search ?? '';
       if (!allowed.includes(field) || typeof search !== 'string' || search.length > 128) invalid();
       const query = {from:[{collectionId:collection}],orderBy:[{field:{fieldPath:field},direction:'ASCENDING'}],limit:26};
@@ -101,7 +113,8 @@ export function adminBackend(db, clock = Date.now) {
         if (field === '__name__') {
           if (!validId(search)) invalid();
           query.where = {fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{referenceValue:db.doc(`${collection}/${search}`)}}};
-        } else if (field === 'email') {
+        } else if (field === 'email' || field === 'studentNumber') {
+          if(field==='studentNumber' && !validStudentId(search)) fail('invalid-argument','Enter exactly 10 numeric digits for Student ID search.');
           query.where = {fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:search}}};
         } else {
           query.where = {compositeFilter:{op:'AND',filters:[
@@ -116,13 +129,16 @@ export function adminBackend(db, clock = Date.now) {
         query.startAt = {before:false,values:[...(field === '__name__' ? [] : [{stringValue:data.cursor.value}]),
           {referenceValue:db.doc(`${collection}/${data.cursor.id}`)}]};
       }
-      const records = await t.query(query), items = records.slice(0,25).map(record => {
+      const records = await t.query(query);
+      const managers=collection==='organizations' && records.length ? await t.getAll(...records.slice(0,25).map(r=>userPath(r.managerUid))) : [];
+      const items = records.slice(0,25).map((record,index) => {
         const result = {id:record.id,version:record.version};
-        const keys = collection === 'users' ? ['uid','email','fullName','platformRole','accountStatus']
+        const keys = collection === 'users' ? ['uid','email','fullName','studentNumber','platformRole','accountStatus']
           : ['organizationId','name','description','logoURL','mission','vision','goals','membershipRequirements','visibility','status','managerUid','approvalSettings'];
         for (const key of keys) if (key in record) result[key] = record[key];
         if (collection === 'users') result.canReactivate = record.uid === record.id && record.platformRole === 'user'
           && record.accountStatus === 'disabled' && completeProfile(record);
+        if(collection==='organizations') {const manager=managers[index]?.data(); result.managerStudentId=validStudentId(manager?.studentNumber)?manager.studentNumber:null; result.managerName=manager?.fullName ?? null; result.managerStatus=manager?.accountStatus ?? null;}
         return result;
       });
       const last = items.at(-1);
@@ -167,13 +183,21 @@ export function adminBackend(db, clock = Date.now) {
             versionMatches(target,data.version);
             if (data.expectedManagerUid !== current.managerUid) fail('conflict','The organization manager changed. Refresh before saving.');
           }
-          const managerUid = patch.managerUid ?? current?.managerUid;
-          const [manager] = await t.getAll(userPath(managerUid));
-          const candidate = manager.data();
+          let managerUid=current?.managerUid,candidate;
+          if(patch.managerStudentId) {
+            const matched=await resolveStudentId(t,db,patch.managerStudentId);
+            if(matched.version!==patch.managerProfileVersion || matched.registryVersion!==patch.managerRegistryVersion)
+              fail('conflict','The manager profile or Student ID registry changed. Resolve and review it again.');
+            managerUid=matched.uid;candidate=matched.profile;
+          } else {
+            const [manager]=await t.getAll(userPath(managerUid));candidate=manager.data();
+          }
           if (candidate?.uid !== managerUid || candidate.accountStatus !== 'active' || !completeProfile(candidate)
             || !['user','platformAdmin'].includes(candidate.platformRole))
             fail('failed-precondition','Choose an active manager with a complete student profile.');
           changes = {...patch}; delete changes.acceptsRequests;
+          delete changes.managerStudentId;delete changes.managerProfileVersion;delete changes.managerRegistryVersion;
+          if(patch.managerStudentId)changes.managerUid=managerUid;
           if (creating || 'acceptsRequests' in patch) changes.approvalSettings = {
             ...(current?.approvalSettings ?? {mode:'manual'}), acceptsRequests:patch.acceptsRequests ?? true,
           };

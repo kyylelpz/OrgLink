@@ -1,3 +1,5 @@
+import {profileBackend} from '../../workers/attendance/src/student_ids.js';
+import {RestFirestore} from '../../workers/attendance/src/firestore.js';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -31,14 +33,16 @@ test('Auth emulator: verification + pending approval + reset preserve UID and pr
   try {
     const {user}=await createUserWithEmailAndPassword(auth,email,password); const uid=user.uid;
     const ref=doc(db,'users',uid);
-    const profile={uid,email,fullName:'Synthetic Email Student', studentNumber:'2026-123',yearLevel:1,section:'A',
+    const profile={uid,email,fullName:'Synthetic Email Student', studentNumber:'2026123456',yearLevel:1,section:'A',
       college:'College of Engineering',program:'Bachelor of Science in Computer Engineering',photoURL:null,
       platformRole:'user',accountStatus:'pending',createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
     await assertFails(setDoc(ref,profile)); // Unverified auth alone cannot create a profile.
     await sendEmailVerification(user);
     await applyActionCode(auth,await codeFor('VERIFY_EMAIL')); await reload(user); await user.getIdToken(true);
     assert.equal(user.emailVerified,true);
-    await assertSucceeds(setDoc(ref,profile));
+    await assertFails(setDoc(ref,profile)); // Even verified clients cannot bypass the atomic registry.
+    const rest=new RestFirestore(async()=> 'owner',{origin:`http://${firestoreHost}`});
+    await profileBackend(rest).save({auth:{uid,email},data:{details:{fullName:profile.fullName,studentNumber:profile.studentNumber,yearLevel:1,section:'A',college:profile.college,program:profile.program}}});
     await assertFails(updateDoc(ref,{accountStatus:'active',updatedAt:serverTimestamp()}));
     await assertFails(setDoc(doc(db,'users','different-uid'),{...profile,uid:'different-uid'}));
     await env.withSecurityRulesDisabled(async context=>setDoc(doc(context.firestore(),'organizations','email-public'),

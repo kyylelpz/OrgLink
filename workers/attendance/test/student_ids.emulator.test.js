@@ -1,0 +1,42 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {initializeApp,deleteApp} from 'firebase-admin/app';
+import {getAuth} from 'firebase-admin/auth';
+import {getFirestore,FieldValue} from 'firebase-admin/firestore';
+import {RestFirestore} from '../src/firestore.js';
+import {profileBackend} from '../src/student_ids.js';
+import {adminBackend} from '../src/admin.js';
+import {claimExistingStudentId,analyzeStudentIds} from '../../../tools/admin/backfill-student-ids.mjs';
+for(const name of ['FIRESTORE_EMULATOR_HOST','FIREBASE_AUTH_EMULATOR_HOST'])if(!/^(127\.0\.0\.1|localhost):\d+$/.test(process.env[name]??''))throw Error('Local Auth and Firestore emulators required; no live fallback.');
+const db=new RestFirestore(async()=> 'owner',{origin:`http://${process.env.FIRESTORE_EMULATOR_HOST}`});
+const details=sid=>({fullName:'Synthetic BulSU Student',studentNumber:sid,yearLevel:6,section:'A',college:'College of Engineering',program:'Bachelor of Science in Computer Engineering'});
+test('real concurrent reservations, profile edits, registry backfill and manager resolution use atomic Firestore transactions',async()=>{
+  const app=initializeApp({projectId:'orglink-dev'},'student-id-tests'),store=getFirestore(app),auth=getAuth(app);
+  const prefix='sid-'+Date.now(),first=prefix+'-first',second=prefix+'-second',legacy=prefix+'-legacy',admin=prefix+'-admin';
+  const api=profileBackend(db),adminApi=adminBackend(db),req=(uid,sid)=>({auth:{uid,email:`${uid}@example.edu`},data:{details:details(sid)}});
+  try {
+    for(const uid of [first,second,legacy,admin])await auth.createUser({uid,email:`${uid}@example.edu`,emailVerified:true});
+    const races=await Promise.allSettled([api.save(req(first,'2030999999')),api.save(req(second,'2030999999'))]);
+    assert.equal(races.filter(r=>r.status==='fulfilled').length,1);assert.equal(races.find(r=>r.status==='rejected').reason.code,'already-exists');
+    const owner=(await store.doc('studentIds/2030999999').get()).data().uid;
+    assert.equal((await store.doc('users/'+owner).get()).data().accountStatus,'pending');
+    await store.doc('users/'+owner).update({accountStatus:'active'});
+    await api.save(req(owner,'2030000001'));assert.equal((await store.doc('studentIds/2030999999').get()).data().state,'retired');
+    assert.equal((await store.doc('users/'+owner).get()).data().studentNumber,'2030000001');
+    await assert.rejects(api.save(req('intruder','2030999999')),e=>e.code==='already-exists');
+    await store.doc('users/'+legacy).set({...details('2040000001'),uid:legacy,email:`${legacy}@example.edu`,platformRole:'user',accountStatus:'active'});
+    await assert.rejects(api.save(req('intruder','2040000001')),e=>e.code==='already-exists');
+    const candidate={uid:legacy,studentId:'2040000001',email:`${legacy}@example.edu`};
+    assert.equal((await claimExistingStudentId({store,auth,candidate,timestamp:()=>FieldValue.serverTimestamp()})).result,'claimed');
+    assert.equal((await claimExistingStudentId({store,auth,candidate,timestamp:()=>FieldValue.serverTimestamp()})).result,'unchanged');
+    const report=analyzeStudentIds([{...(await store.doc('users/'+legacy).get()).data(),id:legacy}],[{...(await store.doc('studentIds/2040000001').get()).data(),id:'2040000001'}]);assert.equal(report.unclaimed.length,0);assert.equal(report.staleRegistry.length,0);
+    await store.doc('users/'+admin).set({...details('2050000001'),uid:admin,email:`${admin}@example.edu`,platformRole:'platformAdmin',accountStatus:'active'});
+    const lookup=await adminApi.manager({auth:{uid:admin},data:{studentId:'2040000001'}});assert.equal(lookup.eligible,true);
+    const command={operation:'createOrganization',targetId:prefix+'-org',requestId:'create_'+prefix,changes:{name:'Student ID Test Organization',status:'active',visibility:'private',managerStudentId:lookup.studentId,managerProfileVersion:lookup.version,managerRegistryVersion:lookup.registryVersion}};
+    await adminApi.mutate({auth:{uid:admin},data:command});assert.equal((await store.doc('organizations/'+command.targetId).get()).data().managerUid,legacy);
+    await store.doc('users/'+legacy).update({section:'B'});
+    await assert.rejects(adminApi.mutate({auth:{uid:admin},data:{...command,targetId:prefix+'-stale',requestId:'stale_'+prefix}}),e=>e.code==='conflict');
+    await store.doc('users/'+second+'-duplicate').set({...details('2040000001'),uid:second+'-duplicate'});
+    await assert.rejects(adminApi.manager({auth:{uid:admin},data:{studentId:'2040000001'}}),e=>e.code==='failed-precondition');
+  }finally{await store.terminate();await deleteApp(app);}
+});

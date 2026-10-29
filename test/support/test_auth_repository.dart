@@ -11,7 +11,7 @@ const student = AuthUser(
 );
 const validDetails = StudentDetails(
   fullName: 'Student Name',
-  studentNumber: '2026-001',
+  studentNumber: '2026000001',
   yearLevel: 1,
   section: 'A',
   college: AcademicOptions.college,

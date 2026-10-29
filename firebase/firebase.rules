@@ -30,24 +30,18 @@ service cloud.firestore {
     }
     match /users/{uid} {
       allow get: if owner(uid);
-      allow create: if owner(uid) && verifiedIdentity()
-        && request.auth.token.email is string
-        && request.resource.data.keys().hasAll(['uid','email','fullName','studentNumber','yearLevel','section','photoURL','platformRole','accountStatus','createdAt','updatedAt'])
-        && request.resource.data.keys().hasOnly(['uid','email','fullName','studentNumber','yearLevel','section','college','program','photoURL','platformRole','accountStatus','createdAt','updatedAt'])
-        && request.resource.data.uid == uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.platformRole == 'user'
-        && request.resource.data.accountStatus == 'pending'
-        && (request.resource.data.photoURL == null || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048))
-        && validStudent(request.resource.data) && validAcademic(request.resource.data) && academicSelection(request.resource.data)
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
+      // Profiles and Student ID claims are created atomically by the authenticated Worker.
+      allow create: if false;
       allow update: if owner(uid) && verifiedIdentity()
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['college', 'program']) || academicSelection(request.resource.data))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName','studentNumber','yearLevel','section','college','program','updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName','yearLevel','section','college','program','updatedAt'])
         && validStudent(request.resource.data) && validAcademic(request.resource.data)
         && request.resource.data.updatedAt == request.time;
       // Listing, deletion, privileged fields and other users' data are denied.
+    }
+    match /studentIds/{studentId} {
+      // No public lookup, client reservation, change or release.
+      allow read, write: if false;
     }
     function eligible() {
       return verifiedIdentity()

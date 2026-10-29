@@ -18,7 +18,7 @@ const invalid = () => {
   );
 };
 // Cache keys and in-flight fetches per isolate. Request headers never select key URLs.
-export function firebaseVerifier({ fetchImpl = fetch, clock = Date.now } = {}) {
+export function firebaseVerifier({ fetchImpl = fetch, clock = Date.now, returnClaims = false } = {}) {
   let keys = new Map(),
     expires = 0,
     pending,
@@ -139,7 +139,7 @@ export function firebaseVerifier({ fetchImpl = fetch, clock = Date.now } = {}) {
     }
     if (!valid) invalid();
     if (payload.firebase?.sign_in_provider === "password" && payload.email_verified !== true) invalid();
-    return payload.sub;
+    return returnClaims ? payload : payload.sub;
   };
 }
 export function googleAccessToken({
