@@ -111,6 +111,7 @@ class StudentProfile {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   bool get isComplete => email.isNotEmpty && details.hasValidIdentity;
-  // Role data never grants administrative access in this module.
+  // Presentation hint only; privileged operations independently authorize in the Worker.
+  bool get isPlatformAdmin => isEligible && platformRole == 'platformAdmin';
   bool get isEligible => isComplete && accountStatus == 'active';
 }

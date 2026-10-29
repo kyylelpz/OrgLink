@@ -487,8 +487,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
       child: _AuthScaffold(
         centered: true,
         title: 'Check your email',
-        description:
-            'We sent a verification link to your email address.',
+        description: 'We sent a verification link to your email address.',
         illustration: 'verify',
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1189,6 +1188,8 @@ class AccountStatusScreen extends StatelessWidget {
     final auth = context.watch<AuthViewModel>();
     final message = switch (auth.profile?.accountStatus) {
       'pending' => 'Your account is awaiting approval.',
+      'rejected' =>
+        'Your account application was not approved. Contact your school for assistance.',
       'suspended' =>
         'Your account is suspended. Contact your school for assistance.',
       'disabled' =>

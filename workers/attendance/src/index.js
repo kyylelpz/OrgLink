@@ -1,3 +1,4 @@
+import { adminBackend } from "./admin.js";
 import { attendanceBackend, AttendanceError } from "./attendance.js";
 import { firebaseVerifier, googleAccessToken } from "./auth.js";
 import { BackendError, RestFirestore, TransportError } from "./firestore.js";
@@ -19,7 +20,7 @@ const response = (body, code = 200) =>
       "X-Content-Type-Options": "nosniff",
     },
   });
-async function readJSON(request) {
+async function readJSON(request, limit = 8192) {
   if (
     !/^application\/json(?:;|$)/i.test(
       request.headers.get("Content-Type") ?? "",
@@ -27,7 +28,7 @@ async function readJSON(request) {
   )
     throw new AttendanceError(
       "invalid-argument",
-      "Send a JSON attendance request.",
+      "Send a JSON request.",
     );
   const reader = request.body?.getReader();
   if (!reader)
@@ -38,11 +39,11 @@ async function readJSON(request) {
     const { value, done } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 8192) {
+    if (size > limit) {
       await reader.cancel();
       throw new AttendanceError(
         "invalid-argument",
-        "Attendance request is too large.",
+        "The request is too large.",
       );
     }
     chunks.push(value);
@@ -71,7 +72,7 @@ export function createHandler({
     oauth = googleAccessToken({ fetchImpl, clock });
   return async (request, env) => {
     const path = new URL(request.url).pathname;
-    if (!["/issue", "/redeem", "/correct"].includes(path))
+    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate"].includes(path))
       return response(
         { error: { code: "not-found", message: "Endpoint not found." } },
         404,
@@ -81,7 +82,7 @@ export function createHandler({
         {
           error: {
             code: "invalid-argument",
-            message: "Use POST for attendance.",
+            message: "Use POST for this endpoint.",
           },
         },
         405,
@@ -90,7 +91,7 @@ export function createHandler({
     try {
       const uid = await verify(request.headers.get("Authorization"));
       stage = "request-json";
-      const data = await readJSON(request);
+      const data = await readJSON(request, path.startsWith("/admin/") ? 65536 : 8192);
       stage = "configuration";
       let origin = "https://firestore.googleapis.com";
       if (env.FIRESTORE_EMULATOR_HOST) {
@@ -105,9 +106,10 @@ export function createHandler({
             : oauth(env.FIREBASE_SERVICE_ACCOUNT),
         { fetchImpl, origin },
       );
-      const backend = attendanceBackend(db, clock);
-      const operation = path.slice(1);
-      stage = `attendance.${operation}`;
+      const isAdmin = path.startsWith("/admin/");
+      const backend = isAdmin ? adminBackend(db, clock) : attendanceBackend(db, clock);
+      const operation = isAdmin ? path.slice(7) : path.slice(1);
+      stage = `${isAdmin ? "platform-admin" : "attendance"}.${operation}`;
       const result = await backend[operation]({
         auth: { uid },
         data,
@@ -117,12 +119,12 @@ export function createHandler({
     } catch (error) {
       if (error instanceof AttendanceError)
         return response(
-          { error: { code: error.code, message: error.message } },
+          { error: { code: error.code, message: path.startsWith("/admin/") && error.code === "unauthenticated" ? "Sign in again to open administration." : error.message } },
           status[error.code] ?? 400,
         );
       // Never return upstream Google errors, token contents or service-account details.
       const diagnostic = {
-        event: "attendance_backend_failure",
+        event: path.startsWith("/admin/") ? "platform_admin_backend_failure" : "attendance_backend_failure",
         endpoint: path.slice(1),
         stage: error instanceof BackendError ? error.stage : stage,
         code: "unavailable",
@@ -149,7 +151,7 @@ export function createHandler({
           error: {
             code: "unavailable",
             message:
-              "Verification could not be confirmed. Check attendance status before retrying.",
+              path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
           },
         },
         503,

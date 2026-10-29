@@ -1,5 +1,10 @@
 # OrgLink
 
+Platform Administration MVP is implemented locally: protected dashboard, account
+decisions and organization/manager management through the existing Worker. See
+[Platform Administration](docs/platform-admin.md) for explicit operator-only
+bootstrap, manual deployment and acceptance. No administrator was provisioned.
+
 Module 3 event management and registration is implemented. See
 [the Module 3 guide](docs/module3.md) for the selected approval policy, atomic
 registration rules, routes, indexes, deployment and testing instructions.

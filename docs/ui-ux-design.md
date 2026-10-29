@@ -110,3 +110,18 @@ See [Module 1](module1.md) for current test evidence, manual provider/templates/
 App Links setup, undeployed Rules/Worker verification guards and the explicit
 Google-link emulator limitation. Earlier audit counts above describe the prior
 redesign audit, not validation of this authentication addition.
+
+## Platform Administration MVP
+
+Eligible platform admins have a Profile → Platform Administration entry. New
+utility routes provide real saved-profile/organization counts, paginated account
+search and confirmed account decisions, organization creation/editing and explicit
+manager assignment. The existing bottom navigation and Modules 1–4 styling remain
+unchanged. Inter, midnight headers, shared surfaces/actions/status feedback and
+OrganizationLogo are reused; pages/dialogs adapt to narrow screens and 200% text.
+
+UI visibility is only a presentation guard. The Worker checks the authoritative
+active platformAdmin profile for every call; ordinary users and managers are
+denied. See [Platform Administration](platform-admin.md) for current policies,
+audit/concurrency behavior, provisioning and manual acceptance. This supersedes
+earlier future-only administration notes; no deployment/provisioning occurred.

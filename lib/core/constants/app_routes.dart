@@ -1,4 +1,7 @@
 abstract final class AppRoutes {
+  static const admin = '/admin',
+      adminAccounts = '/admin/accounts',
+      adminOrganizations = '/admin/organizations';
   static const qr = '/qr',
       myQRCode = '/qr/my-code',
       qrScan = '/qr/scan',

@@ -139,6 +139,13 @@ class ProfileOverview extends StatelessWidget {
                 style: AppActionStyle.outlined,
                 onPressed: () => context.push(AppRoutes.linkPassword),
               ),
+            if (auth.profile?.isPlatformAdmin == true)
+              AppActionButton(
+                label: 'Platform Administration',
+                icon: Icons.admin_panel_settings_outlined,
+                style: AppActionStyle.outlined,
+                onPressed: () => context.push(AppRoutes.admin),
+              ),
             const SizedBox(height: AppSpacing.xl),
             AppSurfaceCard(
               child: Column(

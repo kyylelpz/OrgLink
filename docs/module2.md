@@ -1,5 +1,9 @@
 # Module 2: Organization discovery and membership
 
+The [Platform Administration MVP](platform-admin.md) adds trusted organization
+creation/editing and explicit manager assignment. Existing organization-scoped
+permissions still use managerUid; memberships and child records are preserved.
+
 Module 3 extends the read-only event baseline described here; see
 [module3.md](module3.md) for current event permissions and summary-query compatibility.
 

@@ -1,3 +1,5 @@
+import '../features/admin/data/repositories/admin_repository.dart';
+import '../features/admin/data/services/admin_service.dart';
 import '../features/attendance/data/services/attendance_service.dart';
 import '../features/attendance/data/repositories/attendance_repository.dart';
 import '../features/attendance/data/repositories/firestore_attendance_repository.dart';
@@ -32,6 +34,11 @@ class AppDependencies extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider(create: (_) => AdminService(FirebaseAuth.instance)),
+        Provider<AdminRepository>(
+          create: (context) =>
+              WorkerAdminRepository(context.read<AdminService>()),
+        ),
         Provider(
           create: (_) =>
               FirebaseAuthService(FirebaseAuth.instance, GoogleSignIn.instance),

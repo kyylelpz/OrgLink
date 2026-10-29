@@ -239,3 +239,10 @@ No deployment or Firebase Console configuration is part of this change.
 - `test/widget_test.dart`
 - `workers/attendance/src/auth.js`
 - `workers/attendance/test/auth.test.js`
+
+## Platform administrator approvals
+
+The separately implemented [Platform Administration MVP](platform-admin.md) now
+provides trusted account approval/rejection/deactivation. It preserves this
+module's email-verification and pending defaults. The initial administrator must
+be explicitly provisioned by an operator; an email address alone grants nothing.

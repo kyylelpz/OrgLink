@@ -1,3 +1,5 @@
+import '../features/admin/presentation/screens/admin_screen.dart';
+import '../features/admin/presentation/viewmodels/admin_view_model.dart';
 import '../core/widgets/authenticated_shell.dart';
 import '../features/attendance/presentation/attendance_scope.dart';
 import '../features/attendance/presentation/screens/attendance_screens.dart';
@@ -36,6 +38,18 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     requiresEmailVerification: auth.user?.requiresEmailVerification == true,
   ),
   routes: [
+    GoRoute(
+      path: AppRoutes.admin,
+      builder: (_, _) => const AdminScreen(section: AdminSection.dashboard),
+    ),
+    GoRoute(
+      path: AppRoutes.adminAccounts,
+      builder: (_, _) => const AdminScreen(section: AdminSection.accounts),
+    ),
+    GoRoute(
+      path: AppRoutes.adminOrganizations,
+      builder: (_, _) => const AdminScreen(section: AdminSection.organizations),
+    ),
     GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),
     GoRoute(
       path: AppRoutes.onboarding,
@@ -327,6 +341,9 @@ String? authRedirect(
     return path == AppRoutes.accountStatus || path == AppRoutes.completeProfile
         ? null
         : AppRoutes.accountStatus;
+  }
+  if (path == AppRoutes.admin || path.startsWith('${AppRoutes.admin}/')) {
+    return null;
   }
   if (path == AppRoutes.qr ||
       path.startsWith('${AppRoutes.qr}/') ||
