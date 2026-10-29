@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/auth.test.js test/firestore.workerd.test.js",
+    "test": "node --test test/auth.test.js test/firestore.workerd.test.js test/admin.test.js test/student_ids.test.js test/images.test.js",
+    "test:student-id:emulator": "node --test --test-concurrency=1 test/admin.emulator.test.js test/student_ids.emulator.test.js",
+    "test:admin:emulator": "node --test test/admin.emulator.test.js",
     "test:emulator": "node --test --test-concurrency=1 test/attendance.emulator.test.cjs",
-    "check": "wrangler deploy --dry-run --outdir .worker-build"
+    "check": "wrangler deploy --dry-run --outdir .worker-build",
+    "test:images:emulator": "node --test test/images.emulator.test.js"
   },
   "devDependencies": {
     "firebase-admin": "^13.10.0",

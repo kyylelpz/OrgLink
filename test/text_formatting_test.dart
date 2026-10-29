@@ -157,13 +157,25 @@ void main() {
         find.text('Suggested capitalization: Juan Dela Cruz'),
         findsOneWidget,
       );
-      await tester.enterText(fields.at(2), '2026-001');
+      await tester.enterText(fields.at(2), '2026000001');
       await tester.ensureVisible(find.byType(DropdownButtonFormField<int>));
       await tester.tap(find.byType(DropdownButtonFormField<int>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Year 1').last);
       await tester.pumpAndSettle();
       await tester.enterText(fields.at(3), 'A');
+      await tester.ensureVisible(find.byKey(const ValueKey('college-field')));
+      await tester.tap(find.byKey(const ValueKey('college-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('College of Engineering').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('program-field')));
+      await tester.tap(find.byType(DropdownButtonFormField<String>).last);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text('Bachelor of Science in Civil Engineering').last,
+      );
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Save Student Profile'));
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();

@@ -1,0 +1,73 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {RestFirestore,Timestamp} from '../src/firestore.js';
+import {adminBackend} from '../src/admin.js';
+const require=createRequire(new URL('../../../firebase/tests/package.json',import.meta.url));
+const {initializeTestEnvironment,assertFails,assertSucceeds}=require('@firebase/rules-unit-testing');
+const {doc,setDoc,updateDoc,getDocs,collection}=require('firebase/firestore');
+const host=process.env.FIRESTORE_EMULATOR_HOST;
+if(!/^(127\.0\.0\.1|localhost):\d+$/.test(host??''))throw Error('A loopback Firestore emulator is required. No live fallback.');
+const db=new RestFirestore(async()=> 'owner',{origin:`http://${host}`});
+const api=adminBackend(db);
+const suffix=Date.now().toString(36),admin=`pa-admin-${suffix}`,pending=`pa-pending-${suffix}`,manager=`pa-manager-${suffix}`,replacement=`pa-replacement-${suffix}`,org=`pa-org-${suffix}`;
+const p=(uid,status='active',role='user')=>({uid,email:`${uid}@example.edu`,fullName:`Platform Test ${suffix} ${uid}`,studentNumber:uid===admin?'2026000001':uid===pending?'2026000002':uid===manager?'2026000003':uid===replacement?'2026000004':'2026999999',yearLevel:1,section:'A',platformRole:role,accountStatus:status,
+  college:'College of Engineering',program:'Bachelor of Science in Computer Engineering',createdAt:Timestamp.fromMillis(Date.now()),updatedAt:Timestamp.fromMillis(Date.now())});
+const as=(uid,data)=>({auth:{uid},data});
+async function snapshot(path){return db.runTransaction(async t=>(await t.getAll(db.doc(path)))[0]);}
+test('Firestore REST admin MVP: real queries/counts, concurrent decisions, manager ownership, audit and direct-client denial',async()=>{
+  const env=await initializeTestEnvironment({projectId:'orglink-dev',firestore:{rules:readFileSync(new URL('../../../firebase/firebase.rules',import.meta.url),'utf8')}});
+  try{
+    await db.runTransaction(async t=>{
+      t.set(db.doc('users/'+admin),p(admin,'active','platformAdmin'));t.set(db.doc('users/'+pending),p(pending,'pending'));
+      t.set(db.doc('users/'+manager),p(manager));t.set(db.doc('users/'+replacement),p(replacement));
+      t.set(db.doc('studentIds/2026000003'),{uid:manager,state:'active'});t.set(db.doc('studentIds/2026000004'),{uid:replacement,state:'active'});
+      for(let i=0;i<28;i++)t.set(db.doc(`users/pa-page-${suffix}-${i}`),{...p(`pa-page-${suffix}-${i}`),fullName:`Page ${suffix} ${String(i).padStart(2,'0')}`});
+    });
+    await assert.rejects(api.stats(as(manager,{})),e=>e.code==='permission-denied');
+    const stats=await api.stats(as(admin,{}));assert.ok(stats.users>=32);assert.ok(stats.pending>=1);
+    const first=await api.list(as(admin,{collection:'users',field:'fullName',search:`Page ${suffix}`}));assert.equal(first.items.length,25);
+    const second=await api.list(as(admin,{collection:'users',field:'fullName',search:`Page ${suffix}`,cursor:first.nextCursor}));assert.equal(second.items.length,3);
+    assert.equal(new Set([...first.items,...second.items].map(p=>p.id)).size,28);
+    const data={operation:'accountStatus',targetId:pending,version:(await snapshot('users/'+pending)).updateTime,action:'approve',requestId:'approve_'+suffix};
+    const results=await Promise.allSettled([api.mutate(as(admin,data)),api.mutate(as(admin,{...data,requestId:'reject_'+suffix,action:'reject'}))]);
+    assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'conflict');
+    const audits=await db.query({from:[{collectionId:'activityLogs'}],where:{fieldFilter:{field:{fieldPath:'actorUid'},op:'EQUAL',value:{stringValue:admin}}}});assert.equal(audits.length,1);
+    const winner=results[0].status==='fulfilled'?data:{...data,requestId:'reject_'+suffix,action:'reject'};assert.equal((await api.mutate(as(admin,winner))).duplicate,true);
+    await api.mutate(as(admin,{operation:'createOrganization',targetId:org,requestId:'create_'+suffix,changes:{name:'IEEE iOS Society',description:'Synthetic integration organization',managerStudentId:'2026000003',managerProfileVersion:(await api.manager(as(admin,{studentId:'2026000003'}))).version,managerRegistryVersion:(await api.manager(as(admin,{studentId:'2026000003'}))).registryVersion,visibility:'public',status:'active'}}));
+    await db.runTransaction(async t=>{t.set(db.doc(`organizations/${org}/events/event`),{title:'Existing Event'});t.set(db.doc(`organizations/${org}/events/event/attendance/participant`),{attendanceStatus:'present'});t.set(db.doc(`organizations/${org}/memberships/${manager}`),{membershipRole:'manager',membershipStatus:'active'});});
+    const managerBefore=(await snapshot('users/'+manager)).data();
+    await api.mutate(as(admin,{operation:'accountStatus',targetId:manager,requestId:'disable_'+suffix,version:(await snapshot('users/'+manager)).updateTime,action:'deactivate'}));
+    const disabled=(await api.list(as(admin,{collection:'users',field:'__name__',search:manager}))).items[0];assert.equal(disabled.canReactivate,true);
+    const reactivate={operation:'accountStatus',targetId:manager,requestId:'reactivate_'+suffix,version:disabled.version,action:'reactivate'};
+    await assert.rejects(api.mutate(as(manager,reactivate)),e=>e.code==='permission-denied');
+    await assert.rejects(api.mutate(as(admin,{...reactivate,version:data.version})),e=>e.code==='conflict');
+    await api.mutate(as(admin,reactivate));assert.equal((await api.mutate(as(admin,reactivate))).duplicate,true);
+    const managerAfter=(await snapshot('users/'+manager)).data();assert.equal(managerAfter.accountStatus,'active');
+    for(const key of Object.keys(managerBefore))if(key!=='updatedAt')assert.deepEqual(managerAfter[key],managerBefore[key]);
+    const reactivationLog=(await snapshot(`activityLogs/admin-${admin}-reactivate_${suffix}`)).data();
+    assert.equal(reactivationLog.actorUid,admin);assert.equal(reactivationLog.request.action,'reactivate');
+    assert.equal(reactivationLog.before.accountStatus,'disabled');assert.equal(reactivationLog.after.accountStatus,'active');
+    assert.equal((await api.list(as(admin,{collection:'users',field:'__name__',search:manager}))).items[0].canReactivate,false);
+    const version=(await snapshot('organizations/'+org)).updateTime;
+    const update={operation:'updateOrganization',targetId:org,requestId:'replace_'+suffix,version,expectedManagerUid:manager,changes:{managerStudentId:'2026000004',managerProfileVersion:(await api.manager(as(admin,{studentId:'2026000004'}))).version,managerRegistryVersion:(await api.manager(as(admin,{studentId:'2026000004'}))).registryVersion,description:'Changed'}};
+    await api.mutate(as(admin,update));assert.equal((await snapshot('organizations/'+org)).data().managerUid,replacement);
+    assert.equal((await snapshot(`organizations/${org}/events/event`)).data().title,'Existing Event');
+    assert.equal((await snapshot(`organizations/${org}/events/event/attendance/participant`)).data().attendanceStatus,'present');
+    assert.equal((await snapshot(`organizations/${org}/memberships/${manager}`)).data().membershipRole,'manager');
+    await assert.rejects(api.mutate(as(admin,{...update,requestId:'stale_'+suffix})),e=>e.code==='conflict');
+    const oldManagerClient=env.authenticatedContext(manager,{email:`${manager}@example.edu`}).firestore();
+    const newManagerClient=env.authenticatedContext(replacement,{email:`${replacement}@example.edu`}).firestore();
+    await assertFails(getDocs(collection(oldManagerClient,`organizations/${org}/memberships`)));
+    await assertSucceeds(getDocs(collection(newManagerClient,`organizations/${org}/memberships`)));
+    const client=env.authenticatedContext(admin,{email:`${admin}@example.edu`,email_verified:true}).firestore();
+    await assertFails(getDocs(collection(client,'users')));
+    await assertFails(updateDoc(doc(client,'users',pending),{accountStatus:'active'}));
+    await assertFails(updateDoc(doc(client,'users',admin),{platformRole:'user'}));
+    await assertFails(updateDoc(doc(client,'organizations',org),{managerUid:manager}));
+    await assertFails(setDoc(doc(client,'activityLogs','forged'),{actorUid:admin}));
+    await db.runTransaction(async t=>t.update(db.doc('users/'+admin),{accountStatus:'disabled'}));
+    await assert.rejects(api.list(as(admin,{collection:'users'})),e=>e.code==='permission-denied');
+  }finally{await env.cleanup();}
+});

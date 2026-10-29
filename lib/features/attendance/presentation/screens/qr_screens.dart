@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -49,10 +50,31 @@ class QRLandingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hub = context.watch<EventHubViewModel>();
-    return !attendancePermissionsReady(hub) ||
-            attendanceOrganizations(hub).isEmpty
-        ? const QRHubScreen()
-        : const ScannerScreen();
+    final orgs = hub.organizations;
+
+    // Instantly check if they manage any org
+    final isManager =
+        orgs.managed.value?.isNotEmpty == true ||
+        orgs.mine.value?.any(
+              (m) => m.role == 'officer' || m.role == 'manager',
+            ) ==
+            true;
+
+    // If they are a manager, take them straight to the camera
+    if (isManager) {
+      return const ScannerScreen();
+    }
+
+    // If permissions are still loading, show a blank loading screen (no flash of Hub)
+    if (!attendancePermissionsReady(hub)) {
+      return const Scaffold(
+        backgroundColor: AppColors.brandMidnight,
+        body: Center(child: CircularProgressIndicator(color: AppColors.white)),
+      );
+    }
+
+    // Otherwise, show the QR Hub (Student pass)
+    return const QRHubScreen();
   }
 }
 
@@ -64,106 +86,162 @@ class QRHubScreen extends StatelessWidget {
     final permissions = attendanceOrganizations(hub);
     final orgs = hub.organizations;
     final name = context.watch<AuthViewModel?>()?.profile?.details.fullName;
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight:
-            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
-        leading: const AppBackButton(),
-        title: const Text('QR Hub'),
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
       ),
-      body: AppPageBody(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const AppSectionHeading(
-              title: 'Your Event Pass',
-              description: 'Student QR',
-              prominent: true,
+      child: Scaffold(
+        backgroundColor: AppColors.brandMist,
+        appBar: AppBar(
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          backgroundColor: AppColors.brandMidnight,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppColors.white),
+          titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: AppColors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(AppShape.featureRadius),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: const BoxDecoration(
-                color: AppColors.brandMidnight,
-                borderRadius: AppShape.card,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (name?.isNotEmpty == true) ...[
-                    Text(
-                      name!,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleLarge?.copyWith(color: AppColors.white),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                  ],
-                  Text(
-                    'Your registered events, ready to go.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: AppColors.white),
+          ),
+          leading: const AppBackButton(),
+          title: const Text('QR Hub'),
+        ),
+        body: AppPageBody(
+          child: SingleChildScrollView(
+            // Added scroll for smaller screens
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: AppSpacing.md),
+                const AppSectionHeading(
+                  title: 'Your Event Pass',
+                  description: 'Student QR',
+                  prominent: true,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: const BoxDecoration(
+                    color: AppColors.brandMidnight,
+                    borderRadius: AppShape.card,
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (name?.isNotEmpty == true) ...[
+                        Text(
+                          name!,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(color: AppColors.white),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                      Text(
+                        'Your registered events, ready to go.',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppColors.white),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      const AppAssetIcon(
+                        'qr',
+                        size: 44,
+                        color: AppColors.brandPurple,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        "Show up.\nWe'll take it from here.",
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.white,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () => context.go(AppRoutes.myQRCode),
+                  icon: const Icon(Icons.qr_code),
+                  label: const Text('My QR Code'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.go(AppRoutes.myAttendance),
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('My Attendance'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+
+                // --- ORGANIZER TOOLS ---
+                if (permissions.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  const AppAssetIcon(
-                    'qr',
-                    size: 44,
-                    color: AppColors.brandPurple,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    "Show up.\nWe'll take it from here.",
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.white,
+                  const AppSectionHeading(title: 'Organizer Tools'),
+                  const SizedBox(height: AppSpacing.sm),
+
+                  // Primary: Scan QR Code
+                  FilledButton.tonalIcon(
+                    onPressed:
+                        !attendancePermissionsReady(hub) || permissions.isEmpty
+                        ? null
+                        : () => context.go(AppRoutes.qrScan),
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Scan QR Code'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
+
+                  const SizedBox(height: AppSpacing.sm),
+
+                  // Secondary: Attendance Management (Now colored!)
+                  FilledButton.tonalIcon(
+                    onPressed: () => context.go(AppRoutes.attendanceHub),
+                    icon: const Icon(
+                      Icons.analytics_outlined,
+                      color: AppColors.success,
+                    ),
+                    label: const Text('Attendance Management'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.success.withValues(
+                        alpha: 0.15,
+                      ), // Soft green
+                      foregroundColor: AppColors.success, // Green text
+                      minimumSize: const Size(double.infinity, 48),
+                    ),
+                  ),
+
+                  if (orgs.mine.loading ||
+                      orgs.managed.loading ||
+                      orgs.associated.values.any((q) => q.loading))
+                    const Padding(
+                      padding: EdgeInsets.only(top: AppSpacing.sm),
+                      child: LinearProgressIndicator(),
+                    ),
+                  if (orgs.mine.failure != null ||
+                      orgs.managed.failure != null ||
+                      orgs.associated.values.any((q) => q.failure != null))
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      child: AppErrorView(
+                        message: 'Unable to load attendance permissions.',
+                        onRetry: orgs.retry,
+                      ),
+                    ),
                 ],
-              ),
+              ],
             ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: () => context.go(AppRoutes.myQRCode),
-              icon: const Icon(Icons.qr_code),
-              label: const Text('My QR Code'),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            TextButton(
-              onPressed: () => context.go(AppRoutes.myAttendance),
-              child: const Text('My Attendance'),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const AppSectionHeading(title: 'Organizer Tools'),
-            const SizedBox(height: AppSpacing.sm),
-            FilledButton.tonalIcon(
-              onPressed: !attendancePermissionsReady(hub) || permissions.isEmpty
-                  ? null
-                  : () => context.go(AppRoutes.qrScan),
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Scan QR Code'),
-            ),
-            if (permissions.isEmpty)
-              const Text(
-                'Scanning requires organization manager access or an active officer assignment with attendance permission.',
-              ),
-            if (orgs.mine.loading ||
-                orgs.managed.loading ||
-                orgs.associated.values.any((q) => q.loading))
-              const LinearProgressIndicator(),
-            if (orgs.mine.failure != null ||
-                orgs.managed.failure != null ||
-                orgs.associated.values.any((q) => q.failure != null))
-              AppErrorView(
-                message: 'Unable to load attendance permissions.',
-                onRetry: orgs.retry,
-              ),
-            if (permissions.isNotEmpty)
-              TextButton(
-                onPressed: () => context.go(AppRoutes.attendanceHub),
-                child: const Text('Attendance Management'),
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -172,6 +250,7 @@ class QRHubScreen extends StatelessWidget {
 
 class MyQRCodeScreen extends StatelessWidget {
   const MyQRCodeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final model = context.watch<MyAttendanceViewModel>(), hub = model.events;
@@ -181,159 +260,267 @@ class MyQRCodeScreen extends StatelessWidget {
     final selected = model.selected;
     final event = hub.registeredEvents[selected]?.value;
     final record = model.records[selected];
-    final name = context.watch<AuthViewModel?>()?.profile?.details.fullName;
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight:
-            56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
-        leading: const AppBackButton(),
-        title: const Text('My QR Code'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: model.busy ? null : model.refresh,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
       ),
-      body: AppPageBody(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const AppSectionHeading(
-              title: 'Ready to Check In',
-              prominent: true,
+      child: Scaffold(
+        backgroundColor: AppColors.brandMist,
+        appBar: AppBar(
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          backgroundColor: AppColors.brandMidnight,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppColors.white),
+          titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: AppColors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(AppShape.featureRadius),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            const Text(
-              'Select a registered event. A pass can be issued only during the attendance window and is checked by the server when scanned.',
-            ),
-            if (hub.mine.loading) const LinearProgressIndicator(),
-            if (hub.mine.failure != null)
-              AppErrorView(
-                message: hub.mine.failure!.message,
-                onRetry: hub.mine.retry,
-              ),
-            if (!hub.mine.loading && eligible.isEmpty)
-              const Text('You have no active event registrations.'),
-            const SizedBox(height: AppSpacing.lg),
-            DropdownButtonFormField<String>(
-              key: ValueKey(selected),
-              initialValue:
-                  eligible.any(
-                    (r) => '${r.organizationId}/${r.eventId}' == selected,
-                  )
-                  ? selected
-                  : null,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Registered Event'),
-              items: [
-                for (final r in eligible)
-                  DropdownMenuItem(
-                    value: '${r.organizationId}/${r.eventId}',
-                    child: Text(
-                      hub
-                              .registeredEvents['${r.organizationId}/${r.eventId}']
-                              ?.value
-                              ?.title ??
-                          'Event details unavailable',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-              onChanged: model.busy ? null : model.select,
-            ),
-            if (selected != null)
-              AppSurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (event != null) ...[
-                      EventSummary(event: event),
-                      const SizedBox(height: AppSpacing.lg),
-                    ],
-                    Text(
-                      hub
-                              .availableOrganizations[selected.split('/')[0]]
-                              ?.name ??
-                          'Organization Unavailable',
-                    ),
-                    Text(
-                      '${schedule(event?.startAt)} - ${schedule(event?.endAt)}',
-                    ),
-                    const Text('Registration: Registered'),
-                    if (record?.loading == false && record?.failure == null)
-                      Text('Attendance: ${attendanceLabel(record?.value)}'),
-                    if (hub.registeredEvents[selected]?.loading == true ||
-                        record?.loading == true)
-                      const LinearProgressIndicator(),
-                    if (hub.registeredEvents[selected]?.failure != null)
-                      TextButton(
-                        onPressed: hub.registeredEvents[selected]!.retry,
-                        child: const Text('Retry Event Details'),
-                      ),
-                    if (record?.failure != null)
-                      AppErrorView(
-                        message: record!.failure!.message,
-                        onRetry: record.retry,
-                      ),
-                    if (record?.value != null) ...[
-                      const Text('Already Verified'),
-                      Text(attendanceLabel(record!.value)),
-                      Text(verificationLabel(record.value)),
-                    ] else ...[
-                      if (name?.isNotEmpty == true) ...[
-                        const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          name!,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                      ],
-                      if (model.windowMessage != null)
-                        Text(model.windowMessage!),
-                      if (model.credential != null &&
-                          model.secondsRemaining > 0)
-                        LayoutBuilder(
-                          builder: (context, constraints) => Center(
-                            child: QrImageView(
-                              data: model.credential!.payload.encoded,
-                              size: constraints.maxWidth.clamp(0, 260),
-                              backgroundColor: Colors.white,
-                              semanticsLabel: 'Short-lived attendance pass',
-                            ),
-                          ),
-                        ),
-                      if (model.credential != null)
-                        Text(
-                          model.secondsRemaining > 0
-                              ? 'Expires in ${model.secondsRemaining} seconds. The server determines validity.'
-                              : 'This pass has expired. Generate another before scanning.',
-                        ),
-                      FilledButton(
-                        onPressed: model.canGenerate ? model.generate : null,
-                        child: Text(
-                          model.credential == null
-                              ? 'Generate QR Pass'
-                              : 'Regenerate QR Pass',
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            const SizedBox(height: AppSpacing.lg),
-            const Text(
-              'Keep your pass private. Show it only to an authorized attendance operator.',
-            ),
-            if (model.busy) const LinearProgressIndicator(),
-            if (model.failure != null) Text(model.failure!.message),
-            TextButton(
-              onPressed: () => context.go(AppRoutes.myAttendance),
-              child: const Text('My Attendance'),
+          ),
+          leading: const AppBackButton(),
+          title: const Text('My QR Code'),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh',
+              onPressed: model.busy ? null : model.refresh,
+              icon: const Icon(Icons.refresh),
             ),
           ],
+        ),
+        body: AppPageBody(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: AppSpacing.md),
+              const AppSectionHeading(
+                title: 'Ready to Check In',
+                prominent: true,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const Text('Select a registered event.'),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Selector
+              if (hub.mine.loading) const LinearProgressIndicator(),
+              if (hub.mine.failure != null)
+                AppErrorView(
+                  message: hub.mine.failure!.message,
+                  onRetry: hub.mine.retry,
+                ),
+              if (!hub.mine.loading && eligible.isEmpty)
+                const Text('You have no active event registrations.'),
+
+              if (eligible.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  key: ValueKey(selected),
+                  initialValue:
+                      eligible.any(
+                        (r) => '${r.organizationId}/${r.eventId}' == selected,
+                      )
+                      ? selected
+                      : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Registered Event',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final r in eligible)
+                      DropdownMenuItem(
+                        value: '${r.organizationId}/${r.eventId}',
+                        child: Text(
+                          hub
+                                  .registeredEvents['${r.organizationId}/${r.eventId}']
+                                  ?.value
+                                  ?.title ??
+                              'Event details unavailable',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: model.busy ? null : model.select,
+                ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // Premium Event Card
+              if (selected != null)
+                AppSurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Use the existing EventSummary for clean title/date
+                      if (event != null) ...[
+                        EventSummary(event: event),
+                        const Divider(height: AppSpacing.xl),
+                      ],
+
+                      // Details
+                      Text(
+                        hub
+                                .availableOrganizations[selected.split('/')[0]]
+                                ?.name ??
+                            'Organization Unavailable',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: AppColors.brandBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule,
+                            size: 14,
+                            color: AppColors.muted,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${schedule(event?.startAt)} - ${schedule(event?.endAt)}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.muted),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+
+                      // Status Chips
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          const AppStatusChip(
+                            label: 'Registered',
+                            tone: AppStatusTone.success,
+                          ),
+                          if (record?.loading == false &&
+                              record?.failure == null)
+                            AttendanceStatusBadge(record?.value),
+                        ],
+                      ),
+
+                      if (hub.registeredEvents[selected]?.loading == true ||
+                          record?.loading == true)
+                        const Padding(
+                          padding: EdgeInsets.only(top: AppSpacing.md),
+                          child: LinearProgressIndicator(),
+                        ),
+                      if (hub.registeredEvents[selected]?.failure != null)
+                        TextButton(
+                          onPressed: hub.registeredEvents[selected]!.retry,
+                          child: const Text('Retry Event Details'),
+                        ),
+                      if (record?.failure != null)
+                        AppErrorView(
+                          message: record!.failure!.message,
+                          onRetry: record.retry,
+                        ),
+
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // QR Generation Area
+                      if (record?.value != null) ...[
+                        const Center(
+                          child: Text(
+                            'Already Verified',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Center(child: Text(verificationLabel(record!.value))),
+                      ] else ...[
+                        // if (name?.isNotEmpty == true) ...[
+                        //   Text(
+                        //     name!,
+                        //     textAlign: TextAlign.center,
+                        //     style: Theme.of(context).textTheme.titleMedium,
+                        //   ),
+                        //   const SizedBox(height: AppSpacing.md),
+                        // ],
+                        if (model.windowMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.md,
+                            ),
+                            child: Text(
+                              model.windowMessage!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ),
+                        if (model.credential != null &&
+                            model.secondsRemaining > 0)
+                          LayoutBuilder(
+                            builder: (context, constraints) => Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  borderRadius: AppShape.card,
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: QrImageView(
+                                  data: model.credential!.payload.encoded,
+                                  size: constraints.maxWidth.clamp(0, 230),
+                                  backgroundColor: Colors.white,
+                                  semanticsLabel: 'Short-lived attendance pass',
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (model.credential != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm,
+                            ),
+                            child: Text(
+                              model.secondsRemaining > 0
+                                  ? 'Expires in ${model.secondsRemaining} seconds. The server determines validity.'
+                                  : 'This pass has expired. Generate another before scanning.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        FilledButton(
+                          onPressed: model.canGenerate ? model.generate : null,
+                          child: Text(
+                            model.credential == null
+                                ? 'Generate QR Pass'
+                                : 'Regenerate QR Pass',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.lg),
+              const Text(
+                'Keep your pass private. Show it only to an authorized attendance operator.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+              if (model.busy) const LinearProgressIndicator(),
+              if (model.failure != null) Text(model.failure!.message),
+
+              const SizedBox(height: AppSpacing.md),
+              FilledButton.tonalIcon(
+                onPressed: () => context.go(AppRoutes.myAttendance),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('My Attendance'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -664,35 +851,162 @@ class _CameraScannerState extends State<_CameraScanner>
                     child: AppLoadingView(message: 'Verifying attendance...'),
                   ),
                 ),
-              AppActionButton(
-                label: 'Manual Lookup',
-                icon: Icons.search,
-                style: AppActionStyle.outlined,
-                onPressed: () => context.go(AppRoutes.attendanceHub),
+              AppSurfaceCard(
+                onTap: () => context.go(AppRoutes.attendanceHub),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandMidnight.withValues(alpha: 0.05),
+                        borderRadius: AppShape.button,
+                      ),
+                      child: const Icon(
+                        Icons.search,
+                        color: AppColors.brandMidnight,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    const Expanded(
+                      child: Text(
+                        'Manual Lookup',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: AppColors.brandMidnight,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: AppColors.muted),
+                  ],
+                ),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                'More QR Actions',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: AppColors.white),
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => context.push(AppRoutes.myQRCode),
-                    child: const Text('My QR Code'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => context.push(AppRoutes.myAttendance),
-                    child: const Text('My Attendance'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => context.push(AppRoutes.qrActions),
-                    child: const Text('QR Hub Actions'),
-                  ),
-                ],
+
+              // OPTIMIZED MORE QR ACTIONS
+              const SizedBox(height: AppSpacing.xl),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'More QR Actions',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // Action 1: My QR Code
+                    AppSurfaceCard(
+                      onTap: () => context.push(AppRoutes.myQRCode),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.brandBlue.withValues(alpha: 0.1),
+                              borderRadius: AppShape.button,
+                            ),
+                            child: const Icon(
+                              Icons.qr_code,
+                              color: AppColors.brandBlue,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          const Expanded(
+                            child: Text(
+                              'My QR Code',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.muted,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+
+                    // Action 2: My Attendance
+                    AppSurfaceCard(
+                      onTap: () => context.push(AppRoutes.myAttendance),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.1),
+                              borderRadius: AppShape.button,
+                            ),
+                            child: const Icon(
+                              Icons.fact_check_outlined,
+                              color: AppColors.success,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          const Expanded(
+                            child: Text(
+                              'My Attendance',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.muted,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+
+                    // Action 3: QR Hub Actions
+                    AppSurfaceCard(
+                      onTap: () => context.go(AppRoutes.qrActions),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.tonal,
+                              borderRadius: AppShape.button,
+                            ),
+                            child: const Icon(
+                              Icons.search,
+                              color: AppColors.brandMidnight,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          const Expanded(
+                            child: Text(
+                              'QR Hub Actions',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.muted,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

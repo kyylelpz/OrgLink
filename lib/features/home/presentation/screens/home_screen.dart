@@ -81,7 +81,7 @@ class _DashboardState extends State<_Dashboard> {
                 CommunityDashboardHeader(
                   greeting: '$salutation,\n$firstName!',
                   initials: initials.isEmpty ? '?' : initials,
-                  imageUrl: auth.user?.photoURL,
+                  imageUrl: auth.profile?.photoURL,
                   onNotifications: () => context.push(AppRoutes.notifications),
                   onProfile: () => context.push(AppRoutes.completeProfile),
                   search: AppSearchField(
@@ -200,18 +200,41 @@ class _DashboardState extends State<_Dashboard> {
                                   preview: true,
                                 ),
                             ] else ...[
-                              CommunitySectionHeading(
-                                title: 'Make Your Next Move',
-                                actionLabel: 'Explore',
-                                onAction: () => context.push(AppRoutes.events),
-                              ),
-                              if (upcoming.isEmpty)
-                                const AppEmptyView(
-                                  title: 'No Upcoming Events',
-                                  message:
-                                      'Published upcoming events will appear here.',
-                                )
-                              else
+                              // 1. HAPPENING NOW (ONGOING EVENTS)
+                              if (model.ongoing.isNotEmpty) ...[
+                                CommunitySectionHeading(
+                                  title: 'Happening Now',
+                                  actionLabel: 'View All',
+                                  onAction: () =>
+                                      context.push(AppRoutes.events),
+                                ),
+                                for (final event in model.ongoing)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.sm,
+                                    ),
+                                    child: LiveEventCard(
+                                      event: event,
+                                      organizationName:
+                                          model
+                                              .hub
+                                              .availableOrganizations[event
+                                                  .organizationId]
+                                              ?.name ??
+                                          'Organization',
+                                    ),
+                                  ),
+                                const SizedBox(height: AppSpacing.md),
+                              ],
+
+                              // 2. FEATURED EVENT (Only show if there is an upcoming event)
+                              if (upcoming.isNotEmpty) ...[
+                                CommunitySectionHeading(
+                                  title: 'Featured Event',
+                                  actionLabel: 'Explore',
+                                  onAction: () =>
+                                      context.push(AppRoutes.events),
+                                ),
                                 EventCard(
                                   event: upcoming.first,
                                   organizationName:
@@ -224,25 +247,46 @@ class _DashboardState extends State<_Dashboard> {
                                       'Organization',
                                   style: EventCardStyle.featured,
                                 ),
-                              const SizedBox(height: AppSpacing.sm),
-                              CommunitySectionHeading(
-                                title: 'Coming Up',
-                                actionLabel: 'My Events',
-                                onAction: () =>
-                                    context.push(AppRoutes.myEvents),
-                              ),
-                              for (final event in upcoming.skip(1))
-                                EventCard(
-                                  event: event,
-                                  organizationName:
-                                      model
-                                          .hub
-                                          .availableOrganizations[event
-                                              .organizationId]
-                                          ?.name ??
-                                      'Organization',
-                                  style: EventCardStyle.compact,
+                                const SizedBox(height: AppSpacing.sm),
+                              ],
+
+                              // 3. EMPTY STATE (Only show if BOTH are empty)
+                              if (upcoming.isEmpty &&
+                                  model.ongoing.isEmpty) ...[
+                                CommunitySectionHeading(
+                                  title: 'Featured Event',
+                                  actionLabel: 'Explore Orgs',
+                                  onAction: () =>
+                                      context.push(AppRoutes.organizations),
                                 ),
+                                const AppEmptyView(
+                                  title: 'No Events Right Now',
+                                  message:
+                                      'Check back later or explore organizations to get involved.',
+                                ),
+                              ],
+
+                              // 4. MORE EVENTS (Only show if there are 2 or more upcoming events)
+                              if (upcoming.length > 1) ...[
+                                CommunitySectionHeading(
+                                  title: 'More Events',
+                                  actionLabel: 'My Events',
+                                  onAction: () =>
+                                      context.push(AppRoutes.myEvents),
+                                ),
+                                for (final event in upcoming.skip(1))
+                                  EventCard(
+                                    event: event,
+                                    organizationName:
+                                        model
+                                            .hub
+                                            .availableOrganizations[event
+                                                .organizationId]
+                                            ?.name ??
+                                        'Organization',
+                                    style: EventCardStyle.compact,
+                                  ),
+                              ],
                               const SizedBox(height: AppSpacing.xl),
                               CommunitySectionHeading(
                                 title: 'Your Organizations',
@@ -263,21 +307,85 @@ class _DashboardState extends State<_Dashboard> {
                                 ),
                             ],
                             const SizedBox(height: AppSpacing.xl),
+                            // IMPROVED ORGANIZATION MANAGEMENT
                             if (model
                                 .hub
                                 .managementOrganizations
                                 .isNotEmpty) ...[
                               const AppSectionHeading(
                                 title: 'Organization Management',
+                                description: 'Tools for your organizations',
+                                prominent: true,
                               ),
+                              const SizedBox(height: AppSpacing.md),
                               for (final org
                                   in model.hub.managementOrganizations)
-                                AppActionButton(
-                                  label: 'Manage Events: ${org.name}',
-                                  onPressed: () => context.push(
-                                    AppRoutes.manageEvents(org.id),
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.md,
                                   ),
-                                  style: AppActionStyle.tonal,
+                                  child: AppSurfaceCard(
+                                    onTap: () => context.push(
+                                      AppRoutes.manageEvents(org.id),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.brandMidnight
+                                                .withValues(alpha: 0.05),
+                                            borderRadius: AppShape.button,
+                                          ),
+                                          child: const Icon(
+                                            Icons.admin_panel_settings_outlined,
+                                            color: AppColors.brandMidnight,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: AppSpacing.md),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                org.name,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: AppColors
+                                                          .brandMidnight,
+                                                    ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Manage Events',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color:
+                                                          AppColors.brandBlue,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(
+                                          Icons.chevron_right,
+                                          color: AppColors.muted,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               const SizedBox(height: AppSpacing.lg),
                             ],

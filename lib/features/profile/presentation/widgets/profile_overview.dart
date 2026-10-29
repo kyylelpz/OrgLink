@@ -72,118 +72,192 @@ class ProfileOverview extends StatelessWidget {
     ];
     return AppPageBody(
       maxWidth: AppLayout.formWidth,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final identity = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    details.fullName,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.brandMidnight,
+      child: SingleChildScrollView(
+        // <-- ADDED
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final identity = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      details.fullName,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(color: AppColors.brandMidnight),
                     ),
-                  ),
-                  Text(
-                    'Year ${details.yearLevel} · Section ${details.section}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                  ),
-                  Text(
-                    details.studentNumber,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                  ),
-                ],
-              );
-              final avatar = ProfileIdentity(
-                name: details.fullName,
-                photo: auth.user?.photoURL,
-              );
-              if (constraints.maxWidth < 300 ||
-                  MediaQuery.textScalerOf(context).scale(14) > 21) {
-                return Column(
+                    Text(
+                      'Year ${details.yearLevel} · Section ${details.section}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                    Text(
+                      details.studentNumber,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                );
+                final avatar = ProfileIdentity(
+                  name: details.fullName,
+                  photo: auth.profile?.photoURL,
+                );
+                if (constraints.maxWidth < 300 ||
+                    MediaQuery.textScalerOf(context).scale(14) > 21) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      avatar,
+                      const SizedBox(height: AppSpacing.md),
+                      identity,
+                    ],
+                  );
+                }
+                return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     avatar,
-                    const SizedBox(height: AppSpacing.md),
-                    identity,
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(child: identity),
                   ],
                 );
-              }
-              return Row(
+              },
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppActionButton(
+              label: 'Edit Student Profile',
+              onPressed: auth.isBusy ? null : onEdit,
+              style: AppActionStyle.outlined,
+            ),
+            if (auth.user?.providers.contains('google.com') == true &&
+                auth.user?.providers.contains('password') != true)
+              AppActionButton(
+                label: 'Link Password',
+                style: AppActionStyle.outlined,
+                onPressed: () => context.push(AppRoutes.linkPassword),
+              ),
+            if (auth.profile?.isPlatformAdmin == true)
+              AppActionButton(
+                label: 'Platform Administration',
+                icon: Icons.admin_panel_settings_outlined,
+                style: AppActionStyle.outlined,
+                onPressed: () => context.push(AppRoutes.admin),
+              ),
+            const SizedBox(height: AppSpacing.xl),
+            AppSurfaceCard(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  avatar,
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(child: identity),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          AppActionButton(
-            label: 'Edit Student Profile',
-            onPressed: auth.isBusy ? null : onEdit,
-            style: AppActionStyle.outlined,
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          AppSurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const AppSectionHeading(title: 'Academic Information'),
-                const SizedBox(height: AppSpacing.sm),
-                Text(academic.join(' · ')),
-                if (details.college?.isNotEmpty != true ||
-                    details.program?.isNotEmpty != true) ...[
+                  const AppSectionHeading(title: 'Academic Information'),
                   const SizedBox(height: AppSpacing.sm),
-                  const Text(
-                    'College and Program are optional. Add them when you edit your profile.',
-                  ),
+                  Text(academic.join(' · ')),
+                  if (details.college?.isNotEmpty != true ||
+                      details.program?.isNotEmpty != true) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    const Text(
+                      'College and Program are optional. Add them when you edit your profile.',
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          AppSurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const AppSectionHeading(
-                  title: 'Google Email',
-                  description: 'Read-only Google account information.',
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                SelectableText(auth.user?.email ?? auth.profile!.email),
-              ],
+            // AppSurfaceCard(
+            //   child: Column(
+            //     crossAxisAlignment: CrossAxisAlignment.start,
+            //     children: [
+            //       const AppSectionHeading(
+            //         title: 'Google Email',
+            //       ),
+            //       const SizedBox(height: AppSpacing.sm),
+            //       SelectableText(auth.user?.email ?? auth.profile!.email),
+            //     ],
+            //   ),
+            // ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // NEW CARD STYLE LINKS
+            const AppSectionHeading(title: 'Your Communities'),
+            AppSurfaceCard(
+              onTap: () => context.push(AppRoutes.myOrganizations),
+              child: Row(
+                children: [
+                  const Icon(Icons.groups_outlined, color: AppColors.brandBlue),
+                  const SizedBox(width: AppSpacing.md),
+                  const Expanded(
+                    child: Text(
+                      'My Organizations',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: AppColors.muted),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          const AppSectionHeading(title: 'Your Communities'),
-          TextButton(
-            onPressed: () => context.push(AppRoutes.myOrganizations),
-            child: const Text('My Organizations'),
-          ),
-          const AppSectionHeading(title: 'Participation History'),
-          TextButton(
-            onPressed: () => context.push(AppRoutes.myAttendance),
-            child: const Text('My Attendance'),
-          ),
-          TextButton(
-            onPressed: () => context.push(AppRoutes.myEvents),
-            child: const Text('My Events'),
-          ),
-          if (auth.failure != null)
-            Text(
-              auth.failure!.message,
-              style: const TextStyle(color: AppColors.error),
+
+            const SizedBox(height: AppSpacing.lg),
+            const AppSectionHeading(title: 'Participation History'),
+            AppSurfaceCard(
+              onTap: () => context.push(AppRoutes.myAttendance),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.fact_check_outlined,
+                    color: AppColors.brandBlue,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  const Expanded(
+                    child: Text(
+                      'My Attendance',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: AppColors.muted),
+                ],
+              ),
             ),
-          const SignOutButton(),
-        ],
+            const SizedBox(height: AppSpacing.sm),
+            AppSurfaceCard(
+              onTap: () => context.push(AppRoutes.myEvents),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.event_note_outlined,
+                    color: AppColors.brandBlue,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  const Expanded(
+                    child: Text(
+                      'My Events',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: AppColors.muted),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.xl),
+            if (auth.failure != null)
+              Text(
+                auth.failure!.message,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            const SignOutButton(),
+            const SizedBox(height: AppSpacing.xl), // Bottom padding
+          ],
+        ),
       ),
     );
   }

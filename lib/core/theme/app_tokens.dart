@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 abstract final class AppColors {
   static const brandMidnight = Color(0xFF000246);
+  static const splashBackground = Color(0xFF020044);
   static const brandNavy = Color(0xFF1E2A78);
   static const brandBlue = Color(0xFF152D97);
   static const brandPurple = Color(0xFF8E75F7);

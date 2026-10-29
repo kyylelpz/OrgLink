@@ -81,6 +81,7 @@ class OrgEvent {
     required this.createdBy,
     required this.visibility,
     this.posterURL,
+    this.posterPublicId,
     this.startAt,
     this.endAt,
     this.registrationDeadline,
@@ -103,7 +104,7 @@ class OrgEvent {
       approvalStatus,
       createdBy,
       visibility;
-  final String? posterURL, reviewedBy;
+  final String? posterURL, posterPublicId, reviewedBy;
   final int capacity, registrationCount;
   final DateTime? startAt,
       endAt,
@@ -159,6 +160,9 @@ class OrgEvent {
     createdBy: textValue(data['createdBy']),
     visibility: textValue(data['visibility'], 'public'),
     posterURL: data['posterURL'] is String ? data['posterURL'] as String : null,
+    posterPublicId: data['posterPublicId'] is String
+        ? data['posterPublicId'] as String
+        : null,
     startAt: firestoreDate(data['startAt']),
     endAt: firestoreDate(data['endAt']),
     registrationDeadline: firestoreDate(data['registrationDeadline']),
@@ -181,6 +185,7 @@ class OrgEvent {
     'description': description,
     'venue': venue,
     'posterURL': posterURL,
+    if (posterPublicId != null) 'posterPublicId': posterPublicId,
     'visibility': visibility,
     'capacity': capacity,
     'registrationCount': registrationCount,

@@ -1,3 +1,7 @@
+import 'splash_gate.dart';
+import '../core/services/worker_api_service.dart';
+import '../features/admin/data/repositories/admin_repository.dart';
+import '../features/admin/data/services/admin_service.dart';
 import '../features/attendance/data/services/attendance_service.dart';
 import '../features/attendance/data/repositories/attendance_repository.dart';
 import '../features/attendance/data/repositories/firestore_attendance_repository.dart';
@@ -26,12 +30,19 @@ import 'app.dart';
 import 'router.dart';
 
 class AppDependencies extends StatelessWidget {
-  const AppDependencies({super.key});
+  const AppDependencies({super.key, this.splashGate});
+  final SplashGate? splashGate;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider(create: (_) => WorkerApiService(FirebaseAuth.instance)),
+        Provider(create: (_) => AdminService(FirebaseAuth.instance)),
+        Provider<AdminRepository>(
+          create: (context) =>
+              WorkerAdminRepository(context.read<AdminService>()),
+        ),
         Provider(
           create: (_) =>
               FirebaseAuthService(FirebaseAuth.instance, GoogleSignIn.instance),
@@ -68,8 +79,10 @@ class AppDependencies extends StatelessWidget {
               FirebaseAuthRepository(context.read<FirebaseAuthService>()),
         ),
         Provider(
-          create: (context) =>
-              UserProfileService(context.read<FirestoreService>()),
+          create: (context) => UserProfileService(
+            context.read<FirestoreService>(),
+            api: context.read<WorkerApiService>(),
+          ),
         ),
         Provider<ProfileRepository>(
           create: (context) =>
@@ -82,7 +95,10 @@ class AppDependencies extends StatelessWidget {
           ),
         ),
         Provider<GoRouter>(
-          create: (context) => createAppRouter(context.read<AuthViewModel>()),
+          create: (context) => createAppRouter(
+            context.read<AuthViewModel>(),
+            splashGate: splashGate,
+          ),
           dispose: (_, router) => router.dispose(),
         ),
       ],

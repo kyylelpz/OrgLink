@@ -1,3 +1,6 @@
+import 'splash_gate.dart';
+import '../features/admin/presentation/screens/admin_screen.dart';
+import '../features/admin/presentation/viewmodels/admin_view_model.dart';
 import '../core/widgets/authenticated_shell.dart';
 import '../features/attendance/presentation/attendance_scope.dart';
 import '../features/attendance/presentation/screens/attendance_screens.dart';
@@ -25,22 +28,77 @@ import '../features/home/presentation/screens/coming_soon_screen.dart';
 import '../features/attendance/presentation/scanner_route_observer.dart';
 import '../features/profile/presentation/screens/complete_profile_screen.dart';
 
-GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
+GoRouter createAppRouter(AuthViewModel auth, {SplashGate? splashGate}) =>
+    _createTimedRouter(auth, splashGate ?? SplashGate());
+
+GoRouter _createTimedRouter(AuthViewModel auth, SplashGate gate) => GoRouter(
   initialLocation: AppRoutes.splash,
-  refreshListenable: auth,
-  redirect: (_, state) => authRedirect(
-    auth.status,
-    state.uri.path,
-    profileStatus: auth.profileStatus,
-    eligible: auth.profile?.isEligible == true,
-  ),
+  refreshListenable: Listenable.merge([auth, gate]),
+  redirect: (_, state) => _splashRedirect(auth, gate, state),
   routes: [
-    GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),
+    GoRoute(
+      path: AppRoutes.admin,
+      builder: (_, _) => const AdminScreen(section: AdminSection.dashboard),
+    ),
+    GoRoute(
+      path: AppRoutes.adminAccounts,
+      builder: (_, _) => const AdminScreen(section: AdminSection.accounts),
+    ),
+    GoRoute(
+      path: AppRoutes.adminOrganizations,
+      builder: (_, _) => const AdminScreen(section: AdminSection.organizations),
+    ),
+    GoRoute(
+      path: AppRoutes.splash,
+      // The minimum starts at a genuinely visible frame, not behind a route fade.
+      pageBuilder: (_, state) => NoTransitionPage(
+        key: state.pageKey,
+        child: SplashScreen(gate: gate),
+      ),
+    ),
     GoRoute(
       path: AppRoutes.onboarding,
       builder: (_, _) => const OnboardingScreen(),
     ),
     GoRoute(path: AppRoutes.signIn, builder: (_, _) => const SignInScreen()),
+    GoRoute(path: AppRoutes.signUp, builder: (_, _) => const SignUpScreen()),
+    GoRoute(
+      path: AppRoutes.forgotPassword,
+      builder: (_, _) => const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.verifyEmail,
+      builder: (_, _) => const EmailVerificationScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.linkPassword,
+      builder: (_, _) => const LinkPasswordScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.resetEmailSent,
+      builder: (_, _) => const ResetEmailSentScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.resetPassword,
+      builder: (_, state) =>
+          ResetPasswordScreen(code: state.uri.queryParameters['oobCode'] ?? ''),
+    ),
+    GoRoute(
+      path: AppRoutes.resetSuccess,
+      builder: (_, _) => auth.passwordResetSucceeded
+          ? const PasswordResetSuccessScreen()
+          : const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.emailAction,
+      builder: (_, state) => state.uri.queryParameters['mode'] == 'verifyEmail'
+          ? EmailActionScreen(code: state.uri.queryParameters['oobCode'] ?? '')
+          : state.uri.queryParameters['mode'] == 'resetPassword'
+          ? ResetPasswordScreen(
+              code: state.uri.queryParameters['oobCode'] ?? '',
+            )
+          : const InvalidEmailActionScreen(),
+    ),
     ShellRoute(
       builder: (_, state, child) => auth.profile?.isEligible == true
           ? AuthenticatedShell(
@@ -157,13 +215,7 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
                 child: const EventManagementScreen(),
               ),
             ),
-            GoRoute(
-              path: '/organizations/:organizationId/events/new',
-              builder: (_, state) => EventContextScope(
-                organizationId: state.pathParameters['organizationId']!,
-                child: const EventEditorScreen(),
-              ),
-            ),
+            _createEventRoute(auth),
             GoRoute(
               path: '/organizations/:organizationId/events/:eventId',
               builder: (_, state) => EventContextScope(
@@ -247,19 +299,84 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
   ),
 );
 
+String? _splashRedirect(
+  AuthViewModel auth,
+  SplashGate gate,
+  GoRouterState state,
+) {
+  String? guarded(String path) => authRedirect(
+    auth.status,
+    path,
+    profileStatus: auth.profileStatus,
+    eligible: auth.profile?.isEligible == true,
+    requiresEmailVerification: auth.user?.requiresEmailVerification == true,
+  );
+  gate.synchronize(auth);
+  if (gate.holding) {
+    if (state.uri.path != AppRoutes.splash) gate.pendingLocation = state.uri;
+    return state.uri.path == AppRoutes.splash ? null : AppRoutes.splash;
+  }
+  if (state.uri.path == AppRoutes.splash && gate.pendingLocation != null) {
+    final pending = gate.pendingLocation!;
+    final redirect = guarded(pending.path);
+    if (redirect == AppRoutes.splash) return null;
+    gate.pendingLocation = null;
+    return redirect ?? pending.toString();
+  }
+  return guarded(state.uri.path);
+}
+
+// Route-level exit handling also covers shell tabs and AppBackButton navigation.
+GoRoute _createEventRoute(AuthViewModel auth) {
+  final editorKey = GlobalKey<EventEditorScreenState>();
+  return GoRoute(
+    path: '/organizations/:organizationId/events/new',
+    builder: (_, state) => EventContextScope(
+      organizationId: state.pathParameters['organizationId']!,
+      child: EventEditorScreen(key: editorKey),
+    ),
+    onExit: (_, _) {
+      final editor = editorKey.currentState;
+      // Never hold up a forced sign-out, account switch or eligibility redirect.
+      if (editor == null ||
+          auth.user?.id != editor.ownerUid ||
+          auth.profile?.isEligible != true) {
+        return true;
+      }
+      return editor.confirmExit();
+    },
+  );
+}
+
 String? authRedirect(
   AuthStatus status,
   String path, {
   ProfileStatus profileStatus = ProfileStatus.loading,
   bool eligible = false,
+  bool requiresEmailVerification = false,
 }) {
+  // Action codes are bearer credentials validated by Firebase, never a dashboard bypass.
+  if ([
+    AppRoutes.resetPassword,
+    AppRoutes.emailAction,
+    AppRoutes.resetSuccess,
+    AppRoutes.resetEmailSent,
+  ].contains(path)) {
+    return null;
+  }
   if (status == AuthStatus.loading || status == AuthStatus.error) {
     return path == AppRoutes.splash ? null : AppRoutes.splash;
   }
   if (status == AuthStatus.signedOut) {
-    return path == AppRoutes.signIn || path == AppRoutes.onboarding
+    return path == AppRoutes.signIn ||
+            path == AppRoutes.onboarding ||
+            path == AppRoutes.signUp ||
+            path == AppRoutes.forgotPassword
         ? null
         : AppRoutes.signIn;
+  }
+  if (requiresEmailVerification) {
+    return path == AppRoutes.verifyEmail ? null : AppRoutes.verifyEmail;
   }
   if (profileStatus == ProfileStatus.loading ||
       profileStatus == ProfileStatus.error) {
@@ -273,12 +390,16 @@ String? authRedirect(
         ? null
         : AppRoutes.accountStatus;
   }
+  if (path == AppRoutes.admin || path.startsWith('${AppRoutes.admin}/')) {
+    return null;
+  }
   if (path == AppRoutes.qr ||
       path.startsWith('${AppRoutes.qr}/') ||
       path == AppRoutes.myAttendance ||
       path == AppRoutes.attendanceHub ||
       path == AppRoutes.completeProfile ||
       path == AppRoutes.home ||
+      path == AppRoutes.linkPassword ||
       path == AppRoutes.calendar ||
       path == AppRoutes.notifications ||
       path == AppRoutes.events ||

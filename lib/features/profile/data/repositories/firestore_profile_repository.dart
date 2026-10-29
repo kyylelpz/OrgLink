@@ -18,7 +18,11 @@ class FirestoreProfileRepository implements ProfileRepository {
 
   @override
   Future<void> save(AuthUser user, StudentDetails details) async {
-    if (!details.isValid || user.email == null || user.email!.isEmpty) {
+    if (!details.isValid ||
+        !details.hasValidAcademicSelection ||
+        user.requiresEmailVerification ||
+        user.email == null ||
+        user.email!.isEmpty) {
       throw const AppFailure(
         'Complete all student details with valid information.',
       );

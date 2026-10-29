@@ -136,11 +136,12 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Not Marked'), findsOneWidget);
         expect(
-          find.textContaining('Present: 0 | Absent: 0 | Not Marked: 1'),
+          find.widgetWithText(AttendanceStatusBadge, 'Not Marked'),
           findsOneWidget,
         );
+        expect(find.text('0'), findsNWidgets(2)); // Present and Absent metrics.
+        expect(find.text('1'), findsOneWidget); // Not Marked metric.
         await tester.pumpWidget(const SizedBox.shrink());
         model.dispose();
         event.dispose();

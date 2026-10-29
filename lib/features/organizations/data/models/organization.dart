@@ -22,6 +22,7 @@ class Organization {
     required this.status,
     required this.managerUid,
     this.logoURL,
+    this.logoPublicId,
     this.mission = '',
     this.vision = '',
     this.goals = const [],
@@ -33,7 +34,7 @@ class Organization {
     this.updatedAt,
   });
   final String id, name, description, visibility, status, managerUid;
-  final String? logoURL;
+  final String? logoURL, logoPublicId;
   final String mission, vision;
   final List<String> goals, membershipRequirements, positions;
   final Map<String, dynamic> approvalSettings;
@@ -50,6 +51,9 @@ class Organization {
         name: textValue(data['name'], 'Unnamed organization'),
         description: textValue(data['description']),
         logoURL: data['logoURL'] is String ? data['logoURL'] as String : null,
+        logoPublicId: data['logoPublicId'] is String
+            ? data['logoPublicId'] as String
+            : null,
         visibility: textValue(data['visibility']),
         status: textValue(data['status']),
         managerUid: textValue(data['managerUid']),
@@ -78,6 +82,7 @@ class Organization {
     'name': name,
     'description': description,
     'logoURL': logoURL,
+    if (logoPublicId != null) 'logoPublicId': logoPublicId,
     'mission': mission,
     'vision': vision,
     'goals': goals,

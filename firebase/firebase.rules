@@ -17,28 +17,34 @@ service cloud.firestore {
     function validAcademic(data) {
       return validAcademicField(data, 'college') && validAcademicField(data, 'program');
     }
+    function verifiedIdentity() {
+      return request.auth != null && (request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'password'
+        || request.auth.token.get('email_verified', false) == true);
+    }
+    function academicSelection(data) {
+      return data.get('college', '') == 'College of Engineering' && data.get('program', '') in [
+        'Bachelor of Science in Civil Engineering', 'Bachelor of Science in Computer Engineering',
+        'Bachelor of Science in Electrical Engineering', 'Bachelor of Science in Electronics Engineering',
+        'Bachelor of Science in Industrial Engineering', 'Bachelor of Science in Manufacturing Engineering',
+        'Bachelor of Science in Mechanical Engineering', 'Bachelor of Science in Mechatronics Engineering'];
+    }
     match /users/{uid} {
       allow get: if owner(uid);
-      allow create: if owner(uid)
-        && request.auth.token.email is string
-        && request.resource.data.keys().hasAll(['uid','email','fullName','studentNumber','yearLevel','section','photoURL','platformRole','accountStatus','createdAt','updatedAt'])
-        && request.resource.data.keys().hasOnly(['uid','email','fullName','studentNumber','yearLevel','section','college','program','photoURL','platformRole','accountStatus','createdAt','updatedAt'])
-        && request.resource.data.uid == uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.platformRole == 'user'
-        && request.resource.data.accountStatus == 'active'
-        && (request.resource.data.photoURL == null || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048))
-        && validStudent(request.resource.data) && validAcademic(request.resource.data)
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
-      allow update: if owner(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName','studentNumber','yearLevel','section','college','program','updatedAt'])
+      // Profiles and Student ID claims are created atomically by the authenticated Worker.
+      allow create: if false;
+      allow update: if owner(uid) && verifiedIdentity()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['college', 'program']) || academicSelection(request.resource.data))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName','yearLevel','section','college','program','updatedAt'])
         && validStudent(request.resource.data) && validAcademic(request.resource.data)
         && request.resource.data.updatedAt == request.time;
       // Listing, deletion, privileged fields and other users' data are denied.
     }
+    match /studentIds/{studentId} {
+      // No public lookup, client reservation, change or release.
+      allow read, write: if false;
+    }
     function eligible() {
-      return request.auth != null
+      return verifiedIdentity()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accountStatus == 'active'
         && validStudent(get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
@@ -154,7 +160,7 @@ service cloud.firestore {
           return eventEditor(resource.data) && organization(orgId).status == 'active'
             && resource.data.eventStatus == 'draft' && resource.data.get('archivedAt',null) == null
             && !(resource.data.approvalStatus == 'pending' && resource.data.get('submittedAt',null) != null)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','visibility','approvalStatus','submittedAt','updatedAt'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','startAt','endAt','venue','capacity','registrationDeadline','visibility','approvalStatus','submittedAt','updatedAt'])
             && request.resource.data.approvalStatus == 'pending' && request.resource.data.submittedAt == null
             && validEvent(request.resource.data);
         }
@@ -190,6 +196,7 @@ service cloud.firestore {
         allow create: if eligible() && organization(orgId).status == 'active' && (assignedManager() || eventOfficer())
           && request.resource.data.keys().hasAll(['eventId','organizationId','title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','registrationCount','eventStatus','approvalStatus','createdBy','createdAt','updatedAt','visibility','submittedAt','reviewedAt','reviewedBy','publishedAt','cancelledAt','completedAt','archivedAt'])
           && request.resource.data.keys().hasOnly(['eventId','organizationId','title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','registrationCount','eventStatus','approvalStatus','createdBy','createdAt','updatedAt','visibility','submittedAt','reviewedAt','reviewedBy','publishedAt','cancelledAt','completedAt','archivedAt'])
+          && request.resource.data.posterURL == null
           && validEvent(request.resource.data) && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.registrationCount == 0 && request.resource.data.eventStatus == 'draft' && request.resource.data.approvalStatus == 'pending'
           && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time

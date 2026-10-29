@@ -282,15 +282,18 @@ void main() {
               ),
             )
             .map((t) => t.data),
-        ['Home', 'Calendar', 'QR', 'Organizations', 'Profile'],
+        ['Home', 'Events', 'QR', 'Organizations', 'Profile'],
       );
       expect(find.textContaining('Student!'), findsOneWidget);
       expect(find.text('Event Soon'), findsOneWidget);
       expect(find.text('Event Middle'), findsOneWidget);
       expect(find.text('Event Late'), findsNothing);
-      await tester.tap(find.text('Calendar').last);
+      await tester.tap(find.text('Events').last);
       await tester.pumpAndSettle();
-      expect(find.text('Coming Soon'), findsOneWidget);
+      expect(
+        app.router.routeInformationProvider.value.uri.path,
+        AppRoutes.events,
+      );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(
@@ -376,7 +379,7 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(camera.starts, greaterThan(beforeResume));
-      await tester.tap(find.text('Calendar').last);
+      await tester.tap(find.text('Events').last);
       await tester.pumpAndSettle();
       expect(camera.disposals, greaterThan(0));
       await tester.tap(find.text('QR'));
@@ -421,7 +424,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Demo Robotics'), findsOneWidget);
       expect(find.text('Demo Creative'), findsNothing);
-      await tester.tap(find.widgetWithText(FilterChip, 'Discover'));
+      await tester.tap(find.widgetWithText(FilterChip, 'Discover').first);
       await tester.pumpAndSettle();
       expect(find.text('Demo Creative'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsNothing);
@@ -452,7 +455,7 @@ void main() {
       addTearDown(() => app.close(tester));
       await app.mount(tester);
       for (var i = 0; i < 3; i++) {
-        await tester.tap(find.text('Calendar').last);
+        await tester.tap(find.text('Events').last);
         await tester.pumpAndSettle();
       }
       expect(app.router.canPop(), isFalse);
@@ -702,7 +705,7 @@ void main() {
           profile(
             details: const StudentDetails(
               fullName: name,
-              studentNumber: '2026-001',
+              studentNumber: '2026000001',
               yearLevel: 1,
               section: 'A',
             ),
@@ -763,7 +766,7 @@ void main() {
       await app.mount(tester);
       app.events.catalog.emit([]);
       await tester.pumpAndSettle();
-      expect(find.text('No Upcoming Events'), findsOneWidget);
+      expect(find.text('No Events Right Now'), findsOneWidget);
       expect(find.text('Organization Management'), findsNothing);
       // Permission-derived management getter remains the source of visibility.
       final managed = Organization.fromMap('robotics', {
@@ -773,10 +776,10 @@ void main() {
       app.orgs.document.emit(managed);
       app.orgs.organizations.emit([managed, otherOrg]);
       await tester.pumpAndSettle();
-      expect(find.text('Manage Events: Demo Robotics'), findsOneWidget);
-      await tester.ensureVisible(find.text('Manage Events: Demo Robotics'));
+      expect(find.text('Manage Events'), findsOneWidget);
+      await tester.ensureVisible(find.text('Manage Events'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Manage Events: Demo Robotics'));
+      await tester.tap(find.text('Manage Events'));
       await tester.pumpAndSettle();
       expect(
         find.widgetWithText(AppBar, 'Organization Event Management'),

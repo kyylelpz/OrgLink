@@ -11,9 +11,11 @@ const student = AuthUser(
 );
 const validDetails = StudentDetails(
   fullName: 'Student Name',
-  studentNumber: '2026-001',
+  studentNumber: '2026000001',
   yearLevel: 1,
   section: 'A',
+  college: AcademicOptions.college,
+  program: 'Bachelor of Science in Computer Engineering',
 );
 StudentProfile profile({
   String status = 'active',
@@ -43,6 +45,73 @@ class TestAuthRepository implements AuthRepository {
     if (cancelSignIn) return false;
     controller.add(student);
     return true;
+  }
+
+  AuthUser? emailUser;
+  int emailSignIns = 0,
+      emailRegistrations = 0,
+      verifications = 0,
+      resets = 0,
+      links = 0;
+  @override
+  Future<void> signInWithEmail(String email, String password) async {
+    emailSignIns++;
+    await signInGate?.future;
+    if (signInError case final error?) throw error;
+    controller.add(
+      emailUser ??
+          AuthUser(
+            id: 'email-student',
+            email: email,
+            emailVerified: false,
+            providers: const ['password'],
+          ),
+    );
+  }
+
+  @override
+  Future<void> registerWithEmail(String email, String password) async {
+    emailRegistrations++;
+    await signInWithEmail(email, password);
+  }
+
+  @override
+  Future<void> sendVerification() async {
+    verifications++;
+    if (signInError case final error?) throw error;
+  }
+
+  @override
+  Future<AuthUser?> reloadUser() async => emailUser;
+  @override
+  Future<void> resetPassword(String email) async {
+    resets++;
+    if (signInError case final error?) throw error;
+  }
+
+  @override
+  Future<void> linkPassword(String password) async {
+    links++;
+    if (signInError case final error?) throw error;
+  }
+
+  int resetChecks = 0, passwordChanges = 0, emailApplies = 0;
+  @override
+  Future<void> verifyResetCode(String code) async {
+    resetChecks++;
+    if (signInError case final error?) throw error;
+  }
+
+  @override
+  Future<void> confirmPasswordReset(String code, String password) async {
+    passwordChanges++;
+    if (signInError case final error?) throw error;
+  }
+
+  @override
+  Future<void> applyEmailVerification(String code) async {
+    emailApplies++;
+    if (signInError case final error?) throw error;
   }
 
   @override

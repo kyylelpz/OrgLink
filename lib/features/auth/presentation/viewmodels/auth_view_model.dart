@@ -30,6 +30,10 @@ class AuthViewModel extends ChangeNotifier {
   bool _isSigningOut = false;
   bool _isSaving = false;
   bool _signInCancelled = false;
+  bool _emailBusy = false;
+  String? message;
+  String? resetEmail;
+  bool passwordResetSucceeded = false;
 
   AuthStatus get status => _status;
   ProfileStatus get profileStatus => _profileStatus;
@@ -39,7 +43,7 @@ class AuthViewModel extends ChangeNotifier {
   bool get isSigningIn => _isSigningIn;
   bool get isSigningOut => _isSigningOut;
   bool get isSaving => _isSaving;
-  bool get isBusy => _isSigningIn || _isSigningOut || _isSaving;
+  bool get isBusy => _isSigningIn || _isSigningOut || _isSaving || _emailBusy;
   bool get signInCancelled => _signInCancelled;
 
   void _notify() {
@@ -89,15 +93,22 @@ class AuthViewModel extends ChangeNotifier {
   void _onUser(AuthUser? user) {
     if (_disposed) return;
     if (_user?.id == user?.id &&
+        _user?.emailVerified == user?.emailVerified &&
+        listEquals(_user?.providers, user?.providers) &&
         _status != AuthStatus.loading &&
         _status != AuthStatus.error) {
       return;
     }
     _clearProfile();
+    if (_user?.id != user?.id) {
+      resetEmail = null;
+      passwordResetSucceeded = false;
+      message = null;
+    }
     _user = user;
     _failure = null;
     _status = user == null ? AuthStatus.signedOut : AuthStatus.signedIn;
-    if (user != null) _watchProfile();
+    if (user != null && !user.requiresEmailVerification) _watchProfile();
     _notify();
   }
 
@@ -147,6 +158,10 @@ class AuthViewModel extends ChangeNotifier {
 
   Future<void> retry() async {
     if (_disposed || isBusy) return;
+    if (_user?.requiresEmailVerification == true) {
+      await checkVerification();
+      return;
+    }
     _failure = null;
     if (_user != null && _status == AuthStatus.signedIn) {
       _clearProfile();
@@ -177,10 +192,124 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> _emailOperation(
+    Future<void> Function() action, {
+    bool changesIdentity = false,
+  }) async {
+    if (_disposed || isBusy) return false;
+    final uid = _user?.id;
+    _emailBusy = true;
+    _failure = null;
+    message = null;
+    _notify();
+    try {
+      await action();
+      if (!_disposed && !changesIdentity && _user?.id != uid) {
+        message = null;
+        resetEmail = null;
+        passwordResetSucceeded = false;
+        return false;
+      }
+      return !_disposed;
+    } catch (error) {
+      if (!_disposed && (_user?.id == uid || uid == null)) {
+        _failure = AppFailure.from(error);
+      }
+      return false;
+    } finally {
+      _emailBusy = false;
+      _notify();
+    }
+  }
+
+  Future<bool> signInWithEmail(String email, String password) async {
+    if (_status != AuthStatus.signedOut) return false;
+    return _emailOperation(
+      () => _repository.signInWithEmail(email, password),
+      changesIdentity: true,
+    );
+  }
+
+  Future<bool> registerWithEmail(String email, String password) async {
+    if (_status != AuthStatus.signedOut) return false;
+    return _emailOperation(() async {
+      final error = AuthInput.email(email) ?? AuthInput.newPassword(password);
+      if (error != null) throw AppFailure(error);
+      await _repository.registerWithEmail(email, password);
+    }, changesIdentity: true);
+  }
+
+  Future<bool> resendVerification() => _emailOperation(() async {
+    if (_user?.requiresEmailVerification != true) return;
+    await _repository.sendVerification();
+    message = 'Verification email requested. Check your inbox and spam folder.';
+  });
+  Future<bool> checkVerification() => _emailOperation(() async {
+    final user = await _repository.reloadUser();
+    if (!_disposed && _user?.id == user?.id) {
+      _onUser(user);
+      if (user?.requiresEmailVerification == true) {
+        message =
+            'Your email is not verified yet. Open the latest verification link and try again.';
+      }
+    }
+  });
+  Future<bool> forgotPassword(String email) => _emailOperation(() async {
+    await _repository.resetPassword(email);
+    resetEmail = email.trim();
+    message =
+        'If this address can receive a reset email, instructions will arrive shortly. Check your inbox and spam folder.';
+  });
+  Future<bool> linkPassword(String password) => _emailOperation(() async {
+    if (_user?.emailVerified != true ||
+        _user?.providers.contains('google.com') != true ||
+        _user?.providers.contains('password') == true) {
+      throw const AppFailure(
+        'Sign in again with your existing method before linking a password.',
+      );
+    }
+    final error = AuthInput.newPassword(password);
+    if (error != null) throw AppFailure(error);
+    await _repository.linkPassword(password);
+    final user = await _repository.reloadUser();
+    if (!_disposed && _user?.id == user?.id) _onUser(user);
+    message = 'Password linked to your existing account.';
+  });
+
+  Future<bool> verifyResetCode(String code) => _emailOperation(() async {
+    passwordResetSucceeded = false;
+    if (code.isEmpty) {
+      throw const AppFailure(
+        'This link is invalid or has expired. Request a new email and try again.',
+      );
+    }
+    await _repository.verifyResetCode(code);
+  });
+  Future<bool> confirmPasswordReset(String code, String password) =>
+      _emailOperation(() async {
+        if (code.isEmpty || AuthInput.newPassword(password) != null) {
+          throw AppFailure(
+            code.isEmpty
+                ? 'Request a new reset email and open its link.'
+                : AuthInput.newPassword(password)!,
+          );
+        }
+        await _repository.confirmPasswordReset(code, password);
+        if (!_disposed) passwordResetSucceeded = true;
+      });
+  Future<bool> applyEmailVerification(String code) => _emailOperation(() async {
+    await _repository.applyEmailVerification(code);
+    final user = await _repository.reloadUser();
+    if (!_disposed && _user?.id == user?.id) _onUser(user);
+    message = 'Your email was verified. Sign in to continue.';
+  });
+
   Future<bool> saveProfile(StudentDetails details) async {
     final user = _user;
-    if (_disposed || isBusy || user == null) return false;
-    if (!details.isValid) {
+    if (_disposed || isBusy || user == null || user.requiresEmailVerification) {
+      return false;
+    }
+    if (!details.isValid || !details.hasValidAcademicSelection) {
       _failure = const AppFailure('Please correct the student details.');
       _notify();
       return false;

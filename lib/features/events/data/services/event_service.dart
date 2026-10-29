@@ -158,6 +158,7 @@ class EventService {
     final reference = _events(org).doc();
     await reference.set({
       ...draft.toMap(),
+      'posterURL': null,
       'eventId': reference.id,
       'organizationId': org,
       'createdBy': uid,
@@ -179,7 +180,7 @@ class EventService {
 
   Future<void> edit(String org, String id, EventDraft draft) =>
       _event(org, id).update({
-        ...draft.toMap(),
+        ...(draft.toMap()..remove('posterURL')),
         'approvalStatus': 'pending',
         'submittedAt': null,
         'updatedAt': FieldValue.serverTimestamp(),

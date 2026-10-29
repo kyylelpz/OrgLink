@@ -1,5 +1,10 @@
 # OrgLink
 
+Platform Administration MVP is implemented locally: protected dashboard, account
+decisions and organization/manager management through the existing Worker. See
+[Platform Administration](docs/platform-admin.md) for explicit operator-only
+bootstrap, manual deployment and acceptance. No administrator was provisioned.
+
 Module 3 event management and registration is implemented. See
 [the Module 3 guide](docs/module3.md) for the selected approval policy, atomic
 registration rules, routes, indexes, deployment and testing instructions.
@@ -13,180 +18,55 @@ final demonstration use the existing Firebase project **orglink-dev**.
 
 ## Authentication and student onboarding
 
-Google Sign-In uses the installed google_sign_in 7.2 API (`initialize`,
-`authenticate`, ID token), then Firebase Authentication credential exchange.
-Firebase's persisted Android session and a single auth listener restore sign-in
-on restart; Google authentication is only requested by a button press. Sign-out
-attempts Google and Firebase, even if Google cleanup fails. Cancellation is
-shown separately from failures. Operations prevent duplicate submissions.
+Module 1 now supports Firebase email/password and existing Google Sign-In.
+See [Module 1](docs/module1.md) for registration, verification, password reset,
+explicit password linking, controlled academic dropdowns, security boundaries,
+validation evidence and required manual Firebase setup.
 
-Routing follows auth state ? server-confirmed profile lookup ? profile form if
-missing/incomplete ? account-status check ? Home for active complete accounts.
-Signed-out startup goes directly to sign-in. Onboarding remains registered.
-One profile subscription per UID receives status changes without reads from
-widget builds. Profile errors block protected navigation and offer retry and
-sign-out; an initial server response has a 20-second timeout. Cached/optimistic
-profile snapshots cannot establish eligibility.
+New profiles are **user / pending**. Email verification does not approve an
+account. Existing account UIDs, roles, statuses and memberships are preserved.
+The app uses only the configured **orglink-dev** project. No Console settings
+or deployed infrastructure were changed by this implementation.
 
-New profiles receive **user / active**, providing immediate access as requested.
-Pending, suspended, disabled and unknown statuses block Home. No administrative
-routes or privileges are granted from profile role strings. Home is a simple
-welcome screen with edit-profile and sign-out actions; organization features
-remain outside this module.
+The current implemented UI is documented in
+[the UI/UX baseline](docs/ui-ux-design.md). Historical migration plans do not
+override it. Passwords are handled exclusively by Firebase Authentication.
 
-## Profile schema
+## Images and Cloudinary
 
-Document path: `users/{Firebase Auth UID}`.
+Profile photos, organization logos, and event posters use the existing trusted
+Cloudflare Worker for upload authorization, Cloudinary signing, asset verification,
+and Firestore reference updates. Profile photos and logos support a live square
+preview with drag, pinch-to-zoom, Cancel, Reset, Confirm, and Keep Original.
+Managers and Platform Admins share the logo editor. Create Event and Edit Draft
+posters reuse the interactive cropper with a responsive landscape frame matching
+the existing Event Details slot, plus a live Home center-trim preview and Keep Original. Create Event
+places Event Poster above Event Details in the same card, with a separate
+normal-weight (Optional) supporting label. It can select/preview a poster locally; Save Draft creates the event first and then
+automatically uploads/finalizes its poster. Failed uploads retain the saved draft
+and offer Retry Upload without creating another event.
 
-| Field | Type | Source / behavior |
-| --- | --- | --- |
-| uid | string | Firebase UID, also document ID; immutable to client |
-| email | string | Auth email; read-only and immutable to client |
-| fullName | string | Required, trimmed, 2?100 characters |
-| studentNumber | string | Required, 3?30 letters, digits or hyphens |
-| yearLevel | integer | Required, 1?6 |
-| section | string | Required, 1?30 letters, digits, spaces or hyphens |
-| photoURL | string or null | Google photo at creation; immutable to client |
-| platformRole | string | `user` at creation; protected afterward |
-| accountStatus | string | `active` at creation; protected afterward |
-| createdAt | Firestore Timestamp | Server timestamp on creation; immutable |
-| updatedAt | Firestore Timestamp | Server timestamp on every save |
+Uploads retain gallery resizing/compression and the 5 MiB limit. New uploads use
+signed dynamic Media Library asset folders: `orglink/profiles`,
+`orglink/organizations`, and `orglink/events`. Public IDs and existing references
+are preserved; no manual dashboard folder creation or migration is needed.
 
-Only an explicit valid form submission creates a document. A transaction checks
-existence and creates defaults only for a missing document. Existing documents
-update only student fields and updatedAt, preserving identity, role, status,
-photo, creation time and unrelated existing data. Later sign-ins never overwrite
-profile details. The form prefills existing values and displays Google email
-and the photo when available.
+See [Cloudinary setup and image workflows](docs/cloudinary-setup.md) for exact
+Worker bindings, endpoints, permissions, cleanup, tests, troubleshooting, and
+manual deployment/Android acceptance. Changes are implemented and tested locally;
+no deployment or live Firestore changes were performed for these updates.
 
-The number/section formats and year range are baseline validation; no project
-specification PDF was present in the repository. Student-number uniqueness and
-institutional enrollment verification are not implemented.
+## Splash and Login Loading
 
-## Architecture and changed files
-
-The existing View ? ChangeNotifier ViewModel ? Repository ? Service ? Model
-structure remains. Provider owns dependencies and subscriptions; go_router
-refreshes from the same AuthViewModel. Firebase initialization, generated options,
-google-services.json, Android app ID and Flutter dependencies are preserved.
-
-Modified:
-
-- `lib/app/dependency_injection.dart`, `lib/app/router.dart`
-- `lib/core/errors/app_failure.dart`, `lib/core/services/firestore_service.dart`
-- `lib/features/auth/data/models/auth_user.dart`
-- `lib/features/auth/data/repositories/auth_repository.dart`, `firebase_auth_repository.dart`
-- `lib/features/auth/data/services/firebase_auth_service.dart`
-- `lib/features/auth/presentation/viewmodels/auth_view_model.dart`
-- `lib/features/auth/presentation/screens/auth_screens.dart`
-- `lib/features/profile/presentation/screens/complete_profile_screen.dart`
-- `lib/features/home/presentation/screens/home_screen.dart`
-- Root `firebase.json`: adds rules/index paths and local emulator configuration;
-  preserves all existing FlutterFire mappings.
-- `firebase/firebase.rules`, `firebase/firestore.indexes.json`
-- Existing Flutter tests/support and this README.
-
-Added:
-
-- `lib/features/profile/data/models/student_profile.dart`
-- `lib/features/profile/data/repositories/profile_repository.dart`
-- `lib/features/profile/data/repositories/firestore_profile_repository.dart`
-- `lib/features/profile/data/services/user_profile_service.dart`
-- `test/student_profile_test.dart`, `test/firebase_auth_service_test.dart`
-- `firebase/tests/`: Node rules tests, dev dependencies, lockfile and local ignore.
-
-No Flutter dependencies were added. Node packages firebase and
-@firebase/rules-unit-testing are development-only dependencies for rules tests.
-
-## Security rules and manual Firebase setup
-
-The previously empty local rules file now permits only the authenticated owner
-to get their profile, create a validated profile with user/active defaults, and
-update permitted student fields with a server updatedAt. UID/email must match
-the Firebase identity on creation. Client role/status changes, profile deletion,
-collection listing and reading another student's private data are denied.
-Unrelated collections and subcollections are denied. Account/role changes require
-Firebase Console or a trusted backend; there is no client admin bypass.
-
-**The rules have not been deployed.** Review and explicitly publish them to the
-existing development project before relying on these restrictions:
-
-```sh
-firebase deploy --only firestore:rules --project orglink-dev
-```
-
-Firebase Console checks for `orglink-dev`:
-
-1. Enable Authentication ? Sign-in method ? Google, and select a support email.
-2. Ensure Cloud Firestore's default database exists.
-3. Verify Android app `com.example.orglink` has the SHA-1 and SHA-256 fingerprints
-   for the signing key used to run the app. Use Android `signingReport` if needed.
-4. Existing google-services.json includes Android and web OAuth clients. If the
-   Firebase Console requires a refreshed file after configuration changes,
-   download it from the same project/app; no configuration file was replaced here.
-5. If the Google OAuth consent setup uses test-user restrictions, add the demo
-   Google accounts there.
-
-Never place service-account credentials in this app. Review existing development
-profiles before publishing rules: the rules protect future writes and do not
-repair previously modified privileged fields.
-
-## Validation and repeatable commands
-
-```sh
-flutter pub get
-dart format .
-flutter analyze
-flutter test
-npm --prefix firebase/tests ci
-firebase emulators:exec --project orglink-dev --only firestore "node --test firebase/tests/profile.rules.test.mjs"
-flutter run -d emulator-5554 --no-resident
-```
-
-Validation performed:
-
-- Dependency resolution and Dart formatting completed.
-- Flutter analysis: no issues.
-- Flutter tests: 21 passed, covering token exchange, cancellation, Google/Firebase
-  sign-out, duplicate operations, restored sessions, profile failure/retry,
-  account changes, form validation/prefilling/saving and routing.
-- Firestore emulator tests: 30 passed, including ownership, schema, timestamps,
-  protected fields, self-reactivation, default-deny and privileged-profile attacks.
-  These tests use local emulator data and do not write to live Firestore.
-- Debug APK built, installed and launched on the connected Android 17 emulator.
-  Existing Firebase plugin warnings about future Kotlin Gradle compatibility
-  remain; the current build passes.
-
-Tests use explicitly named test doubles; production code uses real Firebase and
-Google services. Interactive Google account selection and live Firestore profile
-creation have not been performed with a real student account during this task.
-
-## Manual end-to-end test
-
-1. Complete the Console checks and publish the reviewed rules above.
-2. Run on an Android device/emulator with Google Play services and internet.
-3. Cancel the Google picker; verify cancellation and a working retry button.
-4. Sign in. A new account should reach Student Profile and show its Google email.
-5. Submit blank/invalid fields; verify field errors. Fill valid student details,
-   save once, then verify Home and `users/{uid}` with user/active and timestamps.
-6. Close/reopen the app. Verify the persisted session goes to Home and retains
-   the saved student information.
-7. Edit profile. Verify permitted fields/updatedAt change while createdAt, role,
-   status, email and photo stay unchanged.
-8. With trusted Console access, change accountStatus to suspended. Verify Home
-   redirects to Account Status. Restore active and verify Home becomes available.
-9. Disconnect during initial profile lookup; verify error/retry and sign-out.
-   Reconnect and retry. Writes use online transactions so offline saves cannot
-   report a false success.
-10. Sign out and restart; verify Google Sign-In and blocked protected routes.
-
-Privileged live-data writes are intentionally manual. Revocations require server
-connectivity to reach an existing listener; no client can guarantee immediate
-status changes while offline. Future data modules must enforce their own trusted
-eligibility/authorization checks in Firestore rules; this module denies all such
-collections. Android is the supported sign-in target; web/native desktop Google
-Sign-In flows were not implemented.
-
+Cold startup and successful Google/email-password sign-in display the existing
+animated splash for a minimum of two seconds, starting after its first visible
+frame. Firebase initialization, authentication, and profile/account resolution
+run concurrently with that presentation interval. Slow loading navigates as soon
+as it finishes, without starting another two-second wait. Firebase bootstrap and
+initial session resolution share one interval; cancellation/failure does not add
+a new login splash. Existing verification, profile-completion, and account-status
+guards remain authoritative. See [Module 1 splash timing](docs/module1.md#splash-and-loading-timing)
+for implementation and validation details. No animation asset was changed.
 
 ## Google Sign-In configuration diagnosis
 
@@ -209,8 +89,9 @@ resource and plugin implementation, rather than a preserved device log.
 The 7.2.0 API usage is correct. On Android the plugin reads the web OAuth client
 from the generated native resource, so no hardcoded serverClientId is necessary.
 The Android app ID matches the JSON and the local debug certificate SHA-1 matches
-the Android OAuth entry. Firebase initialization remains unchanged and precedes
-all authentication services.
+the Android OAuth entry. Firebase project/options remain unchanged. Initialization starts after the first
+splash frame and still completes before authentication/dependency services are
+created.
 
 The auth service now logs the operation stage, original Google code/description
 or Firebase code/message, and stack trace in debug mode before repository error

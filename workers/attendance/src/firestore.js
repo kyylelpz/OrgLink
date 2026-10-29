@@ -158,6 +158,22 @@ export class RestFirestore {
       throw new BackendError(`firestore.${method}`, "invalid-json-response");
     }
   }
+  async query(structuredQuery, transaction) {
+    const rows = await this.call("runQuery", { structuredQuery, ...(transaction ? {transaction} : {}) });
+    return rows.filter(row => row.document).map(({document}) => ({
+      ...decode({mapValue: {fields: document.fields ?? {}}}),
+      id: document.name.split("/").at(-1), version: document.updateTime,
+    }));
+  }
+  async count(structuredQuery, transaction) {
+    const rows = await this.call("runAggregationQuery", {
+      structuredAggregationQuery: {structuredQuery, aggregations: [{alias: "total", count: {}}]},
+      ...(transaction ? {transaction} : {}),
+    });
+    const total = rows.find(row => row.result)?.result?.aggregateFields?.total;
+    if (!total || !("integerValue" in total)) throw new BackendError("firestore.count", "invalid-response");
+    return Number(total.integerValue);
+  }
   async runTransaction(handler) {
     let retryTransaction;
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -193,6 +209,8 @@ export class RestFirestore {
               updateTime: docs.get(name)?.updateTime,
             }));
           },
+          query: (structuredQuery) => this.query(structuredQuery, transaction),
+          count: (structuredQuery) => this.count(structuredQuery, transaction),
           set: (name, data) =>
             writes.push({
               update: { name, fields: encode(data).mapValue.fields },

@@ -1,3 +1,4 @@
+import '../../../../core/utils/event_poster_layout.dart';
 import '../../../../core/utils/display_labels.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -11,9 +12,15 @@ import '../../../../core/widgets/app_asset_icon.dart';
 
 enum EventCardStyle { standard, featured, compact, managed }
 
-String schedule(DateTime? value) => value == null
-    ? 'Not recorded'
-    : '${displayDate(value)} ${value.toLocal().hour.toString().padLeft(2, '0')}:${value.toLocal().minute.toString().padLeft(2, '0')}';
+String schedule(DateTime? value) {
+  if (value == null) return 'Not recorded';
+  final local = value.toLocal();
+  final timeOfDay = TimeOfDay.fromDateTime(local);
+  final period = timeOfDay.period == DayPeriod.am ? 'AM' : 'PM';
+  final hour = timeOfDay.hourOfPeriod == 0 ? 12 : timeOfDay.hourOfPeriod;
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${displayDate(value)} $hour:$minute $period';
+}
 
 class EventCard extends StatelessWidget {
   const EventCard({
@@ -206,9 +213,9 @@ class EventPoster extends StatelessWidget {
       borderRadius: AppShape.action,
       child: Image.network(
         event.posterURL!,
-        height: 184,
+        height: EventPosterLayout.detailsHeight,
         width: double.infinity,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover, // <-- fills the rounded box
         excludeFromSemantics: true,
         loadingBuilder: (_, child, progress) =>
             progress == null ? child : fallback,
@@ -439,7 +446,7 @@ class _EventPreview extends StatelessWidget {
                         borderRadius: AppShape.action,
                         child: Image.network(
                           event.posterURL!,
-                          height: 174,
+                          height: EventPosterLayout.featuredHeight,
                           width: double.infinity,
                           fit: BoxFit.cover,
                           excludeFromSemantics: true,
@@ -516,6 +523,143 @@ class _EventPreview extends StatelessWidget {
                     const AppAssetIcon('arrow', size: 18),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+class LiveEventCard extends StatelessWidget {
+  const LiveEventCard({
+    super.key,
+    required this.event,
+    required this.organizationName,
+  });
+  final OrgEvent event;
+  final String organizationName;
+
+  // Helper to format the end date and time nicely
+  String _endTime(BuildContext context) {
+    final end = event.endAt?.toLocal();
+    if (end == null) return 'Schedule not recorded';
+    return '${MaterialLocalizations.of(context).formatShortMonthDay(end)} · ${TimeOfDay.fromDateTime(end).format(context)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppShape.action,
+      child: InkWell(
+        onTap: () =>
+            context.push(AppRoutes.event(event.organizationId, event.id)),
+        borderRadius: AppShape.action,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: AppColors.error.withValues(alpha: 0.08),
+            borderRadius: AppShape.action,
+            border: Border.all(
+              color: AppColors.error.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Pulsing "Live" badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'LIVE NOW',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  // Updated to show Date + Time with AM/PM
+                  Text(
+                    'Ends ${_endTime(context)}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                event.title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: AppColors.brandMidnight,
+                  fontWeight: FontWeight.w700,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                organizationName,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 16,
+                    color: AppColors.muted,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      event.venue,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.muted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: AppColors.brandMidnight,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

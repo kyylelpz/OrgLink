@@ -77,6 +77,45 @@ errors and duplicate-submission guards are included. Providers are keyed to and
 react to Firebase UID changes so a reused route cannot retain a prior account's
 organization/event context. Auth/profile redirects still precede these routes.
 
+## Poster Uploads
+
+Create Event places Event Poster above Event Details in the same card. A separate
+muted, normal-weight `(Optional)` label appears below the heading. Select, preview, change,
+or remove the image locally before saving; no upload occurs at selection time.
+Save Draft creates the draft first, then automatically uploads and finalizes the
+poster using the returned event ID and existing Cloudinary endpoints.
+
+If the poster operation fails, the saved draft and selection remain on screen.
+Retry Upload targets that same event, with saved text fields locked to avoid
+accidental duplicate creation or unsaved text changes. Ambiguous verification
+reuses the upload ticket; expired tickets can be replaced on a subsequent retry.
+Duplicate save/retry operations are blocked while busy. Leaving with a pending
+selection requires confirmation; forced sign-out/account redirects still work.
+The image is held in memory and must be reselected after app termination, while
+the saved draft remains. No image bytes are stored in Firestore.
+
+Existing Edit Draft/details still use Change Poster or Remove Poster with their
+immediate-save behavior. The assigned manager or an active `manageEvents`
+officer who created that event can change its poster only while the draft is
+editable and the organization/account are active. Submitted/published/archived
+and other non-editable events retain the existing restrictions. Poster changes
+reset approval to pending with no submission, as ordinary draft edits do.
+
+Create Event and Edit Draft posters share interactive landscape cropping with
+drag, pinch-to-zoom, Reset, Cancel, Confirm, and Keep Original. The crop uses
+Details content-width/184 (345:184, or 15:8, on a 393 dp phone without horizontal
+insets), while a live Home Preview reproduces content-width/174 center-cover
+trimming. Existing card/detail `contain` and Home `cover` fitting are preserved.
+Profiles and organization logos retain square cropping. Pasted poster URLs are no longer accepted. The shared
+Cloudinary flow retains gallery resizing/compression, 5 MiB validation, progress,
+error/verification retry states, immediate image saves, and existing fallbacks.
+Saving text does not overwrite the current verified poster.
+
+The Worker signs `asset_folder: orglink/events`, verifies the uploaded asset, and
+updates `posterURL`, `posterPublicId`, `imageRevision`, and `updatedAt` atomically.
+Public-ID generation, lifecycle permissions, and cleanup/deletion by public ID
+are preserved. See [Cloudinary setup](cloudinary-setup.md) for exact setup and tests.
+
 ## Firestore schema
 
 ### organizations/{organizationId}/events/{eventId}
@@ -86,7 +125,9 @@ organization/event context. Auth/profile redirects still precede these routes.
 | eventId, organizationId | strings matching document identity/path |
 | title | required string, 1-200 trimmed characters |
 | description | required string, 1-5000 trimmed characters |
-| posterURL | optional HTTPS URL or null, maximum 2048 characters |
+| posterURL | Worker-verified HTTPS URL or null, maximum 2048 characters; null at draft creation; existing stored URLs remain readable |
+| posterPublicId | optional Worker-managed Cloudinary public ID; null after removal |
+| imageRevision | optional Worker-managed concurrency token for image changes |
 | startAt, endAt | Firestore timestamps; end strictly follows start |
 | venue | required string, 1-200 trimmed characters |
 | capacity | integer, 1-100000 prototype bound |
@@ -251,8 +292,8 @@ Manual end-to-end procedure:
 1. Sign in as the organization's manager. Open Organization Details -> Manage
    organization events, or Event Discovery -> Manage -> choose the organization.
 2. Create a synthetic event with a future deadline/start, end after start and
-   capacity 1 or 2. Leave poster blank for the organization-logo fallback.
-3. Save draft. Verify a student cannot discover it. Submit, approve and publish
+   capacity 1 or 2. Optionally select a poster in the creation form; change/remove it and verify its preview before saving. Without a poster, the draft uses the existing fallback.
+3. Save draft and verify automatic poster upload starts only after the event exists. Simulate an upload error and use Retry Upload; confirm the event ID/count stays unchanged. Check Edit Draft landscape drag/pinch, Reset, Cancel, Confirm, Keep Original, and Home Preview and that text edits preserve the poster. Verify a student cannot discover the draft. Submit, approve and publish
    as manager; self-approval is allowed. Inspect the server timestamps and UID.
 4. With a securely provisioned event officer, repeat draft creation and submit.
    Verify the officer cannot edit another creator's draft, approve or publish.
@@ -332,9 +373,12 @@ or event permissions provisioned by this task.
 
 ## Known limitations and deferred features
 
-- Poster input accepts an optional HTTPS URL with a default-logo fallback.
-  Cloud Storage file upload is deferred until its billing/storage/rules setup is
-  explicitly configured. No nonfunctional upload control is shown.
+- Poster file upload is implemented through the trusted Cloudinary Worker flow;
+  Firebase Cloud Storage is not required. Cloudinary credentials, separately
+  approved deployment, and real-device/live-service acceptance remain manual.
+  The create form stages a poster locally and uploads only after draft creation;
+  upload failures retain the saved draft for retry. Existing editable-draft
+  permissions and poster fallback remain unchanged.
 - Event-type taxonomy and organization-wide automatic approval bypass are not
   defined in the PDF or selected policy, so neither was invented. Every event
   follows the selected manager approval flow.

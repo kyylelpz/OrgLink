@@ -1,3 +1,6 @@
+import { imageBackend } from './images.js';
+import { profileBackend } from "./student_ids.js";
+import { adminBackend } from "./admin.js";
 import { attendanceBackend, AttendanceError } from "./attendance.js";
 import { firebaseVerifier, googleAccessToken } from "./auth.js";
 import { BackendError, RestFirestore, TransportError } from "./firestore.js";
@@ -19,7 +22,7 @@ const response = (body, code = 200) =>
       "X-Content-Type-Options": "nosniff",
     },
   });
-async function readJSON(request) {
+async function readJSON(request, limit = 8192) {
   if (
     !/^application\/json(?:;|$)/i.test(
       request.headers.get("Content-Type") ?? "",
@@ -27,7 +30,7 @@ async function readJSON(request) {
   )
     throw new AttendanceError(
       "invalid-argument",
-      "Send a JSON attendance request.",
+      "Send a JSON request.",
     );
   const reader = request.body?.getReader();
   if (!reader)
@@ -38,11 +41,11 @@ async function readJSON(request) {
     const { value, done } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 8192) {
+    if (size > limit) {
       await reader.cancel();
       throw new AttendanceError(
         "invalid-argument",
-        "Attendance request is too large.",
+        "The request is too large.",
       );
     }
     chunks.push(value);
@@ -67,11 +70,11 @@ export function createHandler({
   clock = Date.now,
   logFailure = (entry) => console.error(JSON.stringify(entry)),
 } = {}) {
-  const verify = firebaseVerifier({ fetchImpl, clock }),
+  const verify = firebaseVerifier({ fetchImpl, clock, returnClaims: true }),
     oauth = googleAccessToken({ fetchImpl, clock });
   return async (request, env) => {
     const path = new URL(request.url).pathname;
-    if (!["/issue", "/redeem", "/correct"].includes(path))
+    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate", "/admin/manager", "/profile/save", "/images/sign", "/images/upload", "/images/finalize", "/images/remove"].includes(path))
       return response(
         { error: { code: "not-found", message: "Endpoint not found." } },
         404,
@@ -81,16 +84,17 @@ export function createHandler({
         {
           error: {
             code: "invalid-argument",
-            message: "Use POST for attendance.",
+            message: "Use POST for this endpoint.",
           },
         },
         405,
       );
     let stage = "firebase-auth";
     try {
-      const uid = await verify(request.headers.get("Authorization"));
+      const identity = await verify(request.headers.get("Authorization"));
+      const uid = identity.sub;
       stage = "request-json";
-      const data = await readJSON(request);
+      const data = await readJSON(request, path === "/images/upload" ? 7 * 1024 * 1024 : path.startsWith("/admin/") ? 65536 : 8192);
       stage = "configuration";
       let origin = "https://firestore.googleapis.com";
       if (env.FIRESTORE_EMULATOR_HOST) {
@@ -105,11 +109,14 @@ export function createHandler({
             : oauth(env.FIREBASE_SERVICE_ACCOUNT),
         { fetchImpl, origin },
       );
-      const backend = attendanceBackend(db, clock);
-      const operation = path.slice(1);
-      stage = `attendance.${operation}`;
+      const isAdmin = path.startsWith("/admin/");
+      const isProfile = path.startsWith("/profile/");
+      const isImage = path.startsWith("/images/");
+      const backend = isImage ? imageBackend(db, env, clock, fetchImpl) : isAdmin ? adminBackend(db, clock) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
+      const operation = isImage ? path.slice(8) : isAdmin ? path.slice(7) : isProfile ? path.slice(9) : path.slice(1);
+      stage = `${isImage ? "images" : isAdmin ? "platform-admin" : isProfile ? "profile" : "attendance"}.${operation}`;
       const result = await backend[operation]({
-        auth: { uid },
+        auth: { uid, email: identity.email, photoURL: identity.picture },
         data,
       });
       stage = "response";
@@ -117,12 +124,12 @@ export function createHandler({
     } catch (error) {
       if (error instanceof AttendanceError)
         return response(
-          { error: { code: error.code, message: error.message } },
+          { error: { code: error.code, message: path.startsWith("/admin/") && error.code === "unauthenticated" ? "Sign in again to open administration." : path.startsWith("/profile/") && error.code === "unauthenticated" ? "Sign in again before saving your profile." : error.message } },
           status[error.code] ?? 400,
         );
       // Never return upstream Google errors, token contents or service-account details.
       const diagnostic = {
-        event: "attendance_backend_failure",
+        event: path.startsWith("/images/") ? "image_backend_failure" : path.startsWith("/admin/") ? "platform_admin_backend_failure" : path.startsWith("/profile/") ? "profile_backend_failure" : "attendance_backend_failure",
         endpoint: path.slice(1),
         stage: error instanceof BackendError ? error.stage : stage,
         code: "unavailable",
@@ -149,7 +156,7 @@ export function createHandler({
           error: {
             code: "unavailable",
             message:
-              "Verification could not be confirmed. Check attendance status before retrying.",
+              path.startsWith("/images/") ? "The image operation could not be confirmed. Refresh before retrying." : path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : path.startsWith("/profile/") ? "Your profile save could not be confirmed. Refresh your profile before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
           },
         },
         503,
@@ -158,4 +165,11 @@ export function createHandler({
   };
 }
 const handler = createHandler();
-export default { fetch: (request, env) => handler(request, env) };
+export default {
+  fetch: (request, env) => handler(request, env),
+  async scheduled(_controller, env) {
+    const oauth = googleAccessToken();
+    const db = new RestFirestore(() => oauth(env.FIREBASE_SERVICE_ACCOUNT));
+    await imageBackend(db, env).cleanup();
+  },
+};

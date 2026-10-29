@@ -6,7 +6,11 @@ void main() {
   test(
     'legacy documents remain complete and omitted academic fields preserve patches',
     () {
-      final legacy = StudentDetails.fromMap(validDetails.toMap());
+      final legacy = StudentDetails.fromMap(
+        {...validDetails.toMap()}
+          ..remove('college')
+          ..remove('program'),
+      );
       expect(legacy.college, isNull);
       expect(legacy.program, isNull);
       expect(profile(details: legacy).isEligible, isTrue);
