@@ -1,1 +1,1 @@
-{"name":"orglink-demo-provisioning","private":true,"type":"module","scripts":{"test":"node --test provision-demo.test.mjs provision-platform-admin.test.mjs backfill-student-ids.test.mjs"},"dependencies":{"firebase-admin":"^13.0.0"}}
+{"name":"orglink-demo-provisioning","private":true,"type":"module","scripts":{"test":"node --test provision-demo.test.mjs provision-platform-admin.test.mjs backfill-student-ids.test.mjs demo/*.test.mjs","demo:dry-run":"node seed-demo.mjs dry-run --project orglink-dev"},"dependencies":{"firebase-admin":"^13.0.0","sharp":"^0.35.5"}}

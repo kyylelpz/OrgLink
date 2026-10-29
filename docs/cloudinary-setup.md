@@ -1,5 +1,11 @@
 # Cloudinary Images for OrgLink
 
+For operator-only, automatically sourced fictional development images, see the
+[automated demo seeder](demo-seeder.md). It uses the same Cloudinary binding names,
+signed dynamic folders, ID shape and image fields through an isolated Admin SDK
+tool; it does not change these authenticated application endpoints or configuration.
+Apply and cleanup require explicit approval and the original ownership manifest.
+
 ## Implementation and Security
 
 The existing attendance Worker is also the image authorization backend. All routes use its existing Firebase RS256 ID-token verifier, fixed `orglink-dev` Firestore transport, authenticated POST/JSON convention, and sanitized error envelope. Password accounts must have verified email. Flutter never receives the Cloudinary API secret or the Firebase service account.

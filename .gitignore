@@ -55,3 +55,6 @@ service-account*.json
 
 # Firebase backend dependencies
 **/node_modules/
+
+# Local demo-seeder ownership, provenance, cache and process locks
+.orglink-demo/

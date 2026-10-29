@@ -133,3 +133,12 @@ implemented. Secure QR check-in uses Cloudflare Workers Free with Firebase ID-to
 authentication and atomic Firestore REST transactions; deployment and server-secret
 setup are manual, with no billing account required. See [Module 4 setup, security and testing](docs/module4.md).
 No billing changes or Firebase deployments are performed by the application.
+
+## Automated Development Demo Data
+
+The isolated [demo seeder](docs/demo-seeder.md) previews or provisions fictional
+accounts, organizations, memberships, events, registrations, attendance and
+automatically prepared Cloudinary images. Dry run is offline and needs no secrets.
+Apply and cleanup require explicit owner approval, development credentials,
+project confirmation and the persistent ownership manifest. They never run from
+the app or during tests.

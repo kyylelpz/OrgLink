@@ -129,8 +129,8 @@ void main() {
             .toList();
         expect(slots.map((image) => image.height), [184, 184, 174]);
         expect(slots.map((image) => image.fit), [
-          BoxFit.contain,
-          BoxFit.contain,
+          BoxFit.cover,
+          BoxFit.cover,
           BoxFit.cover,
         ]);
         final detailsWidth = tester
