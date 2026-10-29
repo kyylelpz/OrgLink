@@ -72,7 +72,8 @@ class ProfileOverview extends StatelessWidget {
     ];
     return AppPageBody(
       maxWidth: AppLayout.formWidth,
-      child: SingleChildScrollView( // <-- ADDED
+      child: SingleChildScrollView(
+        // <-- ADDED
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -83,9 +84,8 @@ class ProfileOverview extends StatelessWidget {
                   children: [
                     Text(
                       details.fullName,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.brandMidnight,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(color: AppColors.brandMidnight),
                     ),
                     Text(
                       'Year ${details.yearLevel} · Section ${details.section}',
@@ -132,6 +132,13 @@ class ProfileOverview extends StatelessWidget {
               onPressed: auth.isBusy ? null : onEdit,
               style: AppActionStyle.outlined,
             ),
+            if (auth.user?.providers.contains('google.com') == true &&
+                auth.user?.providers.contains('password') != true)
+              AppActionButton(
+                label: 'Link Password',
+                style: AppActionStyle.outlined,
+                onPressed: () => context.push(AppRoutes.linkPassword),
+              ),
             const SizedBox(height: AppSpacing.xl),
             AppSurfaceCard(
               child: Column(
@@ -163,7 +170,7 @@ class ProfileOverview extends StatelessWidget {
             //   ),
             // ),
             const SizedBox(height: AppSpacing.lg),
-            
+
             // NEW CARD STYLE LINKS
             const AppSectionHeading(title: 'Your Communities'),
             AppSurfaceCard(
@@ -175,26 +182,35 @@ class ProfileOverview extends StatelessWidget {
                   const Expanded(
                     child: Text(
                       'My Organizations',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                   const Icon(Icons.chevron_right, color: AppColors.muted),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: AppSpacing.lg),
             const AppSectionHeading(title: 'Participation History'),
             AppSurfaceCard(
               onTap: () => context.push(AppRoutes.myAttendance),
               child: Row(
                 children: [
-                  const Icon(Icons.fact_check_outlined, color: AppColors.brandBlue),
+                  const Icon(
+                    Icons.fact_check_outlined,
+                    color: AppColors.brandBlue,
+                  ),
                   const SizedBox(width: AppSpacing.md),
                   const Expanded(
                     child: Text(
                       'My Attendance',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                   const Icon(Icons.chevron_right, color: AppColors.muted),
@@ -206,19 +222,25 @@ class ProfileOverview extends StatelessWidget {
               onTap: () => context.push(AppRoutes.myEvents),
               child: Row(
                 children: [
-                  const Icon(Icons.event_note_outlined, color: AppColors.brandBlue),
+                  const Icon(
+                    Icons.event_note_outlined,
+                    color: AppColors.brandBlue,
+                  ),
                   const SizedBox(width: AppSpacing.md),
                   const Expanded(
                     child: Text(
                       'My Events',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                   const Icon(Icons.chevron_right, color: AppColors.muted),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: AppSpacing.xl),
             if (auth.failure != null)
               Text(

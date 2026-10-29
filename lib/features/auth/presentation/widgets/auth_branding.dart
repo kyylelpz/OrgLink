@@ -4,11 +4,12 @@ import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/app_asset_icon.dart';
 
 class AuthBrandMark extends StatelessWidget {
-  const AuthBrandMark({super.key});
+  const AuthBrandMark({super.key, this.size = 40});
+  final double size;
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const AppLogo(size: 40),
+      AppLogo(size: size),
       const SizedBox(width: AppSpacing.sm),
       Expanded(
         child: Text(

@@ -953,3 +953,12 @@ test("unexpected attendance data errors remain sanitized and retain the backend 
   ]);
   assert.equal(JSON.stringify(logs).includes("DO_NOT_LOG"), false);
 });
+
+for (const verified of [false, true]) {
+  test(`password credentials require verified email (${verified})`, async () => {
+    const verify=firebaseVerifier({clock:()=>now,fetchImpl:fixture.fetchKeys});
+    const credential=`Bearer ${await fixture.sign('student',{firebase:{sign_in_provider:'password'},email_verified:verified})}`;
+    if (verified) assert.equal(await verify(credential),'student');
+    else await assert.rejects(verify(credential),denied);
+  });
+}

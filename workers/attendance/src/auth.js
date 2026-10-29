@@ -138,6 +138,7 @@ export function firebaseVerifier({ fetchImpl = fetch, clock = Date.now } = {}) {
       invalid();
     }
     if (!valid) invalid();
+    if (payload.firebase?.sign_in_provider === "password" && payload.email_verified !== true) invalid();
     return payload.sub;
   };
 }

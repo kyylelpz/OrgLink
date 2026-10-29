@@ -1,3 +1,25 @@
+/// Controlled persisted labels; extending options does not change field names.
+abstract final class AcademicOptions {
+  static const college = 'College of Engineering';
+  static const colleges = [college];
+  static const programs = [
+    'Bachelor of Science in Civil Engineering',
+    'Bachelor of Science in Computer Engineering',
+    'Bachelor of Science in Electrical Engineering',
+    'Bachelor of Science in Electronics Engineering',
+    'Bachelor of Science in Industrial Engineering',
+    'Bachelor of Science in Manufacturing Engineering',
+    'Bachelor of Science in Mechanical Engineering',
+    'Bachelor of Science in Mechatronics Engineering',
+  ];
+  static List<String> programsFor(String? value) =>
+      value == college ? programs : const [];
+  static String? validateCollege(String? value) =>
+      colleges.contains(value) ? null : 'Select a college.';
+  static String? validateProgram(String? collegeValue, String? value) =>
+      programsFor(collegeValue).contains(value) ? null : 'Select a program.';
+}
+
 class StudentDetails {
   const StudentDetails({
     required this.fullName,
@@ -52,6 +74,9 @@ class StudentDetails {
       yearLevel >= 1 &&
       yearLevel <= 6 &&
       validateSection(section) == null;
+  bool get hasValidAcademicSelection =>
+      AcademicOptions.validateCollege(college) == null &&
+      AcademicOptions.validateProgram(college, program) == null;
   bool get isValid =>
       hasValidIdentity &&
       validateAcademic(college) == null &&

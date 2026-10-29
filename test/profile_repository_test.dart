@@ -23,12 +23,12 @@ void main() {
       final details = StudentDetails.fromMap({
         ...validDetails.toMap(),
         'college': 'College of Engineering',
-        'program': 'IEEE / iOS Research',
+        'program': AcademicOptions.programs[1],
       });
       await repo.save(student, details);
-      expect(service.saved!.toMap()['program'], 'IEEE / iOS Research');
+      expect(service.saved!.toMap()['program'], AcademicOptions.programs[1]);
       await repo.save(student, validDetails);
-      expect(service.saved!.toMap().containsKey('college'), isFalse);
+      expect(service.saved!.toMap()['college'], AcademicOptions.college);
       await expectLater(
         repo.save(
           student,

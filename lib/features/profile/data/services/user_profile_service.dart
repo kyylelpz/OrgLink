@@ -49,6 +49,10 @@ class UserProfileService {
           'updatedAt': FieldValue.serverTimestamp(),
         };
         if (snapshot.exists) {
+          if (snapshot.data()?['uid'] != user.id ||
+              snapshot.data()?['email'] != user.email) {
+            throw const FormatException('Profile identity mismatch');
+          }
           transaction.update(reference, fields);
         } else {
           transaction.set(reference, {
@@ -57,7 +61,7 @@ class UserProfileService {
             'email': user.email,
             'photoURL': user.photoURL,
             'platformRole': 'user',
-            'accountStatus': 'active',
+            'accountStatus': 'pending',
             'createdAt': FieldValue.serverTimestamp(),
           });
         }

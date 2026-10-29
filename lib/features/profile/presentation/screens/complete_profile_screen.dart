@@ -23,8 +23,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final _name = TextEditingController();
   final _number = TextEditingController();
   final _section = TextEditingController();
-  final _college = TextEditingController();
-  final _program = TextEditingController();
+  String? _college;
+  String? _program;
   bool _editing = false;
   int? _year;
   bool _seeded = false;
@@ -42,8 +42,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     _name.text = details?.fullName ?? auth.user?.displayName ?? '';
     _number.text = details?.studentNumber ?? '';
     _section.text = details?.section ?? '';
-    _college.text = details?.college ?? '';
-    _program.text = details?.program ?? '';
+    _college = AcademicOptions.colleges.contains(details?.college)
+        ? details?.college
+        : null;
+    _program = AcademicOptions.programsFor(_college).contains(details?.program)
+        ? details?.program
+        : null;
     final year = details?.yearLevel;
     _year = year != null && year >= 1 && year <= 6 ? year : null;
     _seeded = true;
@@ -54,8 +58,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     _name.dispose();
     _number.dispose();
     _section.dispose();
-    _college.dispose();
-    _program.dispose();
     super.dispose();
   }
 
@@ -68,12 +70,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         studentNumber: _number.text,
         yearLevel: _year!,
         section: _section.text,
-        college: _college.text.isEmpty && auth.profile?.details.college == null
-            ? null
-            : _college.text,
-        program: _program.text.isEmpty && auth.profile?.details.program == null
-            ? null
-            : _program.text,
+        college: _college,
+        program: _program,
       ),
     );
     if (!mounted || !succeeded) return;
@@ -93,7 +91,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         }
       });
     }
-    
+
     // VIEW STATE
     if (!_editing && auth.profile?.isEligible == true) {
       return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -214,11 +212,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   children: [
                     ProfileIdentity(name: _name.text, photo: photo, size: 60),
                     const SizedBox(width: AppSpacing.lg),
-                    const Expanded(
-                      child: Text(
-                        'Profile photo',
-                      ),
-                    ),
+                    const Expanded(child: Text('Profile photo')),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -243,7 +237,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   enabled: !busy,
                   maxLength: 30,
                   validator: StudentDetails.validateStudentNumber,
-                  decoration: const InputDecoration(labelText: 'Student Number'),
+                  decoration: const InputDecoration(
+                    labelText: 'Student Number',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
@@ -274,31 +270,69 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   decoration: const InputDecoration(labelText: 'Section'),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
+                DropdownButtonFormField<String>(
                   key: const ValueKey('college-field'),
-                  controller: _college,
-                  enabled: !busy,
-                  maxLength: 160,
-                  validator: StudentDetails.validateAcademic,
-                  decoration: const InputDecoration(
-                    labelText: 'College',
-                    helperText: 'Optional. Enter your college name.',
-                  ),
+                  initialValue: _college,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'College'),
+                  items: [
+                    for (final college in AcademicOptions.colleges)
+                      DropdownMenuItem(
+                        value: college,
+                        child: Text(college, overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (value) => setState(() {
+                          _college = value;
+                          _program = null;
+                        }),
+                  validator: AcademicOptions.validateCollege,
                 ),
-                CapitalizationSuggestion(controller: _college, enabled: !busy),
                 const SizedBox(height: AppSpacing.lg),
-                TextFormField(
+                KeyedSubtree(
                   key: const ValueKey('program-field'),
-                  controller: _program,
-                  enabled: !busy,
-                  maxLength: 160,
-                  validator: StudentDetails.validateAcademic,
-                  decoration: const InputDecoration(
-                    labelText: 'Program',
-                    helperText: 'Optional. Enter your program name.',
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('program/$_college'),
+                    initialValue: _program,
+                    isExpanded: true,
+                    itemHeight: null,
+                    decoration: const InputDecoration(labelText: 'Program'),
+                    selectedItemBuilder: (context) => [
+                      for (final program in AcademicOptions.programsFor(
+                        _college,
+                      ))
+                        Text(program, overflow: TextOverflow.ellipsis),
+                    ],
+                    items: [
+                      for (final program in AcademicOptions.programsFor(
+                        _college,
+                      ))
+                        DropdownMenuItem(
+                          value: program,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              children: [
+                                Expanded(child: Text(program)),
+                                if (_program == program)
+                                  const Icon(
+                                    Icons.check,
+                                    color: AppColors.brandBlue,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                    onChanged: busy || _college == null
+                        ? null
+                        : (value) => setState(() => _program = value),
+                    validator: (value) =>
+                        AcademicOptions.validateProgram(_college, value),
                   ),
                 ),
-                CapitalizationSuggestion(controller: _program, enabled: !busy),
                 const SizedBox(height: AppSpacing.lg),
                 const Text(
                   'You can update permitted profile fields later. Roles are never selected during sign-up.',

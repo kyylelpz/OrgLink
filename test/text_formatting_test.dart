@@ -164,6 +164,18 @@ void main() {
       await tester.tap(find.text('Year 1').last);
       await tester.pumpAndSettle();
       await tester.enterText(fields.at(3), 'A');
+      await tester.ensureVisible(find.byKey(const ValueKey('college-field')));
+      await tester.tap(find.byKey(const ValueKey('college-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('College of Engineering').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('program-field')));
+      await tester.tap(find.byType(DropdownButtonFormField<String>).last);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text('Bachelor of Science in Civil Engineering').last,
+      );
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Save Student Profile'));
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();

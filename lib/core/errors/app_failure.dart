@@ -32,13 +32,33 @@ class AppFailure implements Exception {
           'This account has been disabled. Contact support.',
         ),
         'operation-not-allowed' => const AppFailure(
-          'Google Sign-In must be enabled in Firebase Authentication.',
+          'This sign-in method is currently unavailable. Please try another method.',
         ),
+        'wrong-password' ||
+        'user-not-found' ||
+        'invalid-login-credentials' ||
         'invalid-credential' => const AppFailure(
-          'Google credentials could not be verified. Try signing in again.',
+          'Unable to sign in with those credentials. Check your details and try again.',
         ),
         'account-exists-with-different-credential' => const AppFailure(
-          'This email already uses another sign-in method.',
+          'Unable to complete sign-in. Use your existing sign-in method, then link methods from your account.',
+        ),
+        'email-already-in-use' ||
+        'credential-already-in-use' => const AppFailure(
+          'Unable to create or link this account. Try signing in or resetting your password.',
+        ),
+        'weak-password' ||
+        'password-does-not-meet-requirements' => const AppFailure(
+          'Use a stronger password that meets the account password requirements.',
+        ),
+        'invalid-email' => const AppFailure('Enter a valid email address.'),
+        'requires-recent-login' ||
+        'user-mismatch' ||
+        'provider-already-linked' => const AppFailure(
+          'Sign in again with your existing method before linking a password.',
+        ),
+        'invalid-action-code' || 'expired-action-code' => const AppFailure(
+          'This link is invalid or has expired. Request a new email and try again.',
         ),
         'too-many-requests' => const AppFailure(
           'Too many attempts. Please try again later.',

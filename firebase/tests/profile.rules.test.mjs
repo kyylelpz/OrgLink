@@ -15,13 +15,13 @@ beforeEach(async () => { await env.clearFirestore(); });
 const db = (uid = 'alice') => env.authenticatedContext(uid, {email: `${uid}@example.edu`}).firestore();
 const profile = () => ({uid: 'alice', email: 'alice@example.edu', fullName: 'Alice Student',
   studentNumber: '2026-001', yearLevel: 1, section: 'A', photoURL: null,
-  platformRole: 'user', accountStatus: 'active', createdAt: serverTimestamp(), updatedAt: serverTimestamp()});
+  platformRole: 'user', accountStatus: 'pending', college:'College of Engineering', program:'Bachelor of Science in Computer Engineering', createdAt: serverTimestamp(), updatedAt: serverTimestamp()});
 async function seed(overrides = {}) {
   await env.withSecurityRulesDisabled(async context => {
     await setDoc(doc(context.firestore(), 'users/alice'), {...profile(), ...overrides});
   });
 }
-test('owner can create active user profile and read it', async () => {
+test('owner can create pending user profile and read it', async () => {
   const ref = doc(db(), 'users/alice');
   await assertSucceeds(setDoc(ref, profile()));
   await assertSucceeds(getDoc(ref));
@@ -36,7 +36,7 @@ test('cannot create a profile for another UID', async () => {
   await assertFails(setDoc(doc(db('bob'), 'users/alice'), profile()));
 });
 for (const override of [
-  {platformRole: 'platformAdmin'}, {platformRole: 'officer'}, {accountStatus: 'pending'},
+  {platformRole: 'platformAdmin'}, {platformRole: 'officer'}, {accountStatus: 'active'},
   {uid: 'bob'}, {email: 'bob@example.edu'}, {fullName: ''}, {fullName: '    '},
   {studentNumber: '!'}, {yearLevel: 0}, {yearLevel: 7}, {yearLevel: 1.5},
   {section: ''}, {extra: true}, {createdAt: Timestamp.fromMillis(0)},
@@ -80,11 +80,11 @@ test('reject invalid edits, client timestamps, deletes and unrelated collections
 
 test('optional academics accept new and legacy profiles without privilege changes', async () => {
   const ref = doc(db(), 'users/alice');
-  await assertSucceeds(setDoc(ref, {...profile(), college:'College of Engineering', program:'IEEE / iOS Research'}));
+  await assertSucceeds(setDoc(ref, {...profile(), college:'College of Engineering', program:'Bachelor of Science in Computer Engineering'}));
   await assertSucceeds(updateDoc(ref, {section:'B', updatedAt:serverTimestamp()}));
   const data = (await getDoc(ref)).data();
   assert.equal(data.college, 'College of Engineering');
-  assert.equal(data.program, 'IEEE / iOS Research');
+  assert.equal(data.program, 'Bachelor of Science in Computer Engineering');
   assert.equal(data.platformRole, 'user');
   await assertFails(updateDoc(ref, {program:'Valid Program', platformRole:'platformAdmin', updatedAt:serverTimestamp()}));
 });
@@ -92,8 +92,8 @@ test('optional academics accept new and legacy profiles without privilege change
 test('legacy profiles may add optional academics or leave them blank', async () => {
   await seed();
   const ref = doc(db(), 'users/alice');
-  await assertSucceeds(updateDoc(ref, {college:'Engineering', program:'Computer Engineering', updatedAt:serverTimestamp()}));
-  await assertSucceeds(updateDoc(ref, {college:'', program:'', updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref, {college:'College of Engineering', program:'Bachelor of Science in Computer Engineering', updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref, {college:'', program:'', updatedAt:serverTimestamp()}));
   await assertFails(updateDoc(doc(db('bob'), 'users/alice'), {college:'Other', updatedAt:serverTimestamp()}));
 });
 for (const value of [null, 42, 'x', 'a'.repeat(161), '  ', 'College\nName']) {
@@ -102,3 +102,29 @@ for (const value of [null, 42, 'x', 'a'.repeat(161), '  ', 'College\nName']) {
     await assertFails(updateDoc(doc(db(), 'users/alice'), {college:value, updatedAt:serverTimestamp()}));
   });
 }
+
+for (const verified of [false, true]) {
+  test(`password identity verification=${verified} gates profile creation without approval bypass`, async () => {
+    const password = env.authenticatedContext('alice', {email:'alice@example.edu', email_verified:verified, firebase:{sign_in_provider:'password'}}).firestore();
+    const ref = doc(password, 'users/alice');
+    await (verified ? assertSucceeds : assertFails)(setDoc(ref, profile()));
+    await assertFails(setDoc(ref, {...profile(), accountStatus:'active'}));
+    await env.withSecurityRulesDisabled(async c => setDoc(doc(c.firestore(), 'users/alice'), {...profile(),accountStatus:'active'}));
+    await (verified ? assertSucceeds : assertFails)(updateDoc(ref, {section:'B',updatedAt:serverTimestamp()}));
+    await env.withSecurityRulesDisabled(async c => setDoc(doc(c.firestore(),'organizations/example'),{status:'active',visibility:'public',managerUid:'manager'}));
+    await (verified ? assertSucceeds : assertFails)(getDoc(doc(password,'organizations/example')));
+  });
+}
+test('pending account cannot access organizations and cannot approve itself', async () => {
+  await assertSucceeds(setDoc(doc(db(),'users/alice'),profile()));
+  await assertFails(getDoc(doc(db(),'organizations/missing')));
+  await assertFails(updateDoc(doc(db(),'users/alice'),{accountStatus:'active',updatedAt:serverTimestamp()}));
+});
+test('legacy academic values remain readable and unchanged until an explicit controlled replacement', async () => {
+  await seed({college:'IEEE College',program:'iOS Research',accountStatus:'active'});
+  const ref=doc(db(),'users/alice');
+  await assertSucceeds(updateDoc(ref,{section:'B',updatedAt:serverTimestamp()}));
+  assert.equal((await getDoc(ref)).data().program,'iOS Research');
+  await assertFails(updateDoc(ref,{program:'Unlisted Program',updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{college:'College of Engineering',program:'Bachelor of Science in Civil Engineering',updatedAt:serverTimestamp()}));
+});

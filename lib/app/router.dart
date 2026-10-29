@@ -33,6 +33,7 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     state.uri.path,
     profileStatus: auth.profileStatus,
     eligible: auth.profile?.isEligible == true,
+    requiresEmailVerification: auth.user?.requiresEmailVerification == true,
   ),
   routes: [
     GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),
@@ -41,6 +42,44 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
       builder: (_, _) => const OnboardingScreen(),
     ),
     GoRoute(path: AppRoutes.signIn, builder: (_, _) => const SignInScreen()),
+    GoRoute(path: AppRoutes.signUp, builder: (_, _) => const SignUpScreen()),
+    GoRoute(
+      path: AppRoutes.forgotPassword,
+      builder: (_, _) => const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.verifyEmail,
+      builder: (_, _) => const EmailVerificationScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.linkPassword,
+      builder: (_, _) => const LinkPasswordScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.resetEmailSent,
+      builder: (_, _) => const ResetEmailSentScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.resetPassword,
+      builder: (_, state) =>
+          ResetPasswordScreen(code: state.uri.queryParameters['oobCode'] ?? ''),
+    ),
+    GoRoute(
+      path: AppRoutes.resetSuccess,
+      builder: (_, _) => auth.passwordResetSucceeded
+          ? const PasswordResetSuccessScreen()
+          : const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.emailAction,
+      builder: (_, state) => state.uri.queryParameters['mode'] == 'verifyEmail'
+          ? EmailActionScreen(code: state.uri.queryParameters['oobCode'] ?? '')
+          : state.uri.queryParameters['mode'] == 'resetPassword'
+          ? ResetPasswordScreen(
+              code: state.uri.queryParameters['oobCode'] ?? '',
+            )
+          : const InvalidEmailActionScreen(),
+    ),
     ShellRoute(
       builder: (_, state, child) => auth.profile?.isEligible == true
           ? AuthenticatedShell(
@@ -252,14 +291,30 @@ String? authRedirect(
   String path, {
   ProfileStatus profileStatus = ProfileStatus.loading,
   bool eligible = false,
+  bool requiresEmailVerification = false,
 }) {
+  // Action codes are bearer credentials validated by Firebase, never a dashboard bypass.
+  if ([
+    AppRoutes.resetPassword,
+    AppRoutes.emailAction,
+    AppRoutes.resetSuccess,
+    AppRoutes.resetEmailSent,
+  ].contains(path)) {
+    return null;
+  }
   if (status == AuthStatus.loading || status == AuthStatus.error) {
     return path == AppRoutes.splash ? null : AppRoutes.splash;
   }
   if (status == AuthStatus.signedOut) {
-    return path == AppRoutes.signIn || path == AppRoutes.onboarding
+    return path == AppRoutes.signIn ||
+            path == AppRoutes.onboarding ||
+            path == AppRoutes.signUp ||
+            path == AppRoutes.forgotPassword
         ? null
         : AppRoutes.signIn;
+  }
+  if (requiresEmailVerification) {
+    return path == AppRoutes.verifyEmail ? null : AppRoutes.verifyEmail;
   }
   if (profileStatus == ProfileStatus.loading ||
       profileStatus == ProfileStatus.error) {
@@ -279,6 +334,7 @@ String? authRedirect(
       path == AppRoutes.attendanceHub ||
       path == AppRoutes.completeProfile ||
       path == AppRoutes.home ||
+      path == AppRoutes.linkPassword ||
       path == AppRoutes.calendar ||
       path == AppRoutes.notifications ||
       path == AppRoutes.events ||

@@ -116,10 +116,9 @@ void main() {
           await tester.pumpAndSettle();
           tester.view.viewInsets = const FakeViewPadding(bottom: 260);
           addTearDown(tester.view.resetViewInsets);
-          await tester.enterText(
-            find.byKey(const ValueKey('college-field')),
-            'x',
-          );
+          await tester.tap(find.byKey(const ValueKey('college-field')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(AcademicOptions.college).last);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
           tester.view.viewInsets = const FakeViewPadding();
@@ -181,35 +180,34 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<TextFormField>(find.byKey(const ValueKey('college-field')))
-            .controller!
-            .text,
-        'IEEE College',
+            .widget<DropdownButtonFormField<String>>(
+              find.byKey(const ValueKey('college-field')),
+            )
+            .initialValue,
+        isNull,
       );
-      await tester.ensureVisible(find.byKey(const ValueKey('program-field')));
+      await tester.ensureVisible(find.byKey(const ValueKey('college-field')));
+      await tester.tap(find.byKey(const ValueKey('college-field')));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('program-field')),
-        'iOS and NASA Research',
-      );
+      await tester.tap(find.text(AcademicOptions.college).last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('program-field')));
+      await tester.tap(find.byType(DropdownButtonFormField<String>).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AcademicOptions.programs[1]).last);
+      await tester.pumpAndSettle();
       app.profiles.saveError = const AppFailure('Save failed. Try again.');
       await tester.ensureVisible(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
       expect(find.text('Save failed. Try again.'), findsOneWidget);
-      expect(
-        tester
-            .widget<TextFormField>(find.byKey(const ValueKey('program-field')))
-            .controller!
-            .text,
-        'iOS and NASA Research',
-      );
+      expect(find.text(AcademicOptions.programs[1]), findsOneWidget);
       app.profiles.saveError = null;
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
-      expect(app.profiles.savedDetails!.college, 'IEEE College');
-      expect(app.profiles.savedDetails!.program, 'iOS and NASA Research');
+      expect(app.profiles.savedDetails!.college, AcademicOptions.college);
+      expect(app.profiles.savedDetails!.program, AcademicOptions.programs[1]);
       expect(app.profiles.savedDetails!.fullName, validDetails.fullName);
       expect(find.byKey(const ValueKey('home-dashboard')), findsOneWidget);
       expect(find.text('Your Activity'), findsNothing);

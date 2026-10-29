@@ -37,8 +37,8 @@ Organization-scoped event/detail/management pages retain their existing URL clas
 
 | Area | Current presentation and behavior |
 |---|---|
-| Authentication | Branded splash/onboarding and Google Sign-In. Loading, cancellation, failure/retry, incomplete profile and account eligibility states use the existing auth flow. No email sign-up. |
-| Profile | Identity/photo fallback, academic information and editable Full Name, Student Number, Year Level, Section, optional College/Program; Google identity remains controlled by authentication. Existing serialization/backward compatibility is unchanged. Stored spelling/case is preserved; suggestions are opt-in. |
+| Authentication | Unchanged loading, finalized Sign In/Sign Up, Google and Firebase email/password, verification/resend, forgot/reset/success and invalid-link states. Email actions use Firebase validation; verification does not bypass pending approval. See Module 1 for manual setup and linking acceptance. |
+| Profile | Identity/photo fallback, academic information and editable Full Name, Student Number, Year Level, Section, required controlled College/Program dropdowns on save; identity remains controlled by Firebase Authentication. Existing legacy academics stay readable. Verified Google users can explicitly Link Password after fresh Google reauthentication. Existing serialization/backward compatibility is unchanged. Stored spelling/case is preserved; suggestions are opt-in. |
 | Home | Midnight personalized greeting/search header, four shortcuts, live **Happening Now** cards when data permits, one featured upcoming event, additional upcoming preview, organization previews and role-aware organization management cards. Search navigates actual accessible event/organization records. No Your Activity section, fake statistics or mock production content. |
 | Organizations | Midnight identity/search header; white cards with dynamic logos, actual description/visibility/status and current membership labels. Join/View navigates to existing details; it does not bypass membership requests. |
 | Organization Details | Organization identity, published description/mission/vision/goals, structure, requirements and public officers; events, request/status feedback and authorized management/roster links. |
@@ -78,7 +78,7 @@ Confirmed regressions fixed in this audit:
 
 Navigation and status controls retain semantic labels and current theme contrast. Large-text navigation labels can wrap across lines; no destination is renamed or hidden to force a fixed height. Physical TalkBack/focus order and hardware QR readability still require device acceptance.
 
-## Audit evidence — 29 October 2026
+## Historical redesign audit evidence — before email authentication
 
 - `flutter analyze --no-pub`: **no issues**.
 - Full Flutter suite: **170 tests passed**, including auth/account redirects, membership request/approval/rejection, event create/review/publish/register/withdraw, private access, QR windows/issuance/invalidation, scanner lifecycle/retry/revocation, manual verification and correction/conflict handling.
@@ -91,7 +91,22 @@ Navigation and status controls retain semantic labels and current theme contrast
 
 - Calendar and Notifications remain intentionally Coming Soon. Calendar is available by its compatibility route, not a visible tab. Future ratings, badges, announcements, manager transfer, platform administration and unsupported analytics/export were not implemented.
 - Automated platform fakes do not certify real Google account sign-in, Android camera drivers/settings recovery, predictive Back, screen-reader focus, or two-device Worker QR scanning/expiry. Verify these on the target Android device using the configured development backend.
-- Firestore Rules/deployed backend authorization were not changed or newly certified against a live deployment; the Flutter permission/transport tests and local Worker suite are regression evidence, not a production security certification.
+- During the historical redesign audit, Firestore Rules/deployed backend authorization were not changed or newly certified against a live deployment; the Flutter permission/transport tests and local Worker suite are regression evidence, not a production security certification.
 - Device-level landscape behavior, offline network image quality and daylight QR readability remain manual checks. Current large-font navigation labels may wrap; the approved five-item bar is preserved.
 
 See `docs/ui-migration-phase1.md`, `ui-migration-phase3.md`, `ui-migration-phase4.md` and `ui-migration-phase5-6.md` for historical migration details. This implemented baseline supersedes their older visual plans where the manual redesign differs.
+
+## Email authentication addition — 29 October 2026
+
+The finalized auth frames were read through Figma MCP and implemented within the
+existing theme; the loading screen and authenticated dashboard/navigation remain
+unchanged. New profiles are pending, existing statuses and UIDs stay intact, and
+College/Program use the controlled Engineering options. Auth utilities handle
+Back and real Firebase email action codes. Responsive auth tests cover all four
+phone widths at 200% text scaling. Fixed expiry and immediate universal-logout
+claims from Figma were replaced with accurate Firebase wording.
+
+See [Module 1](module1.md) for current test evidence, manual provider/templates/
+App Links setup, undeployed Rules/Worker verification guards and the explicit
+Google-link emulator limitation. Earlier audit counts above describe the prior
+redesign audit, not validation of this authentication addition.

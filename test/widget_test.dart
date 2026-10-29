@@ -38,10 +38,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
       repository.cancelSignIn = true;
+      await tester.ensureVisible(find.text('Continue With Google'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Continue With Google'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Sign-in cancelled'), findsOneWidget);
       repository.cancelSignIn = false;
+      await tester.ensureVisible(find.text('Continue With Google'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Continue With Google'));
       await tester.pump();
       profiles.controller.add(null);
@@ -52,6 +56,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Use 3?30 letters, digits or hyphens.'), findsOneWidget);
       expect(find.text('Select a year level.'), findsOneWidget);
+      expect(find.text('Select a college.'), findsOneWidget);
+      expect(find.text('Select a program.'), findsOneWidget);
       final fields = find.byType(TextFormField);
       expect(
         tester.widget<TextFormField>(fields.at(0)).initialValue,
@@ -64,6 +70,19 @@ void main() {
       await tester.tap(find.text('Year 1').last);
       await tester.pumpAndSettle();
       await tester.enterText(fields.at(3), 'A');
+      await tester.ensureVisible(find.byKey(const ValueKey('college-field')));
+      await tester.tap(find.byKey(const ValueKey('college-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('College of Engineering').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('program-field')));
+      await tester.tap(find.byKey(const ValueKey('program-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text('Bachelor of Science in Computer Engineering').last,
+      );
+      await tester.pumpAndSettle();
+
       await tester.ensureVisible(find.text('Save Student Profile'));
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
