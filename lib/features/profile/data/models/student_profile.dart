@@ -106,13 +106,14 @@ class StudentProfile {
     required this.platformRole,
     required this.accountStatus,
     this.photoURL,
+    this.photoPublicId,
     this.createdAt,
     this.updatedAt,
   });
   final String uid;
   final String email;
   final StudentDetails details;
-  final String? photoURL;
+  final String? photoURL, photoPublicId;
   final String platformRole;
   final String accountStatus;
   final DateTime? createdAt;

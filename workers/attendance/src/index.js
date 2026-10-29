@@ -1,3 +1,4 @@
+import { imageBackend } from './images.js';
 import { profileBackend } from "./student_ids.js";
 import { adminBackend } from "./admin.js";
 import { attendanceBackend, AttendanceError } from "./attendance.js";
@@ -73,7 +74,7 @@ export function createHandler({
     oauth = googleAccessToken({ fetchImpl, clock });
   return async (request, env) => {
     const path = new URL(request.url).pathname;
-    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate", "/admin/manager", "/profile/save"].includes(path))
+    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate", "/admin/manager", "/profile/save", "/images/sign", "/images/upload", "/images/finalize", "/images/remove"].includes(path))
       return response(
         { error: { code: "not-found", message: "Endpoint not found." } },
         404,
@@ -93,7 +94,7 @@ export function createHandler({
       const identity = await verify(request.headers.get("Authorization"));
       const uid = identity.sub;
       stage = "request-json";
-      const data = await readJSON(request, path.startsWith("/admin/") ? 65536 : 8192);
+      const data = await readJSON(request, path === "/images/upload" ? 7 * 1024 * 1024 : path.startsWith("/admin/") ? 65536 : 8192);
       stage = "configuration";
       let origin = "https://firestore.googleapis.com";
       if (env.FIRESTORE_EMULATOR_HOST) {
@@ -110,9 +111,10 @@ export function createHandler({
       );
       const isAdmin = path.startsWith("/admin/");
       const isProfile = path.startsWith("/profile/");
-      const backend = isAdmin ? adminBackend(db, clock) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
-      const operation = isAdmin ? path.slice(7) : isProfile ? path.slice(9) : path.slice(1);
-      stage = `${isAdmin ? "platform-admin" : isProfile ? "profile" : "attendance"}.${operation}`;
+      const isImage = path.startsWith("/images/");
+      const backend = isImage ? imageBackend(db, env, clock, fetchImpl) : isAdmin ? adminBackend(db, clock) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
+      const operation = isImage ? path.slice(8) : isAdmin ? path.slice(7) : isProfile ? path.slice(9) : path.slice(1);
+      stage = `${isImage ? "images" : isAdmin ? "platform-admin" : isProfile ? "profile" : "attendance"}.${operation}`;
       const result = await backend[operation]({
         auth: { uid, email: identity.email, photoURL: identity.picture },
         data,
@@ -127,7 +129,7 @@ export function createHandler({
         );
       // Never return upstream Google errors, token contents or service-account details.
       const diagnostic = {
-        event: path.startsWith("/admin/") ? "platform_admin_backend_failure" : path.startsWith("/profile/") ? "profile_backend_failure" : "attendance_backend_failure",
+        event: path.startsWith("/images/") ? "image_backend_failure" : path.startsWith("/admin/") ? "platform_admin_backend_failure" : path.startsWith("/profile/") ? "profile_backend_failure" : "attendance_backend_failure",
         endpoint: path.slice(1),
         stage: error instanceof BackendError ? error.stage : stage,
         code: "unavailable",
@@ -154,7 +156,7 @@ export function createHandler({
           error: {
             code: "unavailable",
             message:
-              path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : path.startsWith("/profile/") ? "Your profile save could not be confirmed. Refresh your profile before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
+              path.startsWith("/images/") ? "The image operation could not be confirmed. Refresh before retrying." : path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : path.startsWith("/profile/") ? "Your profile save could not be confirmed. Refresh your profile before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
           },
         },
         503,
@@ -163,4 +165,11 @@ export function createHandler({
   };
 }
 const handler = createHandler();
-export default { fetch: (request, env) => handler(request, env) };
+export default {
+  fetch: (request, env) => handler(request, env),
+  async scheduled(_controller, env) {
+    const oauth = googleAccessToken();
+    const db = new RestFirestore(() => oauth(env.FIREBASE_SERVICE_ACCOUNT));
+    await imageBackend(db, env).cleanup();
+  },
+};

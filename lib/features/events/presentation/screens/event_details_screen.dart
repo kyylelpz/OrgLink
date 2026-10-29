@@ -1,3 +1,5 @@
+import '../../../../core/widgets/image_editor.dart';
+import '../../../../core/services/image_upload_service.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_back_button.dart';
@@ -42,11 +44,14 @@ class EventDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = context.watch<EventContextViewModel>();
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
-          toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
           elevation: 0,
           iconTheme: const IconThemeData(color: AppColors.white),
@@ -70,22 +75,38 @@ class EventDetailsScreen extends StatelessWidget {
             final canSubmit =
                 model.canManageEvent &&
                 event.eventStatus == 'draft' &&
-                (event.submittedAt == null || event.approvalStatus == 'rejected');
+                (event.submittedAt == null ||
+                    event.approvalStatus == 'rejected');
             return AppPageBody(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: AppSpacing.md),
-                    EventPoster(event: event, organizationName: organization.name),
+                    EventPoster(
+                      event: event,
+                      organizationName: organization.name,
+                    ),
+                    if (model.canEdit)
+                      ImageEditor(
+                        key: ValueKey('poster/${event.id}'),
+                        resource: ImageResource(
+                          'event',
+                          organizationId: organization.id,
+                          eventId: event.id,
+                        ),
+                        label: 'Poster',
+                        currentURL: event.posterURL,
+                      ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
                       event.title,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.brandMidnight,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontSize: 25,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandMidnight,
+                          ),
                     ),
                     Text(
                       'Organizer: ${organization.name}',
@@ -103,16 +124,42 @@ class EventDetailsScreen extends StatelessWidget {
                         children: [
                           const AppSectionHeading(title: 'At a Glance'),
                           const SizedBox(height: AppSpacing.md),
-                          _infoRow(Icons.schedule, 'Starts', schedule(event.startAt)),
-                          _infoRow(Icons.schedule, 'Ends', schedule(event.endAt)),
-                          _infoRow(Icons.location_on_outlined, 'Venue', event.venue),
-                          _infoRow(Icons.people_outline, 'Capacity', '${event.capacity} (${event.availableSlots} available)'),
-                          _infoRow(Icons.how_to_reg_outlined, 'Registered', '${event.registrationCount}'),
-                          _infoRow(Icons.timer_outlined, 'Deadline', schedule(event.registrationDeadline)),
+                          _infoRow(
+                            Icons.schedule,
+                            'Starts',
+                            schedule(event.startAt),
+                          ),
+                          _infoRow(
+                            Icons.schedule,
+                            'Ends',
+                            schedule(event.endAt),
+                          ),
+                          _infoRow(
+                            Icons.location_on_outlined,
+                            'Venue',
+                            event.venue,
+                          ),
+                          _infoRow(
+                            Icons.people_outline,
+                            'Capacity',
+                            '${event.capacity} (${event.availableSlots} available)',
+                          ),
+                          _infoRow(
+                            Icons.how_to_reg_outlined,
+                            'Registered',
+                            '${event.registrationCount}',
+                          ),
+                          _infoRow(
+                            Icons.timer_outlined,
+                            'Deadline',
+                            schedule(event.registrationDeadline),
+                          ),
                           _infoRow(
                             Icons.visibility_outlined,
                             'Visibility',
-                            event.visibility == 'private' ? 'Members Only' : 'Public',
+                            event.visibility == 'private'
+                                ? 'Members Only'
+                                : 'Public',
                           ),
                           _infoRow(
                             Icons.info_outline,
@@ -123,7 +170,7 @@ class EventDetailsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    
+
                     // ACTIONS
                     if (canManageAttendance(
                       model.organization.value,
@@ -136,7 +183,9 @@ class EventDetailsScreen extends StatelessWidget {
                         ),
                         icon: const Icon(Icons.fact_check_outlined),
                         label: const Text('Attendance Verification'),
-                        style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                       ),
                     if (model.registration?.value?.status == 'registered') ...[
                       const SizedBox(height: AppSpacing.sm),
@@ -144,14 +193,16 @@ class EventDetailsScreen extends StatelessWidget {
                         onPressed: () => context.go(AppRoutes.myQRCode),
                         icon: const Icon(Icons.qr_code),
                         label: const Text('My QR Code'),
-                        style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                       ),
                     ],
-                    
+
                     const SizedBox(height: AppSpacing.lg),
                     const Divider(),
                     const SizedBox(height: AppSpacing.sm),
-                    
+
                     // REGISTRATION
                     if (model.registration!.loading)
                       const LinearProgressIndicator()
@@ -176,7 +227,9 @@ class EventDetailsScreen extends StatelessWidget {
                                     event.id,
                                   ),
                                 ),
-                          style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                           child: const Text('Register'),
                         ),
                       if (model.canWithdraw)
@@ -192,53 +245,89 @@ class EventDetailsScreen extends StatelessWidget {
                                       !context.mounted) {
                                     return;
                                   }
-                                  final success = await model.register(withdraw: true);
+                                  final success = await model.register(
+                                    withdraw: true,
+                                  );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
                                           success
                                               ? 'Registration withdrawn.'
-                                              : model.failure?.message ?? 'Withdrawal failed.',
+                                              : model.failure?.message ??
+                                                    'Withdrawal failed.',
                                         ),
                                       ),
                                     );
                                   }
                                 },
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                           child: const Text('Withdraw Registration'),
                         ),
                       if (!event.registrationOpen(DateTime.now()))
                         const Padding(
-                          padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                          child: Text('Registration is closed or capacity is full.', style: TextStyle(color: AppColors.error)),
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppSpacing.sm,
+                          ),
+                          child: Text(
+                            'Registration is closed or capacity is full.',
+                            style: TextStyle(color: AppColors.error),
+                          ),
                         ),
-                      if (event.visibility == 'private' && !model.privateEligible)
+                      if (event.visibility == 'private' &&
+                          !model.privateEligible)
                         const Padding(
-                          padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                          child: Text('Active organization membership is required to register.', style: TextStyle(color: AppColors.error)),
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppSpacing.sm,
+                          ),
+                          child: Text(
+                            'Active organization membership is required to register.',
+                            style: TextStyle(color: AppColors.error),
+                          ),
                         ),
                     ],
-                    
+
                     const SizedBox(height: AppSpacing.lg),
-                    
+
                     // MANAGER ACTIONS
                     if (model.failure != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: Text(model.failure!.message, style: const TextStyle(color: AppColors.error)),
+                        child: Text(
+                          model.failure!.message,
+                          style: const TextStyle(color: AppColors.error),
+                        ),
                       ),
-                    if (model.busy) const Padding(padding: EdgeInsets.only(bottom: AppSpacing.md), child: LinearProgressIndicator()),
+                    if (model.busy)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: AppSpacing.md),
+                        child: LinearProgressIndicator(),
+                      ),
                     if (model.canEdit)
                       OutlinedButton(
-                        onPressed: model.busy ? null : () => context.go(AppRoutes.editEvent(event.organizationId, event.id)),
-                        style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                        onPressed: model.busy
+                            ? null
+                            : () => context.go(
+                                AppRoutes.editEvent(
+                                  event.organizationId,
+                                  event.id,
+                                ),
+                              ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                         child: const Text('Edit Draft'),
                       ),
                     if (canSubmit)
                       FilledButton.tonal(
-                        onPressed: model.busy ? null : () => _act(context, 'submit'),
-                        style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                        onPressed: model.busy
+                            ? null
+                            : () => _act(context, 'submit'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                         child: const Text('Submit for Approval'),
                       ),
                     if (model.canReview)
@@ -246,19 +335,27 @@ class EventDetailsScreen extends StatelessWidget {
                         spacing: 12,
                         children: [
                           FilledButton(
-                            onPressed: model.busy ? null : () => _act(context, 'approve'),
+                            onPressed: model.busy
+                                ? null
+                                : () => _act(context, 'approve'),
                             child: const Text('Approve Event'),
                           ),
                           OutlinedButton(
-                            onPressed: model.busy ? null : () => _act(context, 'reject'),
+                            onPressed: model.busy
+                                ? null
+                                : () => _act(context, 'reject'),
                             child: const Text('Reject Event'),
                           ),
                         ],
                       ),
                     if (model.canPublish)
                       FilledButton(
-                        onPressed: model.busy ? null : () => _act(context, 'publish'),
-                        style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                        onPressed: model.busy
+                            ? null
+                            : () => _act(context, 'publish'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                         child: const Text('Publish Event'),
                       ),
                     if (model.isManager &&
@@ -266,27 +363,50 @@ class EventDetailsScreen extends StatelessWidget {
                         event.archivedAt == null) ...[
                       if (['draft', 'published'].contains(event.eventStatus))
                         OutlinedButton(
-                          onPressed: model.busy ? null : () => _act(context, 'cancel'),
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          onPressed: model.busy
+                              ? null
+                              : () => _act(context, 'cancel'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                           child: const Text('Cancel Event'),
                         ),
-                      if (event.eventStatus == 'published' && event.endAt?.isBefore(DateTime.now()) == true)
+                      if (event.eventStatus == 'published' &&
+                          event.endAt?.isBefore(DateTime.now()) == true)
                         OutlinedButton(
-                          onPressed: model.busy ? null : () => _act(context, 'complete'),
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          onPressed: model.busy
+                              ? null
+                              : () => _act(context, 'complete'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                           child: const Text('Mark Completed'),
                         ),
-                      if (['completed', 'cancelled'].contains(event.eventStatus))
+                      if ([
+                        'completed',
+                        'cancelled',
+                      ].contains(event.eventStatus))
                         OutlinedButton(
-                          onPressed: model.busy ? null : () => _act(context, 'archive'),
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          onPressed: model.busy
+                              ? null
+                              : () => _act(context, 'archive'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                           child: const Text('Archive Event'),
                         ),
                     ],
                     if (model.canViewParticipants)
                       OutlinedButton(
-                        onPressed: () => context.go(AppRoutes.participants(event.organizationId, event.id)),
-                        style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                        onPressed: () => context.go(
+                          AppRoutes.participants(
+                            event.organizationId,
+                            event.id,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                         child: const Text('View Participants'),
                       ),
                   ],
@@ -298,7 +418,7 @@ class EventDetailsScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _infoRow(IconData icon, String label, String value) => Padding(
     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
     child: Row(
@@ -314,7 +434,10 @@ class EventDetailsScreen extends StatelessWidget {
               children: [
                 TextSpan(
                   text: value,
-                  style: const TextStyle(color: AppColors.brandMidnight, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    color: AppColors.brandMidnight,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -331,11 +454,14 @@ class RegistrationConfirmationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = context.watch<EventContextViewModel>();
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
-          toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
           elevation: 0,
           iconTheme: const IconThemeData(color: AppColors.white),
@@ -378,12 +504,30 @@ class RegistrationConfirmationScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const AppSectionHeading(title: 'Your Place at a Glance'),
+                          const AppSectionHeading(
+                            title: 'Your Place at a Glance',
+                          ),
                           const SizedBox(height: AppSpacing.md),
-                          _infoRow(Icons.schedule, 'Starts', schedule(event.startAt)),
-                          _infoRow(Icons.location_on_outlined, 'Venue', event.venue),
-                          _infoRow(Icons.people_outline, 'Available slots', '${event.availableSlots}'),
-                          _infoRow(Icons.timer_outlined, 'Deadline', schedule(event.registrationDeadline)),
+                          _infoRow(
+                            Icons.schedule,
+                            'Starts',
+                            schedule(event.startAt),
+                          ),
+                          _infoRow(
+                            Icons.location_on_outlined,
+                            'Venue',
+                            event.venue,
+                          ),
+                          _infoRow(
+                            Icons.people_outline,
+                            'Available slots',
+                            '${event.availableSlots}',
+                          ),
+                          _infoRow(
+                            Icons.timer_outlined,
+                            'Deadline',
+                            schedule(event.registrationDeadline),
+                          ),
                           _infoRow(
                             Icons.info_outline,
                             'Requirement',
@@ -400,22 +544,35 @@ class RegistrationConfirmationScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     if (model.failure != null) Text(model.failure!.message),
-                    if (model.busy) const Padding(padding: EdgeInsets.only(bottom: AppSpacing.md), child: LinearProgressIndicator()),
+                    if (model.busy)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: AppSpacing.md),
+                        child: LinearProgressIndicator(),
+                      ),
                     FilledButton(
                       onPressed: model.canRegister
                           ? () async {
-                              final success = await model.register(withdraw: false);
+                              final success = await model.register(
+                                withdraw: false,
+                              );
                               if (context.mounted && success) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Registration successful.')),
+                                  const SnackBar(
+                                    content: Text('Registration successful.'),
+                                  ),
                                 );
                                 context.go(
-                                  AppRoutes.event(event.organizationId, event.id),
+                                  AppRoutes.event(
+                                    event.organizationId,
+                                    event.id,
+                                  ),
                                 );
                               }
                             }
                           : null,
-                      style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                       child: const Text('Confirm Registration'),
                     ),
                     TextButton(
@@ -435,7 +592,7 @@ class RegistrationConfirmationScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _infoRow(IconData icon, String label, String value) => Padding(
     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
     child: Row(
@@ -451,7 +608,10 @@ class RegistrationConfirmationScreen extends StatelessWidget {
               children: [
                 TextSpan(
                   text: value,
-                  style: const TextStyle(color: AppColors.brandMidnight, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    color: AppColors.brandMidnight,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),

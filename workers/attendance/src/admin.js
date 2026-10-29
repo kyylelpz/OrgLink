@@ -40,15 +40,7 @@ function organizationInput(input, creating) {
       patch[key] = input[key].map(item => text(item,120,true));
     }
   }
-  if ('logoURL' in input) {
-    if (input.logoURL === null || input.logoURL === '') patch.logoURL = null;
-    else {
-      const url = text(input.logoURL,2048,true);
-      let parsed; try { parsed = new URL(url); } catch { invalid(); }
-      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) invalid();
-      patch.logoURL = url;
-    }
-  }
+  if ('logoURL' in input && input.logoURL != null && input.logoURL !== '') invalid();
   for (const [key,options] of [['visibility',['public','private']],['status',['active','inactive']]]) {
     if (key in input) {
       if (!options.includes(input[key])) invalid();

@@ -77,6 +77,27 @@ errors and duplicate-submission guards are included. Providers are keyed to and
 react to Firebase UID changes so a reused route cannot retain a prior account's
 organization/event context. Auth/profile redirects still precede these routes.
 
+## Poster Uploads
+
+Create/save the event draft first, then use Change Poster or Remove Poster in the
+existing editor/details flow. The assigned manager or an active `manageEvents`
+officer who created that event can change its poster only while the draft is
+editable and the organization/account are active. Submitted/published/archived
+and other non-editable events retain the existing restrictions. Poster changes
+reset approval to pending with no submission, as ordinary draft edits do.
+
+Posters retain their rectangular/original framing option and existing optional
+centered Crop Square; interactive square cropping is reserved for profiles and
+organization logos. Pasted poster URLs are no longer accepted. The shared
+Cloudinary flow retains gallery resizing/compression, 5 MiB validation, progress,
+error/verification retry states, immediate image saves, and existing fallbacks.
+Saving text does not overwrite the current verified poster.
+
+The Worker signs `asset_folder: orglink/events`, verifies the uploaded asset, and
+updates `posterURL`, `posterPublicId`, `imageRevision`, and `updatedAt` atomically.
+Public-ID generation, lifecycle permissions, and cleanup/deletion by public ID
+are preserved. See [Cloudinary setup](cloudinary-setup.md) for exact setup and tests.
+
 ## Firestore schema
 
 ### organizations/{organizationId}/events/{eventId}
@@ -86,7 +107,9 @@ organization/event context. Auth/profile redirects still precede these routes.
 | eventId, organizationId | strings matching document identity/path |
 | title | required string, 1-200 trimmed characters |
 | description | required string, 1-5000 trimmed characters |
-| posterURL | optional HTTPS URL or null, maximum 2048 characters |
+| posterURL | Worker-verified HTTPS URL or null, maximum 2048 characters; null at draft creation; existing stored URLs remain readable |
+| posterPublicId | optional Worker-managed Cloudinary public ID; null after removal |
+| imageRevision | optional Worker-managed concurrency token for image changes |
 | startAt, endAt | Firestore timestamps; end strictly follows start |
 | venue | required string, 1-200 trimmed characters |
 | capacity | integer, 1-100000 prototype bound |
@@ -251,8 +274,8 @@ Manual end-to-end procedure:
 1. Sign in as the organization's manager. Open Organization Details -> Manage
    organization events, or Event Discovery -> Manage -> choose the organization.
 2. Create a synthetic event with a future deadline/start, end after start and
-   capacity 1 or 2. Leave poster blank for the organization-logo fallback.
-3. Save draft. Verify a student cannot discover it. Submit, approve and publish
+   capacity 1 or 2. New drafts start without a poster and use the existing fallback.
+3. Save draft. Optionally upload a poster before submission; verify Keep Original or the optional center crop, then verify text edits preserve the poster. Verify a student cannot discover the draft. Submit, approve and publish
    as manager; self-approval is allowed. Inspect the server timestamps and UID.
 4. With a securely provisioned event officer, repeat draft creation and submit.
    Verify the officer cannot edit another creator's draft, approve or publish.
@@ -332,9 +355,10 @@ or event permissions provisioned by this task.
 
 ## Known limitations and deferred features
 
-- Poster input accepts an optional HTTPS URL with a default-logo fallback.
-  Cloud Storage file upload is deferred until its billing/storage/rules setup is
-  explicitly configured. No nonfunctional upload control is shown.
+- Poster file upload is implemented through the trusted Cloudinary Worker flow;
+  Firebase Cloud Storage is not required. Cloudinary credentials, separately
+  approved deployment, and real-device/live-service acceptance remain manual.
+  Posters require an existing editable draft and retain their fallback when absent.
 - Event-type taxonomy and organization-wide automatic approval bypass are not
   defined in the PDF or selected policy, so neither was invented. Every event
   follows the selected manager approval flow.

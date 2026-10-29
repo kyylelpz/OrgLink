@@ -1,16 +1,44 @@
 # OrgLink Current Version QA Audit & Integration Report
 
-## 1. Executive Summary
+## Image Upload Follow-Up — 29 October 2026
+
+This addendum supersedes the earlier test totals and readiness statement below
+for the Cloudinary/image changes. It records prior implementation runs; this
+Markdown-only update does not claim a new runtime test execution or deployment.
+
+- Full Flutter suite: **230 passed**, including **18 image/cropping tests**.
+- Full Flutter analysis: **two existing unused-import warnings** in
+  `complete_profile_screen.dart`; targeted crop/editor analysis: **no issues**.
+- Worker unit suite: **87 passed**, including signed `asset_folder` mappings for
+  profiles, logos, and posters; client folder overrides are rejected.
+- Local image/Firestore REST emulator integration: **one passed**, covering folder
+  upload parameters, concurrent finalization, reference preservation, and cleanup.
+- Earlier combined Firestore/Auth regression: **197 passed, zero failures, one
+  existing TODO** for Google/password linking unsupported by the installed Auth
+  emulator. That scenario remains a manual Android check.
+- Wrangler bundle **dry-run passed**. The original image integration's Android
+  debug APK build passed; no later crop/folder build is asserted here.
+
+Profile photos and organization logos now support interactive square cropping;
+posters preserve original framing or optional center cropping. New uploads sign
+`asset_folder` for actual Media Library placement without changing public IDs or
+existing references. No folders were manually created and no live records or
+infrastructure were modified by these updates. Real Android gallery/pinch behavior
+and real Cloudinary upload, folder placement, lookup, and deletion still require
+manual acceptance after separately authorized setup/deployment. See
+[Cloudinary setup](cloudinary-setup.md) for exact procedures.
+
+## 1. Earlier Audit Executive Summary
 
 This report documents the comprehensive QA audit and integration inspection conducted on the OrgLink Flutter Android application, Cloudflare Workers backend, and Cloud Firestore Security Rules.
 
-**Final Verdict**: **Ready for Deployment**
+**Earlier Baseline Verdict**: **Ready for Deployment** (historical audit scope; see the image-upload addendum above for current limitations).
 
 All automated test suites (Flutter, Worker, Operator Tool, Firestore Rules, and Worker Emulator Integration) passed clean with 0 analysis errors.
 
 ---
 
-## 2. Test Execution & Audit Results
+## 2. Earlier Baseline Test Execution & Audit Results
 
 | Suite / Test Target | Command | Result | Notes |
 | :--- | :--- | :--- | :--- |

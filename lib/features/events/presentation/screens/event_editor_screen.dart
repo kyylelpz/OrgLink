@@ -1,3 +1,5 @@
+import '../../../../core/widgets/image_editor.dart';
+import '../../../../core/services/image_upload_service.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_back_button.dart';
@@ -68,8 +70,7 @@ class _EventFormState extends State<_EventForm> {
   final title = TextEditingController(),
       description = TextEditingController(),
       venue = TextEditingController(),
-      capacity = TextEditingController(),
-      poster = TextEditingController();
+      capacity = TextEditingController();
   late DateTime start, end, deadline;
   String visibility = 'public';
   bool seeded = false;
@@ -89,7 +90,6 @@ class _EventFormState extends State<_EventForm> {
     description.text = draft?.description ?? '';
     venue.text = draft?.venue ?? '';
     capacity.text = '${draft?.capacity ?? 50}';
-    poster.text = draft?.posterURL ?? '';
     visibility =
         draft?.visibility ??
         (model.organization.value?.visibility == 'private'
@@ -104,7 +104,6 @@ class _EventFormState extends State<_EventForm> {
     description.dispose();
     venue.dispose();
     capacity.dispose();
-    poster.dispose();
     super.dispose();
   }
 
@@ -354,26 +353,21 @@ class _EventFormState extends State<_EventForm> {
                           : (value) => setState(() => visibility = value!),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    TextFormField(
-                      controller: poster,
-                      enabled: !model.busy,
-                      decoration: InputDecoration(
-                        labelText: 'Poster HTTPS URL (Optional)',
-                        filled: true,
-                        fillColor: AppColors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: AppShape.action,
-                          borderSide: BorderSide.none,
+                    if (model.eventId != null)
+                      ImageEditor(
+                        key: ValueKey('poster/${model.eventId}'),
+                        resource: ImageResource(
+                          'event',
+                          organizationId: model.organizationId,
+                          eventId: model.eventId,
                         ),
+                        label: 'Poster',
+                        currentURL: model.event?.value?.posterURL,
+                      )
+                    else
+                      const Text(
+                        'Save this draft before adding a poster. Image changes save immediately.',
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) return null;
-                        final uri = Uri.tryParse(value.trim());
-                        return uri?.scheme == 'https' && uri!.host.isNotEmpty
-                            ? null
-                            : 'Enter a valid HTTPS URL.';
-                      },
-                    ),
                   ],
                 ),
               ),
@@ -417,7 +411,6 @@ class _EventFormState extends State<_EventForm> {
                             capacity: int.parse(capacity.text),
                             registrationDeadline: deadline,
                             visibility: visibility,
-                            posterURL: poster.text,
                           ),
                         );
                         if (context.mounted && id != null) {

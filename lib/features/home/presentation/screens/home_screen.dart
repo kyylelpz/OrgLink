@@ -81,7 +81,7 @@ class _DashboardState extends State<_Dashboard> {
                 CommunityDashboardHeader(
                   greeting: '$salutation,\n$firstName!',
                   initials: initials.isEmpty ? '?' : initials,
-                  imageUrl: auth.user?.photoURL,
+                  imageUrl: auth.profile?.photoURL,
                   onNotifications: () => context.push(AppRoutes.notifications),
                   onProfile: () => context.push(AppRoutes.completeProfile),
                   search: AppSearchField(

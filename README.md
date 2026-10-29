@@ -32,6 +32,25 @@ The current implemented UI is documented in
 [the UI/UX baseline](docs/ui-ux-design.md). Historical migration plans do not
 override it. Passwords are handled exclusively by Firebase Authentication.
 
+## Images and Cloudinary
+
+Profile photos, organization logos, and event posters use the existing trusted
+Cloudflare Worker for upload authorization, Cloudinary signing, asset verification,
+and Firestore reference updates. Profile photos and logos support a live square
+preview with drag, pinch-to-zoom, Cancel, Reset, Confirm, and Keep Original.
+Managers and Platform Admins share the logo editor. Event posters retain original
+framing or the existing optional center-square crop; save an editable draft first.
+
+Uploads retain gallery resizing/compression and the 5 MiB limit. New uploads use
+signed dynamic Media Library asset folders: `orglink/profiles`,
+`orglink/organizations`, and `orglink/events`. Public IDs and existing references
+are preserved; no manual dashboard folder creation or migration is needed.
+
+See [Cloudinary setup and image workflows](docs/cloudinary-setup.md) for exact
+Worker bindings, endpoints, permissions, cleanup, tests, troubleshooting, and
+manual deployment/Android acceptance. Changes are implemented and tested locally;
+no deployment or live Firestore changes were performed for these updates.
+
 ## Google Sign-In configuration diagnosis
 
 The configuration error was traced to a duplicate **android/app/src/google-services.json**.

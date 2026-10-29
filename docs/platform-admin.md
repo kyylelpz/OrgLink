@@ -104,9 +104,24 @@ Organization creation uses the existing schema: organizationId, name,
 description, logoURL, mission, vision, goals, visibility, status, managerUid,
 membershipRequirements, approvalSettings, positions, publicOfficers, createdAt,
 updatedAt. Creation supplies empty optional lists and manual approval defaults.
-The UI can edit name, description, HTTPS logo URL, mission/vision, goals,
+The organization text editor can edit name, description, mission/vision, goals,
 requirements, public/private visibility, active/inactive status, request acceptance
 and manager Student ID (resolved to managerUid by the server). Other existing fields are preserved.
+
+Active Platform Admins use Change Logo and Remove Logo on active organization
+cards instead of pasting a URL. Logos use the same interactive square preview as
+profile photos: drag, pinch to zoom, Reset, Cancel, Confirm, or Keep Original.
+Cropping happens before the existing upload; gallery compression and the 5 MiB
+limit remain. Image changes save immediately and reload the admin list; they are
+separate from the organization text form and its version checks.
+
+The existing Worker rechecks authoritative admin eligibility, verifies the asset
+with Cloudinary, and updates `logoURL`, `logoPublicId`, `imageRevision`, and
+`updatedAt` transactionally. `asset_folder: orglink/organizations` is included in
+the signed upload without changing public IDs. Direct Firestore image writes and
+arbitrary URL assignment through `/admin/mutate` remain denied. This capability
+does not grant event editing. See [Cloudinary setup](cloudinary-setup.md) for
+bindings, endpoints, cleanup, and manual deployment/acceptance.
 
 Manager selection uses the exact 10-digit Student ID shown in Account Management. The protected Worker resolves it through the registry to the existing UID. The server
 requires an existing active account with valid student identity and a recognized
@@ -137,7 +152,7 @@ Mutation operations: `accountStatus` takes `action` (`approve`, `reject`, `deact
 `createOrganization` takes `changes`; `updateOrganization` takes `changes`,
 `version` and `expectedManagerUid`. Versions are opaque Firestore updateTime
 strings from list responses. Changes and collections are allowlisted; field
-lengths, status/visibility choices, manager identity, HTTPS logos, IDs and arrays
+lengths, status/visibility choices, manager identity, IDs and arrays
 are validated server-side. Mutation payloads cannot modify arbitrary document
 paths or privileged user fields. Requests are capped at 64KiB for admin endpoints
 and responses at 256KiB in Flutter; attendance retains its existing request cap.

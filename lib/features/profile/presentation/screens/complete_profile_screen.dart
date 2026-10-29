@@ -1,3 +1,5 @@
+import '../../../../core/widgets/image_editor.dart';
+import '../../../../core/services/image_upload_service.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -128,7 +130,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     }
 
     // EDIT STATE
-    final photo = auth.user?.photoURL;
+    final photo = auth.profile?.photoURL;
     final busy = auth.isBusy || _saved;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
@@ -150,10 +152,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               bottom: Radius.circular(AppShape.featureRadius),
             ),
           ),
-          leading: auth.profile?.isEligible == true
-              ? const AppBackButton()
-              : null,
-          actions: const [SignOutButton(compact: true)],
         ),
         bottomNavigationBar: Container(
           decoration: const BoxDecoration(
@@ -212,9 +210,15 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   children: [
                     ProfileIdentity(name: _name.text, photo: photo, size: 60),
                     const SizedBox(width: AppSpacing.lg),
-                    const Expanded(child: Text('Profile photo')),
+                    const Expanded(child: Text('Profile Photo')),
                   ],
                 ),
+                if (auth.profile != null)
+                  ImageEditor(
+                    resource: const ImageResource('profile'),
+                    label: 'Photo',
+                    currentURL: photo,
+                  ),
                 const SizedBox(height: AppSpacing.lg),
                 TextFormField(
                   initialValue: auth.user?.email ?? '',

@@ -38,19 +38,38 @@ Organization-scoped event/detail/management pages retain their existing URL clas
 | Area | Current presentation and behavior |
 |---|---|
 | Authentication | Unchanged loading, finalized Sign In/Sign Up, Google and Firebase email/password, verification/resend, forgot/reset/success and invalid-link states. Email actions use Firebase validation; verification does not bypass pending approval. See Module 1 for manual setup and linking acceptance. |
-| Profile | Identity/photo fallback, academic information and editable Full Name, Student Number, Year Level, Section, required controlled College/Program dropdowns on save; identity remains controlled by Firebase Authentication. Existing legacy academics stay readable. Verified Google users can explicitly Link Password after fresh Google reauthentication. Existing serialization/backward compatibility is unchanged. Stored spelling/case is preserved; suggestions are opt-in. |
+| Profile | Change Photo/Remove Photo with interactive square crop (drag, pinch, Reset, Cancel, Confirm, Keep Original); identity/photo fallback, academic information and editable Full Name, Student Number, Year Level, Section, required controlled College/Program dropdowns on save; identity remains controlled by Firebase Authentication. Existing legacy academics stay readable. Verified Google users can explicitly Link Password after fresh Google reauthentication. Existing serialization/backward compatibility is unchanged. Stored spelling/case is preserved; suggestions are opt-in. |
 | Home | Midnight personalized greeting/search header, four shortcuts, live **Happening Now** cards when data permits, one featured upcoming event, additional upcoming preview, organization previews and role-aware organization management cards. Search navigates actual accessible event/organization records. No Your Activity section, fake statistics or mock production content. |
 | Organizations | Midnight identity/search header; white cards with dynamic logos, actual description/visibility/status and current membership labels. Join/View navigates to existing details; it does not bypass membership requests. |
-| Organization Details | Organization identity, published description/mission/vision/goals, structure, requirements and public officers; events, request/status feedback and authorized management/roster links. |
+| Organization Details | Authorized managers can Change Logo/Remove Logo using the shared interactive square crop; organization identity, published description/mission/vision/goals, structure, requirements and public officers; events, request/status feedback and authorized management/roster links. |
 | Memberships | My Organizations and Membership Requests retain their existing record selection, assigned-manager entries and unavailable-record retry. Request queue and roster show real names, roles, statuses and dates. Approve/Reject requires confirmation and successful completion before feedback. |
 | Event Discovery/My Events | Dark headers, existing search/filters, shared poster/date/registration cards and local navigation. Personal registrations retain name refresh, unavailable-event retry and eligible withdrawal. |
 | Event Details/Registration | Actual organizer, schedule, venue, capacity/deadline/visibility/status, registration status and confirmation review. Existing draft/submission/approval/publication/lifecycle and attendance/participant actions appear only under their existing guards. |
-| Event Management/Editor | Search/status filtering, lifecycle/approval cards and Create Event action. Single draft form with existing validators/date pickers, optional HTTPS poster URL and Save Draft; creation does not publish automatically. |
+| Event Management/Editor | Search/status filtering, lifecycle/approval cards and Create Event action. Single draft form with existing validators/date pickers, Save Draft followed by verified Cloudinary poster upload/removal while editable; Keep Original or the optional center crop preserves the existing poster flow. Creation does not publish automatically. |
 | Participants | Event-scoped identities and registration timestamps, real reserved/capacity totals, loading/error/empty feedback. Attendance entry remains separately permission controlled. |
 | QR Hub/Pass | Personal QR and attendance actions; organizer tools are hidden unless relevant. A registered-event selector drives the existing short-lived server credential, window restrictions, regeneration, expiry and already-verified states. Actual QR pixels are responsive and retain the existing payload. |
 | Scanner | Midnight page with live native camera, framing overlay, permission/error retry, server verification/duplicate feedback, next-participant action and manual lookup. No static camera photograph or sample pass substitutes for live input. |
 | Attendance | Organization/event selection, actual summary tiles, name/status filtering, per-participant results, permitted manual verification and separate correction action. Report/history views show real records. |
 | Correction | Modal organization/event/participant context, before/after status, required reason, confirmation, busy/back guards and visible conflicts. Existing correction/audit calls remain authoritative. |
+
+## Image Editing and Upload Boundaries
+
+Profiles and organization logos use the same Material 3 fixed-square live crop
+preview, with draggable positioning, pinch zoom, Reset, Cancel, Confirm, and
+Keep Original. Platform Admin organization cards reuse the logo editor. No new
+cropping package is required. Event posters keep their original framing or
+optional centered square crop; they are not forced into the interactive editor.
+
+Gallery resizing/compression, the 5 MiB limit, post-crop validation, progress,
+retry/error feedback, and fallback imagery remain. Confirm renders the chosen
+crop before upload; Cancel uploads nothing. Keep Original skips cropping of the
+selected bytes. Image saves are immediate and separate from text forms.
+
+The Worker authorizes and verifies every saved reference. New uploads sign the
+resource's dynamic `asset_folder`, while existing public IDs and image references
+remain intact. The approved splash animation is unaffected. See
+[Cloudinary setup and acceptance](cloudinary-setup.md) for permissions, schema,
+folder paths, configuration, cleanup, and test evidence.
 
 ## Role visibility and data boundaries
 

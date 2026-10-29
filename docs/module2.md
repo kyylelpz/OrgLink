@@ -96,6 +96,25 @@ navigation out of the feature/authentication changes. Search does not create
 Firestore listeners. Associated organization listeners are retained by ID and
 removed when their membership disappears. Normal widget rebuilds do not refetch.
 
+## Organization Logos
+
+Assigned managers of active organizations can Change Logo or Remove Logo in
+Organization Details. Active Platform Admins have the same verified logo editor
+on their admin organization cards. An officer role or title alone does not grant
+logo management. The Worker authorizes against the current complete active
+account, manager assignment or authoritative platform-admin role, and organization
+status; direct Firestore organization writes remain blocked.
+
+Logos share the profile photo's interactive square editor: drag, pinch to zoom,
+Cancel, Reset, Confirm, and Keep Original. Confirm crops before upload; Keep
+Original preserves the selected framing. The existing 5 MiB validation,
+resizing/compression, immediate image saves, and logo/error fallbacks remain.
+
+Verified uploads update `logoURL`, `logoPublicId`, `imageRevision`, and `updatedAt`.
+New uploads sign `asset_folder: orglink/organizations` without changing public-ID
+generation. Existing references and organization names remain unchanged. See
+[Cloudinary setup](cloudinary-setup.md) for endpoints, configuration, and cleanup.
+
 ## Schemas
 
 ### organizations/{organizationId}
@@ -104,7 +123,9 @@ removed when their membership disappears. Normal widget rebuilds do not refetch.
 | --- | --- |
 | organizationId | string, document ID |
 | name, description, mission, vision | strings |
-| logoURL | string or null |
+| logoURL | verified Cloudinary HTTPS URL or null for new image changes; existing stored URLs remain readable |
+| logoPublicId | optional Worker-managed Cloudinary public ID; null after removal |
+| imageRevision | optional Worker-managed concurrency token for image changes |
 | goals | array of strings |
 | visibility | public or private |
 | status | active or inactive |

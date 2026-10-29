@@ -160,7 +160,7 @@ service cloud.firestore {
           return eventEditor(resource.data) && organization(orgId).status == 'active'
             && resource.data.eventStatus == 'draft' && resource.data.get('archivedAt',null) == null
             && !(resource.data.approvalStatus == 'pending' && resource.data.get('submittedAt',null) != null)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','visibility','approvalStatus','submittedAt','updatedAt'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','startAt','endAt','venue','capacity','registrationDeadline','visibility','approvalStatus','submittedAt','updatedAt'])
             && request.resource.data.approvalStatus == 'pending' && request.resource.data.submittedAt == null
             && validEvent(request.resource.data);
         }
@@ -196,6 +196,7 @@ service cloud.firestore {
         allow create: if eligible() && organization(orgId).status == 'active' && (assignedManager() || eventOfficer())
           && request.resource.data.keys().hasAll(['eventId','organizationId','title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','registrationCount','eventStatus','approvalStatus','createdBy','createdAt','updatedAt','visibility','submittedAt','reviewedAt','reviewedBy','publishedAt','cancelledAt','completedAt','archivedAt'])
           && request.resource.data.keys().hasOnly(['eventId','organizationId','title','description','posterURL','startAt','endAt','venue','capacity','registrationDeadline','registrationCount','eventStatus','approvalStatus','createdBy','createdAt','updatedAt','visibility','submittedAt','reviewedAt','reviewedBy','publishedAt','cancelledAt','completedAt','archivedAt'])
+          && request.resource.data.posterURL == null
           && validEvent(request.resource.data) && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.registrationCount == 0 && request.resource.data.eventStatus == 'draft' && request.resource.data.approvalStatus == 'pending'
           && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time

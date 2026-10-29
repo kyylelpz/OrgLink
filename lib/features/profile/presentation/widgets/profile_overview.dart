@@ -103,7 +103,7 @@ class ProfileOverview extends StatelessWidget {
                 );
                 final avatar = ProfileIdentity(
                   name: details.fullName,
-                  photo: auth.user?.photoURL,
+                  photo: auth.profile?.photoURL,
                 );
                 if (constraints.maxWidth < 300 ||
                     MediaQuery.textScalerOf(context).scale(14) > 21) {

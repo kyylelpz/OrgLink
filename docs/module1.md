@@ -64,6 +64,27 @@ Error messages suppress raw SDK details and distinguish network/rate-limit/actio
 code failures without exposing account existence. Password reset does not claim
 instant revocation on every device or a fixed email expiry.
 
+## Profile Photos
+
+The existing profile editor provides Change Photo and Remove Photo. The current
+photo is read from Firestore `users/{uid}.photoURL`, with the existing fallback
+avatar when absent or unavailable. Firebase Auth's provider photo stays separate.
+
+Gallery photos can be dragged and pinched within a live square crop preview.
+Cancel uploads nothing, Reset restores the centered crop, Confirm renders the
+selected square before upload, and Keep Original skips cropping. Existing native
+resizing/compression and the 5 MiB limit remain in effect; crop output is validated
+again. Image changes save immediately, independently of profile text changes.
+
+The existing complete profile's authenticated owner may manage the photo while
+active or pending. The Worker rechecks eligibility and verifies the Cloudinary
+asset before atomically updating `photoURL`, `photoPublicId`, `imageRevision`, and
+`updatedAt`. Direct client image-field writes are denied. `/profile/save` remains
+the Student ID/text save endpoint and preserves existing image fields.
+New photos use signed `asset_folder: orglink/profiles`; existing public IDs and
+references are not migrated. See [Cloudinary setup](cloudinary-setup.md) for the
+upload-ticket flow, configuration, retries, cleanup, and manual acceptance.
+
 ## Academic constants and compatibility
 
 `AcademicOptions` in `lib/features/profile/data/models/student_profile.dart`

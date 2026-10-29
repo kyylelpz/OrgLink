@@ -1,3 +1,5 @@
+import '../../../../core/widgets/image_editor.dart';
+import '../../../../core/services/image_upload_service.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
@@ -13,7 +15,7 @@ import '../widgets/organization_widgets.dart';
 
 class OrganizationDetailsScreen extends StatelessWidget {
   const OrganizationDetailsScreen({super.key});
-  
+
   Widget _section(String title, String text, {bool card = true}) {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -44,11 +46,14 @@ class OrganizationDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = context.watch<OrganizationDetailsViewModel>();
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
-          toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
           elevation: 0,
           iconTheme: const IconThemeData(color: AppColors.white),
@@ -103,17 +108,27 @@ class OrganizationDetailsScreen extends StatelessWidget {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    20,
+                                    20,
+                                    40,
+                                  ),
                                   child: ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 230),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 230,
+                                    ),
                                     child: Text(
                                       'Ideas become\nimpact. Together.',
-                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                        fontSize: 30,
-                                        height: 1.05,
-                                        color: AppColors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            fontSize: 30,
+                                            height: 1.05,
+                                            color: AppColors.white,
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                     ),
                                   ),
                                 ),
@@ -136,13 +151,24 @@ class OrganizationDetailsScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.lg),
+                    if (model.isManager && org.status == 'active')
+                      ImageEditor(
+                        key: ValueKey('logo/${org.id}'),
+                        resource: ImageResource(
+                          'organization',
+                          organizationId: org.id,
+                        ),
+                        label: 'Logo',
+                        currentURL: org.logoURL,
+                      ),
                     Text(
                       org.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.brandMidnight,
-                        fontSize: 25,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: AppColors.brandMidnight,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
@@ -154,12 +180,14 @@ class OrganizationDetailsScreen extends StatelessWidget {
                         const SizedBox(width: AppSpacing.sm),
                         AppStatusChip(
                           label: displayIdentifier(org.status),
-                          tone: org.status == 'active' ? AppStatusTone.success : AppStatusTone.neutral,
+                          tone: org.status == 'active'
+                              ? AppStatusTone.success
+                              : AppStatusTone.neutral,
                         ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    
+
                     // MEMBERSHIP STATUS
                     if (model.membership.loading)
                       const LinearProgressIndicator()
@@ -182,12 +210,19 @@ class OrganizationDetailsScreen extends StatelessWidget {
                                 color: AppColors.brandMidnight,
                               ),
                             ),
-                            if (['rejected', 'removed'].contains(model.membership.value?.status))
+                            if ([
+                              'rejected',
+                              'removed',
+                            ].contains(model.membership.value?.status))
                               const Padding(
                                 padding: EdgeInsets.only(top: AppSpacing.xs),
-                                child: Text('Reapplication is not currently available.', style: TextStyle(color: AppColors.error)),
+                                child: Text(
+                                  'Reapplication is not currently available.',
+                                  style: TextStyle(color: AppColors.error),
+                                ),
                               ),
-                            if (model.membership.value == null && !model.isManager) ...[
+                            if (model.membership.value == null &&
+                                !model.isManager) ...[
                               const SizedBox(height: AppSpacing.md),
                               AppActionButton(
                                 busy: model.busy,
@@ -196,8 +231,14 @@ class OrganizationDetailsScreen extends StatelessWidget {
                                     ? () async {
                                         final success = await model.request();
                                         if (context.mounted && success) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Membership request submitted.')),
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Membership request submitted.',
+                                              ),
+                                            ),
                                           );
                                         }
                                       }
@@ -212,14 +253,17 @@ class OrganizationDetailsScreen extends StatelessWidget {
                             if (!org.acceptsRequests)
                               const Padding(
                                 padding: EdgeInsets.only(top: AppSpacing.sm),
-                                child: Text('This organization is not accepting new requests.', style: TextStyle(color: AppColors.error)),
+                                child: Text(
+                                  'This organization is not accepting new requests.',
+                                  style: TextStyle(color: AppColors.error),
+                                ),
                               ),
                           ],
                         ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
-                    
+
                     if (model.actionFailure != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -228,31 +272,37 @@ class OrganizationDetailsScreen extends StatelessWidget {
                           style: const TextStyle(color: AppColors.error),
                         ),
                       ),
-                    
+
                     // MANAGER ACTIONS
                     if (model.isManager)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: FilledButton.tonalIcon(
-                          onPressed: () => context.go(AppRoutes.manageMembers(org.id)),
+                          onPressed: () =>
+                              context.go(AppRoutes.manageMembers(org.id)),
                           icon: const Icon(Icons.admin_panel_settings_outlined),
                           label: const Text('Manage Membership Requests'),
-                          style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                         ),
                       ),
                     if (model.canViewRoster)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: OutlinedButton.icon(
-                          onPressed: () => context.go(AppRoutes.memberRoster(org.id)),
+                          onPressed: () =>
+                              context.go(AppRoutes.memberRoster(org.id)),
                           icon: const Icon(Icons.people_outline),
                           label: const Text('View Member Roster'),
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                         ),
                       ),
-                    
+
                     const SizedBox(height: AppSpacing.md),
-                    
+
                     // INFO SECTIONS
                     _section('Description', org.description),
                     const SizedBox(height: AppSpacing.md),
@@ -264,7 +314,11 @@ class OrganizationDetailsScreen extends StatelessWidget {
                           const Divider(height: AppSpacing.xl),
                           _section('Our Vision', org.vision, card: false),
                           const Divider(height: AppSpacing.xl),
-                          _section('Our Goals', org.goals.join('\n'), card: false),
+                          _section(
+                            'Our Goals',
+                            org.goals.join('\n'),
+                            card: false,
+                          ),
                         ],
                       ),
                     ),
@@ -276,19 +330,27 @@ class OrganizationDetailsScreen extends StatelessWidget {
                           : org.positions.join('\n'),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    _section('Membership Requirements', org.membershipRequirements.join('\n')),
+                    _section(
+                      'Membership Requirements',
+                      org.membershipRequirements.join('\n'),
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     _section(
                       'Public Officers',
                       org.publicOfficers.isEmpty
                           ? 'No public officer information.'
-                          : org.publicOfficers.map((officer) => '${officer.name} - ${officer.positionTitle}').join('\n'),
+                          : org.publicOfficers
+                                .map(
+                                  (officer) =>
+                                      '${officer.name} - ${officer.positionTitle}',
+                                )
+                                .join('\n'),
                     ),
-                    
+
                     const SizedBox(height: AppSpacing.xl),
                     const AppSectionHeading(title: 'Upcoming Published Events'),
                     const SizedBox(height: AppSpacing.md),
-                    
+
                     if (model.events.loading)
                       const LinearProgressIndicator()
                     else if (model.events.failure != null)
@@ -306,49 +368,69 @@ class OrganizationDetailsScreen extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: AppSurfaceCard(
-                            onTap: () => context.go(AppRoutes.event(org.id, event.id)),
+                            onTap: () =>
+                                context.go(AppRoutes.event(org.id, event.id)),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         event.title,
-                                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.brandMidnight),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.brandMidnight,
+                                        ),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         displayDate(event.startAt),
-                                        style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.muted,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right, color: AppColors.muted),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: AppColors.muted,
+                                ),
                               ],
                             ),
                           ),
                         ),
-                    
+
                     const SizedBox(height: AppSpacing.lg),
                     OutlinedButton(
                       onPressed: () => context.go(AppRoutes.events),
-                      style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                       child: const Text('Browse All Events'),
                     ),
-                    
+
                     if (model.isManager ||
                         (model.membership.value?.role == 'officer' &&
                             model.membership.value?.status == 'active' &&
-                            model.membership.value?.permissions['manageEvents'] == true))
+                            model
+                                    .membership
+                                    .value
+                                    ?.permissions['manageEvents'] ==
+                                true))
                       Padding(
                         padding: const EdgeInsets.only(top: AppSpacing.md),
                         child: FilledButton.tonalIcon(
-                          onPressed: () => context.go(AppRoutes.manageEvents(org.id)),
+                          onPressed: () =>
+                              context.go(AppRoutes.manageEvents(org.id)),
                           icon: const Icon(Icons.edit_calendar),
                           label: const Text('Manage Organization Events'),
-                          style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
                         ),
                       ),
                   ],

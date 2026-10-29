@@ -1,4 +1,6 @@
 import '../../../../core/errors/app_failure.dart';
+import '../../../../core/widgets/image_editor.dart';
+import '../../../../core/services/image_upload_service.dart';
 import '../../../profile/data/models/student_profile.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -437,6 +439,14 @@ class _AdminContentState extends State<_AdminContent> {
               ],
             ),
             Text(org.description),
+            if (org.status == 'active')
+              ImageEditor(
+                key: ValueKey('admin-logo/${org.id}'),
+                resource: ImageResource('organization', organizationId: org.id),
+                label: 'Logo',
+                currentURL: org.logoURL,
+                onSaved: vm.load,
+              ),
             TextButton(
               onPressed: vm.busy ? null : () => _edit(vm, record),
               child: const Text('Edit Organization'),
@@ -552,7 +562,6 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
     final values = {
       'name': org?.name ?? '',
       'description': org?.description ?? '',
-      'logoURL': org?.logoURL ?? '',
       'mission': org?.mission ?? '',
       'vision': org?.vision ?? '',
       'goals': org?.goals.join('\n') ?? '',
@@ -693,7 +702,6 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
                 for (final entry in [
                   ('name', 'Organization Name', 100),
                   ('description', 'Description', 1500),
-                  ('logoURL', 'Logo URL', 2048),
                   ('mission', 'Mission', 1000),
                   ('vision', 'Vision', 1000),
                   ('goals', 'Goals (One per Line)', 1210),
@@ -745,31 +753,7 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
                       if (entry.$1 == 'managerStudentId') {
                         return StudentDetails.validateStudentNumber(value);
                       }
-                      if (entry.$1 == 'logoURL' && v.isNotEmpty) {
-                        final u = Uri.tryParse(v);
-                        if (u == null ||
-                            u.scheme != 'https' ||
-                            u.host.isEmpty ||
-                            u.userInfo.isNotEmpty) {
-                          return 'Enter a valid HTTPS image URL.';
-                        }
-                      }
-                      if ([
-                        'goals',
-                        'membershipRequirements',
-                      ].contains(entry.$1)) {
-                        final lines = v
-                            .split('\n')
-                            .where((s) => s.trim().isNotEmpty)
-                            .toList();
-                        if (lines.length > 10 ||
-                            lines.any(
-                              (s) =>
-                                  s.trim().length > 120 || s.trim().length < 2,
-                            )) {
-                          return 'Use up to 10 lines of 2–120 characters.';
-                        }
-                      }
+
                       return null;
                     },
                   ),

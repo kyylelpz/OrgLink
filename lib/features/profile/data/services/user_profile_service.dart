@@ -34,7 +34,12 @@ class UserProfileService {
           uid: uid,
           email: data['email'] as String? ?? '',
           details: StudentDetails.fromMap(data),
-          photoURL: data['photoURL'] as String?,
+          photoURL: data['photoURL'] is String
+              ? data['photoURL'] as String
+              : null,
+          photoPublicId: data['photoPublicId'] is String
+              ? data['photoPublicId'] as String
+              : null,
           platformRole: data['platformRole'] as String? ?? '',
           accountStatus: data['accountStatus'] as String? ?? '',
           createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
