@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import '../../../../core/services/image_upload_service.dart';
+import '../../../../core/services/worker_api_service.dart';
 import '../../../../core/utils/live_query.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../../organizations/data/models/organization.dart';
@@ -41,7 +43,98 @@ class EventContextViewModel extends ChangeNotifier {
   LiveQuery<OrgEvent?>? event;
   LiveQuery<EventRegistration?>? registration;
   bool busy = false, _disposed = false;
+  bool selectingPoster = false;
   AppFailure? failure;
+  Uint8List? selectedPoster;
+  String? createdDraftId, posterMessage, _pendingPosterUpload;
+  double? posterProgress;
+  ImageUploadService? _posterService;
+  bool get creationSaved => eventId == null && createdDraftId != null;
+  bool get formLocked => busy || creationSaved;
+
+  Future<void> selectPoster(
+    ImageUploadService service, {
+    Future<Uint8List?> Function(Uint8List bytes)? prepare,
+  }) async {
+    if (eventId != null || busy || !canCreate) return;
+    selectingPoster = true;
+    try {
+      await _run(() async {
+        var bytes = await service.select();
+        if (bytes == null || _disposed) return;
+        ImageUploadService.validateBytes(bytes);
+        if (prepare != null) bytes = await prepare(bytes);
+        if (bytes == null || _disposed) return;
+        ImageUploadService.validateBytes(bytes);
+        selectedPoster = bytes;
+        _posterService = service;
+        _pendingPosterUpload = null;
+        posterMessage = null;
+        posterProgress = null;
+      });
+    } finally {
+      selectingPoster = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  void removeSelectedPoster() {
+    if (busy) return;
+    selectedPoster = null;
+    _pendingPosterUpload = null;
+    posterMessage = null;
+    posterProgress = null;
+    failure = null;
+    notifyListeners();
+  }
+
+  Future<String> _finishCreation() async {
+    final id = createdDraftId;
+    if (id == null || id.isEmpty || id.contains('/')) {
+      throw const AppFailure(
+        'A saved draft is required before uploading a poster.',
+      );
+    }
+    final bytes = selectedPoster;
+    if (bytes != null) {
+      if (!canCreate || _posterService == null) {
+        throw const AppFailure('You cannot upload a poster for this draft.');
+      }
+      void progress(String message, double? value) {
+        posterMessage = message;
+        posterProgress = value;
+        if (!_disposed) notifyListeners();
+      }
+
+      try {
+        _pendingPosterUpload ??= await _posterService!.upload(
+          ImageResource('event', organizationId: organizationId, eventId: id),
+          bytes,
+          onProgress: progress,
+        );
+        if (_disposed) return id;
+        progress('Verifying poster', null);
+        await _posterService!.finalize(_pendingPosterUpload!);
+      } on WorkerFailure catch (error) {
+        // Expired/stale tickets need a fresh upload; ambiguous verification can retry its ticket.
+        if ([
+          'failed-precondition',
+          'conflict',
+          'not-found',
+        ].contains(error.code)) {
+          _pendingPosterUpload = null;
+        }
+        rethrow;
+      }
+      selectedPoster = null;
+      _pendingPosterUpload = null;
+      posterMessage = null;
+      posterProgress = null;
+    }
+    return id;
+  }
+
+  Future<String?> retryPoster() => _run(_finishCreation);
   bool get isManager => organization.value?.managerUid == uid;
   bool get isOfficer =>
       membership.value?.role == 'officer' &&
@@ -109,6 +202,7 @@ class EventContextViewModel extends ChangeNotifier {
   }
 
   Future<String?> save(EventDraft draft) => _run(() async {
+    if (creationSaved) return _finishCreation();
     final error = draft.validate(DateTime.now());
     if (error != null) throw AppFailure(error);
     if (eventId == null) {
@@ -117,7 +211,9 @@ class EventContextViewModel extends ChangeNotifier {
           'You cannot create events for this organization.',
         );
       }
-      return repository.create(organizationId, uid, draft);
+      createdDraftId = await repository.create(organizationId, uid, draft);
+      if (_disposed) return createdDraftId!;
+      return _finishCreation();
     }
     if (!canEdit) {
       throw const AppFailure(

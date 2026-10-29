@@ -38,8 +38,13 @@ Profile photos, organization logos, and event posters use the existing trusted
 Cloudflare Worker for upload authorization, Cloudinary signing, asset verification,
 and Firestore reference updates. Profile photos and logos support a live square
 preview with drag, pinch-to-zoom, Cancel, Reset, Confirm, and Keep Original.
-Managers and Platform Admins share the logo editor. Event posters retain original
-framing or the existing optional center-square crop; save an editable draft first.
+Managers and Platform Admins share the logo editor. Create Event and Edit Draft
+posters reuse the interactive cropper with a responsive landscape frame matching
+the existing Event Details slot, plus a live Home center-trim preview and Keep Original. Create Event
+places Event Poster above Event Details in the same card, with a separate
+normal-weight (Optional) supporting label. It can select/preview a poster locally; Save Draft creates the event first and then
+automatically uploads/finalizes its poster. Failed uploads retain the saved draft
+and offer Retry Upload without creating another event.
 
 Uploads retain gallery resizing/compression and the 5 MiB limit. New uploads use
 signed dynamic Media Library asset folders: `orglink/profiles`,

@@ -52,7 +52,10 @@ class _ImageEditorState extends State<ImageEditor> {
     try {
       var bytes = await model.service.select();
       if (bytes == null || !mounted) return;
-      if (['profile', 'organization'].contains(widget.resource.kind)) {
+      if (widget.resource.kind == 'event') {
+        bytes = await showEventPosterCrop(context, bytes);
+        if (bytes == null || !mounted) return;
+      } else if (['profile', 'organization'].contains(widget.resource.kind)) {
         final selected = bytes;
         bytes = await showDialog<Uint8List>(
           context: context,

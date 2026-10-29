@@ -1,3 +1,4 @@
+import '../../../../core/utils/event_poster_layout.dart';
 import '../../../../core/utils/display_labels.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -212,9 +213,9 @@ class EventPoster extends StatelessWidget {
       borderRadius: AppShape.action,
       child: Image.network(
         event.posterURL!,
-        height: 184,
+        height: EventPosterLayout.detailsHeight,
         width: double.infinity,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover, // <-- fills the rounded box
         excludeFromSemantics: true,
         loadingBuilder: (_, child, progress) =>
             progress == null ? child : fallback,
@@ -445,7 +446,7 @@ class _EventPreview extends StatelessWidget {
                         borderRadius: AppShape.action,
                         child: Image.network(
                           event.posterURL!,
-                          height: 174,
+                          height: EventPosterLayout.featuredHeight,
                           width: double.infinity,
                           fit: BoxFit.cover,
                           excludeFromSemantics: true,

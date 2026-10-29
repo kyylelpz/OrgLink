@@ -210,13 +210,7 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
                 child: const EventManagementScreen(),
               ),
             ),
-            GoRoute(
-              path: '/organizations/:organizationId/events/new',
-              builder: (_, state) => EventContextScope(
-                organizationId: state.pathParameters['organizationId']!,
-                child: const EventEditorScreen(),
-              ),
-            ),
+            _createEventRoute(auth),
             GoRoute(
               path: '/organizations/:organizationId/events/:eventId',
               builder: (_, state) => EventContextScope(
@@ -299,6 +293,28 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     ),
   ),
 );
+
+// Route-level exit handling also covers shell tabs and AppBackButton navigation.
+GoRoute _createEventRoute(AuthViewModel auth) {
+  final editorKey = GlobalKey<EventEditorScreenState>();
+  return GoRoute(
+    path: '/organizations/:organizationId/events/new',
+    builder: (_, state) => EventContextScope(
+      organizationId: state.pathParameters['organizationId']!,
+      child: EventEditorScreen(key: editorKey),
+    ),
+    onExit: (_, _) {
+      final editor = editorKey.currentState;
+      // Never hold up a forced sign-out, account switch or eligibility redirect.
+      if (editor == null ||
+          auth.user?.id != editor.ownerUid ||
+          auth.profile?.isEligible != true) {
+        return true;
+      }
+      return editor.confirmExit();
+    },
+  );
+}
 
 String? authRedirect(
   AuthStatus status,

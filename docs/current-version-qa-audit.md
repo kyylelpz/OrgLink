@@ -3,12 +3,12 @@
 ## Image Upload Follow-Up — 29 October 2026
 
 This addendum supersedes the earlier test totals and readiness statement below
-for the Cloudinary/image changes. It records prior implementation runs; this
-Markdown-only update does not claim a new runtime test execution or deployment.
+for the Cloudinary/image changes. It records local implementation runs through the poster-layout/landscape crop
+update. No live-service acceptance or deployment is implied.
 
-- Full Flutter suite: **230 passed**, including **18 image/cropping tests**.
+- Full Flutter suite: **259 passed**, including **26 shared image/cropping tests** and **21 creation-poster tests**.
 - Full Flutter analysis: **two existing unused-import warnings** in
-  `complete_profile_screen.dart`; targeted crop/editor analysis: **no issues**.
+  `complete_profile_screen.dart`; targeted crop/editor and creation-poster analysis: **no issues**.
 - Worker unit suite: **87 passed**, including signed `asset_folder` mappings for
   profiles, logos, and posters; client folder overrides are rejected.
 - Local image/Firestore REST emulator integration: **one passed**, covering folder
@@ -20,7 +20,7 @@ Markdown-only update does not claim a new runtime test execution or deployment.
   debug APK build passed; no later crop/folder build is asserted here.
 
 Profile photos and organization logos now support interactive square cropping;
-posters preserve original framing or optional center cropping. New uploads sign
+Create Event and Edit Draft posters share interactive landscape cropping, based on the existing responsive Details width/184 dp slot, plus Keep Original and a live Home width/174 center-trim preview. The poster section precedes Event Details in the same card with a separate normal-weight (Optional) label. Create Event now stages an optional poster locally and uploads only after draft creation; retries retain the same event ID. Tests cover actual display ratios at 320/393/800 dp, safe-area insets, landscape crop/export geometry, Home trim pixels, square-crop compatibility, section placement, non-bold optional labeling, preview/change/removal, save/upload/verification failure recovery, duplicate prevention, exit confirmation, forced sign-out, Android Back, and narrow-screen layout. New uploads sign
 `asset_folder` for actual Media Library placement without changing public IDs or
 existing references. No folders were manually created and no live records or
 infrastructure were modified by these updates. Real Android gallery/pinch behavior

@@ -119,9 +119,7 @@ void main() {
     },
   );
   for (final kind in ['event']) {
-    testWidgets('$kind retains the original center-crop dialog', (
-      tester,
-    ) async {
+    testWidgets('$kind uses interactive landscape cropping', (tester) async {
       final api = fixture.RecordingImageApi();
       final bytes = (await tester.runAsync(stripedImage))!;
       await tester.pumpWidget(
@@ -140,9 +138,15 @@ void main() {
         ),
       );
       await tester.tap(find.text('Change Image'));
-      await tester.pumpAndSettle();
-      expect(find.text('Crop Square'), findsOneWidget);
-      expect(find.byType(ProfilePhotoCropDialog), findsNothing);
+      await waitForPreview(tester);
+      expect(find.text('Crop Event Poster'), findsOneWidget);
+      expect(find.text('Confirm'), findsOneWidget);
+      expect(
+        tester
+            .widget<ProfilePhotoCropDialog>(find.byType(ProfilePhotoCropDialog))
+            .aspectRatio,
+        greaterThan(1),
+      );
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(api.calls, isEmpty);

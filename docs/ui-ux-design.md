@@ -45,7 +45,7 @@ Organization-scoped event/detail/management pages retain their existing URL clas
 | Memberships | My Organizations and Membership Requests retain their existing record selection, assigned-manager entries and unavailable-record retry. Request queue and roster show real names, roles, statuses and dates. Approve/Reject requires confirmation and successful completion before feedback. |
 | Event Discovery/My Events | Dark headers, existing search/filters, shared poster/date/registration cards and local navigation. Personal registrations retain name refresh, unavailable-event retry and eligible withdrawal. |
 | Event Details/Registration | Actual organizer, schedule, venue, capacity/deadline/visibility/status, registration status and confirmation review. Existing draft/submission/approval/publication/lifecycle and attendance/participant actions appear only under their existing guards. |
-| Event Management/Editor | Search/status filtering, lifecycle/approval cards and Create Event action. Single draft form with existing validators/date pickers, Save Draft followed by verified Cloudinary poster upload/removal while editable; Keep Original or the optional center crop preserves the existing poster flow. Creation does not publish automatically. |
+| Event Management/Editor | Search/status filtering, lifecycle/approval cards and Create Event action. Single draft form with existing validators/date pickers, optional Event Poster section above Event Details in the same card, separate normal-weight (Optional) text, local selection/landscape crop preview/change/removal, and Save Draft. Poster upload starts automatically after draft creation; failure shows Retry Upload for the same draft. Edit Draft retains immediate poster saving and shares landscape drag/pinch cropping, Reset, Cancel, Confirm, Keep Original, and a Home trim preview. Creation does not publish automatically. |
 | Participants | Event-scoped identities and registration timestamps, real reserved/capacity totals, loading/error/empty feedback. Attendance entry remains separately permission controlled. |
 | QR Hub/Pass | Personal QR and attendance actions; organizer tools are hidden unless relevant. A registered-event selector drives the existing short-lived server credential, window restrictions, regeneration, expiry and already-verified states. Actual QR pixels are responsive and retain the existing payload. |
 | Scanner | Midnight page with live native camera, framing overlay, permission/error retry, server verification/duplicate feedback, next-participant action and manual lookup. No static camera photograph or sample pass substitutes for live input. |
@@ -57,13 +57,17 @@ Organization-scoped event/detail/management pages retain their existing URL clas
 Profiles and organization logos use the same Material 3 fixed-square live crop
 preview, with draggable positioning, pinch zoom, Reset, Cancel, Confirm, and
 Keep Original. Platform Admin organization cards reuse the logo editor. No new
-cropping package is required. Event posters keep their original framing or
-optional centered square crop; they are not forced into the interactive editor.
+cropping package is required. Create Event and Edit Draft posters reuse the
+interactive cropper with a landscape frame derived from the Details content
+width/184 dp slot, rather than assuming 16:9. At 393 dp without horizontal insets,
+this is 345:184 (15:8). A live Home Preview mirrors its content-width/174 dp
+center-cover trim. Cards/details retain `contain`; Home retains `cover`. Keep
+Original preserves selected bytes without cropping.
 
 Gallery resizing/compression, the 5 MiB limit, post-crop validation, progress,
 retry/error feedback, and fallback imagery remain. Confirm renders the chosen
 crop before upload; Cancel uploads nothing. Keep Original skips cropping of the
-selected bytes. Image saves are immediate and separate from text forms.
+selected bytes. Profile/logo and Edit Draft image saves are immediate and separate from text forms. Create Event holds its optional poster locally until draft creation succeeds, then uploads it automatically; failed uploads retain the draft and selection for retry. Busy submissions block navigation; leaving a pending selection requires confirmation. No image bytes are persisted across app termination.
 
 The Worker authorizes and verifies every saved reference. New uploads sign the
 resource's dynamic `asset_folder`, while existing public IDs and image references

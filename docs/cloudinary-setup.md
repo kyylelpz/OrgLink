@@ -29,7 +29,7 @@ Input is capped at 5 MiB, and must have JPEG, PNG, or WebP magic bytes. Cloudina
 | Organization logo | Active complete student account and an active organization; the assigned `managerUid` or authoritative `platformAdmin` role with the existing organization-administration capability. |
 | Event poster | Active complete student account and active organization; assigned manager, or active officer with `manageEvents == true` who created this event. Only an editable draft: not archived or awaiting review. |
 
-Permissions are read again for upload and finalization, not just ticket issuance. Poster changes reset approval to pending with no submission, matching ordinary draft edits. Approved draft content must be reviewed again. Published/cancelled/completed/archived event images cannot be changed. New events must first be saved as drafts before a poster can be uploaded.
+Permissions are read again for upload and finalization, not just ticket issuance. Poster changes reset approval to pending with no submission, matching ordinary draft edits. Approved draft content must be reviewed again. Published/cancelled/completed/archived event images cannot be changed. Create Event can stage a poster locally before saving. Save Draft first creates the event and obtains its valid ID, then automatically uploads and finalizes the poster. No Cloudinary request is made before draft creation succeeds.
 
 Firestore Rules prohibit direct client edits of image references and private upload/cleanup queues, even by managers or platform administrators. Event creation requires a null poster. The event editor and admin organization editor no longer accept arbitrary image URLs. Platform Admin organization cards provide the verified logo editor, retaining administrative image management. Existing stored image URLs remain displayed verbatim and are not migrated.
 
@@ -51,16 +51,17 @@ Public IDs are `orglink/profiles/<256-bit random hex>`, `orglink/organizations/<
 | --- | --- | --- |
 | Profile photo | Drag/reposition and pinch-to-zoom inside a fixed 1:1 live preview; Cancel, Reset, Confirm, or Keep Original | Existing profile editing flow after the student profile exists |
 | Organization logo | The same interactive square cropper and actions | Active organization's details for its manager; organization cards in Platform Administration for active platform admins |
-| Event poster | Keep Original or the existing optional centered Crop Square; no interactive square editor is forced on posters | Existing editable draft's editor/details, under current manager/officer permissions |
+| Event poster | Create Event and Edit Draft share drag/pinch landscape cropping, Reset, Cancel, Confirm, and Keep Original; creation holds the selection locally until the draft exists | Create Event and existing editable draft editor/details, under current manager/officer permissions |
 
-Reset returns to the initial centered, cover-fitted square. Panning and zooming
-keep the square fully covered by the image. Confirm renders the visible source
-region into square image bytes before invoking the existing upload service.
+Reset returns to the initial centered, cover-fitted crop. Panning and zooming
+keep the frame fully covered by the image. Confirm renders the visible source
+region before invoking the existing upload service. Profiles/logos remain 1:1;
+posters use the landscape frame described below.
 Cancel uploads nothing. Keep Original returns the selected bytes unchanged by
 cropping; native gallery resizing/compression may already have been applied.
 No cropping dependency was added: the shared dialog uses Flutter gestures and
-image rendering. `ProfilePhotoCropDialog` is reused for profiles and logos with
-resource-specific titles.
+image rendering. `ProfilePhotoCropDialog` is reused for profiles, logos, and
+posters with resource-specific titles and aspect ratios.
 
 Gallery selection still requests a maximum of 2048 pixels on each axis and quality
 85 where supported. Crop output is PNG, capped at 2048 pixels per side and
@@ -68,6 +69,54 @@ revalidated against the same 5 MiB upload limit. Encoding/size failures stay in
 the dialog with an error and allow retry or Keep Original. Upload progress,
 verification retries, removal confirmation, fallback images, and server permissions
 are unchanged. Images save immediately, independently of text-form saves.
+
+### Poster Placement and Actual Display Ratios
+
+Event Poster appears above Event Details inside the same card, outside Schedule
+and Capacity. `(Optional)` is separate muted, normal-weight supporting text below
+the heading. Create Event and Edit Draft use the same landscape crop dialog.
+
+The existing displays do not define a single fixed aspect ratio: the shared
+`EventPoster` used in cards/details has responsive width, height **184 dp**, and
+`BoxFit.contain`; the featured Home poster has height **174 dp** and
+`BoxFit.cover`. The crop derives its ratio from the actual Details content width
+(divided by 184), accounting for the 24 dp page gutters, 960 dp maximum content
+width, and horizontal safe-area insets. For example, a 393 dp phone without
+horizontal insets yields **345 × 184**, or **15:8**, not an assumed 16:9.
+
+The main interactive preview matches Details. Cards with `contain` keep the whole
+cropped image, even when their padded slots have a different shape. A separate
+live Home Preview reproduces Home's centered `cover` trim at content-width/174.
+The displayed poster layouts/fitting have not been redesigned. Keep Original
+bypasses cropping and preserves the existing display behavior for other shapes.
+Square profile/logo cropping remains unchanged; original and cropped selections
+still pass the existing file/size checks and upload paths.
+
+### Create Event Poster Recovery
+
+The optional Event Poster picker keeps selected bytes in the creation ViewModel;
+selection, replacement, removal, and preview make no Cloudinary requests.
+Save Draft creates the event with a null poster first, retains its returned ID,
+then uses the existing `/images/sign`, `/images/upload`, and `/images/finalize`
+flow scoped to that ID. No endpoint, Rule, lifecycle, permission, or asset-folder
+change is needed for this sequence.
+
+If draft creation fails, the selected image stays available and upload does not
+start. If upload/finalization fails after creation, the draft and selected bytes
+are retained, saved text fields are locked, and Retry Upload uses the same event
+ID. An ambiguous finalization retries its existing upload ticket; an expired or
+stale ticket is cleared so a subsequent retry can request a fresh upload. Rate
+limits and all backend checks still apply. Open Saved Draft requires
+confirmation before discarding the local selection; the existing draft can later
+be edited normally. An unconfirmed upload may already have completed on the
+server, so check the saved poster before starting another upload.
+
+Busy operations disable duplicate submissions and block ordinary route exits.
+Leaving with a pending selection asks for confirmation, including navigation tabs
+and Android Back. Forced authentication/account-status redirects remain allowed.
+Local selection is held in memory, not persisted across app termination; a saved
+draft survives, but the image must be selected again after restart. Edit Draft's
+existing immediate poster editor is unchanged.
 
 ## Manual Setup
 
@@ -134,7 +183,7 @@ Manual Android acceptance after separately approved setup/deployment:
 
 1. Active/pending profile owner with an existing complete student profile: choose Change Photo, drag to reposition, pinch to zoom, use Reset, and Confirm. Verify the saved square matches the preview. Repeat with Cancel (no upload) and Keep Original (selected framing preserved), remove the photo, and reopen profile/home to check persistence and fallback.
 2. Assigned organization manager: use Change Logo and repeat the interactive crop, Reset, Cancel, Confirm, Keep Original, and removal checks. Check discovery cards, details, and admin list. Other users/officers cannot change it. Repeat using Change Logo on an active Platform Admin's organization card.
-3. Manager or permitted officer: save a draft, upload/remove poster, edit text without losing the poster, submit/review/publish, and verify poster on cards/details. Officer cannot change another creator's draft; submitted/published events deny image changes.
+3. Manager or permitted officer: select/change/remove an optional poster in Create Event and verify no upload occurs before Save Draft. Save and confirm the resulting draft/poster. Interrupt upload and check that Retry Upload keeps the same event ID without another event; test Stay/Leave on pending-image navigation. Verify the existing Edit Draft poster editor and text edits preserve poster references. Then submit/review/publish and check poster display on cards/details. Officer cannot edit another creator's draft; submitted/published events deny image changes.
 4. Test invalid bearer tokens, stale `expectedURL`, duplicate upload requests, modified signatures, SVG/PDF/video, over-5-MiB files, oversized/multipage images, revoked permission between issuance and finalization, forged URL/public ID fields, expired tickets, and simultaneous replacements. None may assign an unverified reference.
 5. Interrupt networking during upload/verification. Retry verification where available; confirm no false success, no text-data loss, and eventual cleanup of abandoned assets. Cloudinary delivery/CDN invalidation is asynchronous.
 6. In the development Cloudinary Media Library, inspect a new upload of each kind: profile in `orglink/profiles`, logo in `orglink/organizations`, and poster in `orglink/events`. Confirm the asset-folder choice is signed and server-controlled, and public IDs retain their existing resource prefix plus random identifier. Check that existing URLs still resolve and replacement/removal cleanup still targets the public ID. Do not relocate existing assets or create folders manually.
@@ -146,7 +195,7 @@ Manual Android acceptance after separately approved setup/deployment:
 - **Cloudinary 401/403:** check API key/secret pairing, SHA-256 signature support, and resource lookup/destroy permissions. Consult sanitized backend stage/reason, not upstream response bodies in client logs.
 - **Permission denied:** refresh the Firebase session and profile; verify account status, current manager assignment, officer membership and `manageEvents`, event creator, and draft lifecycle. Platform administrators can manage organization logos through the admin organization cards; their role alone does not grant event editing.
 - **Conflict:** another image change won the revision check, or removal's expected URL is stale. Refresh and choose again.
-- **Invalid file:** select a static JPEG/PNG/WebP. Native gallery resizing/compression is requested at 2048 pixels/quality 85 where supported. Profiles and logos support drag/pinch interactive square cropping; event posters retain their existing optional centered square crop. PNG crop re-encoding can exceed the cap; choose a smaller image or keep the original.
+- **Invalid file:** select a static JPEG/PNG/WebP. Native gallery resizing/compression is requested at 2048 pixels/quality 85 where supported. Profiles and logos support interactive square cropping; Create Event and Edit Draft posters support interactive responsive landscape cropping with a live Home trim preview. Keep Original remains available. PNG crop re-encoding can exceed the cap; choose a smaller image or keep the original.
 - **Image does not load:** existing fallback widgets handle delivery failures. Confirm Cloudinary delivery settings allow the generated secure URL. Organization/event privacy is application-level metadata access, not private Cloudinary delivery.
 - **Unexpected Media Library folder:** confirm dynamic folder mode and that the intended updated Worker is serving the request after a separately authorized deployment. New uploads sign `asset_folder`; public-ID path prefixes alone do not set dynamic folder placement. Older assets keep their existing folder. Do not change public IDs, migrate existing references, or manually create dashboard folders to compensate.
 - **Cleanup backlog:** verify the Cron Trigger, Cloudinary credentials/quota, and Firestore access. Jobs remain retryable; no public deletion endpoint exists. Without optional TTL, retired tombstones remain as small documents.
@@ -157,8 +206,8 @@ Manual Android acceptance after separately approved setup/deployment:
 Latest recorded implementation checks on 29 October 2026, before this documentation-only update. These are local results, not evidence of a deployment or live Cloudinary acceptance.
 
 - `dart format .` executed; formatter-only changes outside the image feature were reverted to keep the diff focused.
-- `flutter analyze`: two existing unused-import warnings in `complete_profile_screen.dart`; targeted analysis of the four crop/editor code and test files reports no issues.
-- Full `flutter test`: 230 passed, including 18 shared-image/cropping tests and the existing profile, organization, event, Student ID, Platform Admin, and QR/attendance workflows.
+- `flutter analyze`: two existing unused-import warnings in `complete_profile_screen.dart`; targeted analysis of crop/editor and creation-poster code/test files reports no issues.
+- Full `flutter test`: 259 passed, including 26 shared-image/cropping tests, 21 creation-poster tests and the existing profile, organization, event, Student ID, Platform Admin, and QR/attendance workflows.
 - Worker `npm test`: 87 passed, including all three signed `asset_folder` mappings, unchanged public IDs/references, rejection of client folder overrides, authorization, tampered/expired tickets, invalid files, forged references, replay, revisions, and cleanup.
 - Firestore/Auth emulator regression run: 198 tests, 197 passed, zero failures, one existing TODO for Google/password linking rejected by the installed Auth emulator. That linking scenario remains a manual Android check.
 - Separate image integration test using the actual Firestore REST transaction adapter and local emulator: one passed with the signed asset-folder change (folder parameter assertion, concurrent finalization, identity preservation, removal, and cleanup queries).
@@ -176,13 +225,17 @@ The pre-existing `image_picker` declaration in `pubspec.yaml` was reused and pre
 - `firebase/tests/package.json`
 - `lib/core/services/image_upload_service.dart`
 - `lib/core/services/worker_api_service.dart`
+- `lib/core/utils/event_poster_layout.dart`
 - `lib/core/widgets/image_editor.dart`
 - `lib/core/widgets/profile_photo_crop_dialog.dart`
 - `lib/features/admin/presentation/screens/admin_screen.dart`
 - `lib/features/events/data/models/event.dart`
 - `lib/features/events/data/services/event_service.dart`
 - `lib/features/events/presentation/screens/event_details_screen.dart`
+- `lib/app/router.dart`
 - `lib/features/events/presentation/screens/event_editor_screen.dart`
+- `lib/features/events/presentation/viewmodels/event_context_view_model.dart`
+- `lib/features/events/presentation/widgets/event_widgets.dart`
 - `lib/features/home/presentation/screens/home_screen.dart`
 - `lib/features/organizations/data/models/organization.dart`
 - `lib/features/organizations/presentation/screens/organization_details_screen.dart`
@@ -195,6 +248,8 @@ The pre-existing `image_picker` declaration in `pubspec.yaml` was reused and pre
 - `macos/Flutter/GeneratedPluginRegistrant.swift`
 - `pubspec.lock`
 - `pubspec.yaml`
+- `test/event_creation_poster_test.dart`
+- `test/event_poster_crop_test.dart`
 - `test/image_upload_test.dart`
 - `test/profile_photo_crop_test.dart`
 - `tools/test-firestore.ps1`

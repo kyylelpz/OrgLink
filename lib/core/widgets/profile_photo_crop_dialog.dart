@@ -4,51 +4,70 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../errors/app_failure.dart';
 import '../services/image_upload_service.dart';
+import '../utils/event_poster_layout.dart';
+
+Future<Uint8List?> showEventPosterCrop(BuildContext context, Uint8List bytes) =>
+    showDialog<Uint8List>(
+      context: context,
+      builder: (context) => ProfilePhotoCropDialog(
+        bytes: bytes,
+        label: 'Event Poster',
+        aspectRatio: EventPosterLayout.aspectRatio(context),
+        secondaryAspectRatio: EventPosterLayout.featuredAspectRatio(context),
+      ),
+    );
 
 /// Crop geometry is kept in source-image pixels, independent of screen size.
 class ProfilePhotoCropController {
-  ProfilePhotoCropController(this.imageSize)
-    : center = imageSize.center(Offset.zero);
+  ProfilePhotoCropController(this.imageSize, {this.aspectRatio = 1})
+    : assert(aspectRatio > 0 && aspectRatio.isFinite),
+      center = imageSize.center(Offset.zero);
   final Size imageSize;
+  final double aspectRatio;
   double zoom = 1, _startZoom = 1;
   Offset center, _anchor = Offset.zero;
-  double get side => math.min(imageSize.width, imageSize.height) / zoom;
+  double get side =>
+      math.min(imageSize.width, imageSize.height * aspectRatio) / zoom;
+  double get height => side / aspectRatio;
   Rect get sourceRect =>
-      Rect.fromCenter(center: center, width: side, height: side);
+      Rect.fromCenter(center: center, width: side, height: height);
   void reset() {
     zoom = 1;
     center = imageSize.center(Offset.zero);
   }
 
-  // Focal coordinates are relative to the square viewport, in the range 0..1.
+  // Focal coordinates are normalized independently by viewport width and height.
   void startGesture(Offset focal) {
     _startZoom = zoom;
-    _anchor = center + (focal - const Offset(.5, .5)) * side;
+    _anchor = center + Offset((focal.dx - .5) * side, (focal.dy - .5) * height);
   }
 
   void updateGesture(double scale, Offset focal) {
     zoom = (_startZoom * scale).clamp(1, 8);
-    final wanted = _anchor - (focal - const Offset(.5, .5)) * side;
+    final wanted =
+        _anchor - Offset((focal.dx - .5) * side, (focal.dy - .5) * height);
     center = Offset(
       wanted.dx.clamp(side / 2, imageSize.width - side / 2),
-      wanted.dy.clamp(side / 2, imageSize.height - side / 2),
+      wanted.dy.clamp(height / 2, imageSize.height - height / 2),
     );
   }
 }
 
 Future<Uint8List> renderProfilePhotoCrop(ui.Image image, Rect source) async {
-  final size = source.width.floor().clamp(1, 2048);
+  final scale = math.min(1.0, 2048 / math.max(source.width, source.height));
+  final width = (source.width * scale).round().clamp(1, 2048);
+  final height = (source.height * scale).round().clamp(1, 2048);
   final recorder = ui.PictureRecorder();
   ui.Canvas(recorder).drawImageRect(
     image,
     source,
-    Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
+    Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
     ui.Paint()..filterQuality = FilterQuality.high,
   );
   final picture = recorder.endRecording();
   late ui.Image cropped;
   try {
-    cropped = await picture.toImage(size, size);
+    cropped = await picture.toImage(width, height);
   } finally {
     picture.dispose();
   }
@@ -70,9 +89,13 @@ class ProfilePhotoCropDialog extends StatefulWidget {
     super.key,
     required this.bytes,
     this.label = 'Profile Photo',
+    this.aspectRatio = 1,
+    this.secondaryAspectRatio,
   });
   final Uint8List bytes;
   final String label;
+  final double aspectRatio;
+  final double? secondaryAspectRatio;
   @override
   State<ProfilePhotoCropDialog> createState() => _ProfilePhotoCropDialogState();
 }
@@ -105,6 +128,7 @@ class _ProfilePhotoCropDialogState extends State<ProfilePhotoCropDialog> {
         _image = image;
         _crop = ProfilePhotoCropController(
           Size(image.width.toDouble(), image.height.toDouble()),
+          aspectRatio: widget.aspectRatio,
         );
       });
     } catch (_) {
@@ -139,6 +163,17 @@ class _ProfilePhotoCropDialogState extends State<ProfilePhotoCropDialog> {
   }
 
   @override
+  void didUpdateWidget(ProfilePhotoCropDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.aspectRatio != widget.aspectRatio && _crop != null) {
+      _crop = ProfilePhotoCropController(
+        _crop!.imageSize,
+        aspectRatio: widget.aspectRatio,
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _image?.dispose();
     super.dispose();
@@ -155,6 +190,8 @@ class _ProfilePhotoCropDialogState extends State<ProfilePhotoCropDialog> {
     }
     final factor = viewport / crop.side;
     final rect = crop.sourceRect;
+    Offset normalized(Offset point) =>
+        Offset(point.dx / viewport, point.dy / (viewport / widget.aspectRatio));
     return Semantics(
       label:
           '${widget.label} crop preview. Drag to reposition and pinch to zoom.',
@@ -164,13 +201,13 @@ class _ProfilePhotoCropDialogState extends State<ProfilePhotoCropDialog> {
         onScaleStart: _busy
             ? null
             : (details) =>
-                  crop.startGesture(details.localFocalPoint / viewport),
+                  crop.startGesture(normalized(details.localFocalPoint)),
         onScaleUpdate: _busy
             ? null
             : (details) => setState(
                 () => crop.updateGesture(
                   details.scale,
-                  details.localFocalPoint / viewport,
+                  normalized(details.localFocalPoint),
                 ),
               ),
         child: ClipRect(
@@ -222,14 +259,37 @@ class _ProfilePhotoCropDialogState extends State<ProfilePhotoCropDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Drag to reposition and pinch to zoom. The square shows the image that will be saved.',
+              Text(
+                widget.secondaryAspectRatio == null
+                    ? 'Drag to reposition and pinch to zoom. The square shows the image that will be saved.'
+                    : 'Drag to reposition and pinch to zoom. The crop matches Event Details; cards keep the whole image. Home uses the center trim shown below.',
               ),
               const SizedBox(height: 16),
-              SizedBox.square(
-                dimension: viewport,
+              SizedBox(
+                width: viewport,
+                height: viewport / widget.aspectRatio,
                 child: _preview(context, viewport),
               ),
+              // if (widget.secondaryAspectRatio case final ratio?) ...[
+              //   const SizedBox(height: 12),
+              //   Text(
+              //     'Home Preview',
+              //     style: Theme.of(context).textTheme.bodySmall,
+              //   ),
+              //   SizedBox(
+              //     width: viewport,
+              //     height: viewport / ratio,
+              //     child: _image == null || _crop == null
+              //         ? const SizedBox.shrink()
+              //         : CustomPaint(
+              //             key: const ValueKey('event-poster-home-preview'),
+              //             painter: _CropCoverPreview(
+              //               _image!,
+              //               _crop!.sourceRect,
+              //             ),
+              //           ),
+              //   ),
+              // ],
               if (_busy) const LinearProgressIndicator(),
               if (_error != null)
                 Padding(
@@ -269,4 +329,25 @@ class _ProfilePhotoCropDialogState extends State<ProfilePhotoCropDialog> {
       );
     },
   );
+}
+
+class _CropCoverPreview extends CustomPainter {
+  _CropCoverPreview(this.image, this.source);
+  final ui.Image image;
+  final Rect source;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fit = applyBoxFit(BoxFit.cover, source.size, size);
+    final sourceCrop = Alignment.center.inscribe(fit.source, source);
+    canvas.drawImageRect(
+      image,
+      sourceCrop,
+      Offset.zero & size,
+      Paint()..filterQuality = FilterQuality.high,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CropCoverPreview oldDelegate) =>
+      oldDelegate.image != image || oldDelegate.source != source;
 }

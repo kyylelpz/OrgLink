@@ -1,4 +1,8 @@
+import '../../../../core/widgets/profile_photo_crop_dialog.dart';
+import '../../../../core/utils/event_poster_layout.dart';
 import '../../../../core/widgets/image_editor.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/services/worker_api_service.dart';
 import '../../../../core/services/image_upload_service.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
@@ -14,8 +18,50 @@ import '../viewmodels/event_context_view_model.dart';
 import '../widgets/event_access_view.dart';
 import '../widgets/event_widgets.dart';
 
-class EventEditorScreen extends StatelessWidget {
+class EventEditorScreen extends StatefulWidget {
   const EventEditorScreen({super.key});
+  @override
+  State<EventEditorScreen> createState() => EventEditorScreenState();
+}
+
+class EventEditorScreenState extends State<EventEditorScreen> {
+  Future<bool>? _leaving;
+  String get ownerUid => context.read<EventContextViewModel>().uid;
+  Future<bool> confirmExit() async {
+    final model = context.read<EventContextViewModel>();
+    if (model.eventId != null) return true;
+    if (model.busy) return false;
+    if (model.selectedPoster == null) return true;
+    if (_leaving != null) return _leaving!;
+    _leaving = showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: const Text('Leave Without Poster?'),
+        content: Text(
+          model.creationSaved
+              ? 'Your draft is saved, but its poster upload was not confirmed. Leaving will discard the local image. Check the saved draft before uploading again.'
+              : 'The selected poster and unsaved event details will be discarded. Stay to finish saving your draft.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    ).then((value) => value ?? false);
+    try {
+      return await _leaving!;
+    } finally {
+      _leaving = null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final model = context.watch<EventContextViewModel>();
@@ -200,7 +246,102 @@ class _EventFormState extends State<_EventForm> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // EVENT DETAILS CARD
+              // POSTER CARD (separate)
+              AppSurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const AppSectionHeading(title: 'Event Poster'),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      '(Optional)',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (model.eventId != null) ...[
+                      if (model.event?.value != null)
+                        EventPoster(
+                          event: model.event!.value!,
+                          organizationName: model.organization.value!.name,
+                        ),
+                      ImageEditor(
+                        key: ValueKey('poster/${model.eventId}'),
+                        resource: ImageResource(
+                          'event',
+                          organizationId: model.organizationId,
+                          eventId: model.eventId,
+                        ),
+                        label: 'Poster',
+                        currentURL: model.event?.value?.posterURL,
+                      ),
+                    ] else ...[
+                      if (model.selectedPoster case final bytes?)
+                        AspectRatio(
+                          aspectRatio: EventPosterLayout.aspectRatio(context),
+                          child: Image.memory(
+                            bytes,
+                            key: const ValueKey('selected-event-poster'),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const Center(
+                              child: Text(
+                                'This image cannot be previewed. Choose another image.',
+                              ),
+                            ),
+                          ),
+                        ),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: model.busy
+                                ? null
+                                : () => model.selectPoster(
+                                    context.read<ImageUploadService?>() ??
+                                        ImageUploadService(
+                                          WorkerApiService(
+                                            FirebaseAuth.instance,
+                                          ),
+                                        ),
+                                    prepare: (bytes) =>
+                                        showEventPosterCrop(context, bytes),
+                                  ),
+                            icon: const Icon(
+                              Icons.add_photo_alternate_outlined,
+                            ),
+                            label: Text(
+                              model.selectedPoster == null
+                                  ? 'Select Poster'
+                                  : 'Change Poster',
+                            ),
+                          ),
+                          if (model.selectedPoster != null)
+                            TextButton(
+                              onPressed: model.busy
+                                  ? null
+                                  : model.removeSelectedPoster,
+                              child: const Text('Remove Poster'),
+                            ),
+                        ],
+                      ),
+                      const Text(
+                        'JPEG, PNG or WebP, up to 5 MiB. The poster uploads after your draft is saved.',
+                      ),
+                      if (model.creationSaved)
+                        const Text(
+                          'Your draft is saved. Retry the poster upload or open the saved draft. Event details are locked here to prevent duplicate creation.',
+                        ),
+                      if (model.posterMessage != null)
+                        Text(model.posterMessage!),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // DETAILS CARD (separate)
               AppSurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -210,7 +351,7 @@ class _EventFormState extends State<_EventForm> {
                     TextFormField(
                       controller: title,
                       textCapitalization: TextCapitalization.words,
-                      enabled: !model.busy,
+                      enabled: !model.formLocked,
                       maxLength: 200,
                       decoration: InputDecoration(
                         labelText: 'Event Title',
@@ -225,12 +366,12 @@ class _EventFormState extends State<_EventForm> {
                     ),
                     CapitalizationSuggestion(
                       controller: title,
-                      enabled: !model.busy,
+                      enabled: !model.formLocked,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: description,
-                      enabled: !model.busy,
+                      enabled: !model.formLocked,
                       maxLines: 4,
                       maxLength: 5000,
                       decoration: InputDecoration(
@@ -259,7 +400,7 @@ class _EventFormState extends State<_EventForm> {
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: venue,
-                      enabled: !model.busy,
+                      enabled: !model.formLocked,
                       maxLength: 200,
                       decoration: InputDecoration(
                         labelText: 'Venue',
@@ -275,7 +416,7 @@ class _EventFormState extends State<_EventForm> {
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: capacity,
-                      enabled: !model.busy,
+                      enabled: !model.formLocked,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         labelText: 'Maximum Attendees',
@@ -301,7 +442,7 @@ class _EventFormState extends State<_EventForm> {
                       (value) => value == null || !value.isAfter(DateTime.now())
                           ? 'Choose a future start.'
                           : null,
-                      model.busy,
+                      model.formLocked,
                     ),
                     dateField(
                       'End Date and Time',
@@ -310,7 +451,7 @@ class _EventFormState extends State<_EventForm> {
                       (value) => value == null || !value.isAfter(start)
                           ? 'End must follow start.'
                           : null,
-                      model.busy,
+                      model.formLocked,
                     ),
                     dateField(
                       'Registration Deadline',
@@ -322,7 +463,7 @@ class _EventFormState extends State<_EventForm> {
                               value.isAfter(start)
                           ? 'Deadline must be in the future and no later than start.'
                           : null,
-                      model.busy,
+                      model.formLocked,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     DropdownButtonFormField<String>(
@@ -348,40 +489,14 @@ class _EventFormState extends State<_EventForm> {
                           child: Text('Members Only'),
                         ),
                       ],
-                      onChanged: model.busy
+                      onChanged: model.formLocked
                           ? null
                           : (value) => setState(() => visibility = value!),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    if (model.eventId != null)
-                      ImageEditor(
-                        key: ValueKey('poster/${model.eventId}'),
-                        resource: ImageResource(
-                          'event',
-                          organizationId: model.organizationId,
-                          eventId: model.eventId,
-                        ),
-                        label: 'Poster',
-                        currentURL: model.event?.value?.posterURL,
-                      )
-                    else
-                      const Text(
-                        'Save this draft before adding a poster. Image changes save immediately.',
-                      ),
                   ],
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-
-              if (model.event?.value != null) ...[
-                const AppSectionHeading(title: 'Current Poster'),
-                const SizedBox(height: AppSpacing.md),
-                EventPoster(
-                  event: model.event!.value!,
-                  organizationName: model.organization.value!.name,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-              ],
 
               if (model.failure != null)
                 Padding(
@@ -391,28 +506,37 @@ class _EventFormState extends State<_EventForm> {
                     style: const TextStyle(color: AppColors.error),
                   ),
                 ),
-              if (model.busy)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: AppSpacing.md),
-                  child: LinearProgressIndicator(),
+              if (model.busy && !model.selectingPoster)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: LinearProgressIndicator(
+                    value: model.posterProgress == 1
+                        ? null
+                        : model.posterProgress,
+                  ),
                 ),
               FilledButton(
                 onPressed: model.busy
                     ? null
                     : () async {
-                        if (!form.currentState!.validate()) return;
-                        final id = await model.save(
-                          EventDraft(
-                            title: title.text,
-                            description: description.text,
-                            startAt: start,
-                            endAt: end,
-                            venue: venue.text,
-                            capacity: int.parse(capacity.text),
-                            registrationDeadline: deadline,
-                            visibility: visibility,
-                          ),
-                        );
+                        if (!model.creationSaved &&
+                            !form.currentState!.validate()) {
+                          return;
+                        }
+                        final id = model.creationSaved
+                            ? await model.retryPoster()
+                            : await model.save(
+                                EventDraft(
+                                  title: title.text,
+                                  description: description.text,
+                                  startAt: start,
+                                  endAt: end,
+                                  venue: venue.text,
+                                  capacity: int.parse(capacity.text),
+                                  registrationDeadline: deadline,
+                                  visibility: visibility,
+                                ),
+                              );
                         if (context.mounted && id != null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -427,8 +551,26 @@ class _EventFormState extends State<_EventForm> {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
-                child: const Text('Save Draft'),
+                child: Text(
+                  model.creationSaved
+                      ? model.selectedPoster == null
+                            ? 'Open Draft'
+                            : 'Retry Upload'
+                      : 'Save Draft',
+                ),
               ),
+              if (model.creationSaved && model.selectedPoster != null)
+                TextButton(
+                  onPressed: model.busy
+                      ? null
+                      : () => context.go(
+                          AppRoutes.event(
+                            model.organizationId,
+                            model.createdDraftId!,
+                          ),
+                        ),
+                  child: const Text('Open Saved Draft'),
+                ),
               const SizedBox(height: AppSpacing.xl),
             ],
           ),
