@@ -96,7 +96,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Demo Event').last);
       await tester.pumpAndSettle();
-      expect(find.text('Attendance: Not Marked'), findsOneWidget);
+      expect(
+        find.widgetWithText(AttendanceStatusBadge, 'Not Marked'),
+        findsOneWidget,
+      );
       await tester.ensureVisible(find.text('Generate QR Pass'));
       await tester.tap(find.text('Generate QR Pass'));
       await tester.pumpAndSettle();
@@ -551,14 +554,7 @@ void main() {
       await tester.tap(find.text('QR'));
       await tester.pumpAndSettle();
       expect(find.text('QR Hub'), findsOneWidget);
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Scan QR Code'),
-            )
-            .onPressed,
-        isNull,
-      );
+      expect(find.widgetWithText(FilledButton, 'Scan QR Code'), findsNothing);
       appRouter.go(AppRoutes.qrScan);
       await tester.pumpAndSettle();
       expect(
@@ -567,13 +563,19 @@ void main() {
       );
       appRouter.go(AppRoutes.myAttendance);
       await tester.pumpAndSettle();
-      expect(find.text('Present'), findsOneWidget);
+      expect(
+        find.widgetWithText(AttendanceStatusBadge, 'Present'),
+        findsOneWidget,
+      );
       expect(repo.ownWatches.last, 'student');
       authRepo.controller.add(const AuthUser(id: 'other'));
       await tester.pump();
       profiles.controller.add(profile());
       await tester.pumpAndSettle();
-      expect(find.text('Present'), findsNothing);
+      expect(
+        find.widgetWithText(AttendanceStatusBadge, 'Present'),
+        findsNothing,
+      );
       await tester.pumpWidget(const SizedBox.shrink());
       appRouter.dispose();
       auth.dispose();

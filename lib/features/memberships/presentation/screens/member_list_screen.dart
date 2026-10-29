@@ -18,11 +18,14 @@ class MemberListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final details = context.watch<OrganizationDetailsViewModel>();
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
-          toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
           elevation: 0,
           iconTheme: const IconThemeData(color: AppColors.white),
@@ -78,7 +81,7 @@ class _MemberList extends StatelessWidget {
   const _MemberList({required this.pending, required this.organizationName});
   final bool pending;
   final String organizationName;
-  
+
   Future<void> _review(
     BuildContext context,
     MemberListViewModel model,
@@ -91,7 +94,9 @@ class _MemberList extends StatelessWidget {
       builder: (context) => AlertDialog(
         scrollable: true,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.brandMidnight),
+        titleTextStyle: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(color: AppColors.brandMidnight),
         icon: Icon(
           approve ? Icons.person_add_alt : Icons.person_remove_outlined,
           color: approve ? AppColors.brandBlue : AppColors.error,
@@ -102,7 +107,9 @@ class _MemberList extends StatelessWidget {
           children: [
             Text(
               organizationName,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.brandBlue),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: AppColors.brandBlue),
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -123,7 +130,9 @@ class _MemberList extends StatelessWidget {
           ),
           AppActionButton(
             label: decision,
-            style: approve ? AppActionStyle.primary : AppActionStyle.destructive,
+            style: approve
+                ? AppActionStyle.primary
+                : AppActionStyle.destructive,
             onPressed: () => Navigator.pop(context, true),
           ),
         ],
@@ -166,13 +175,17 @@ class _MemberList extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                     child: Text(
                       model.failure!.message,
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                 if ((members ?? []).isEmpty)
                   AppEmptyView(
                     title: pending ? 'Requests Reviewed' : 'No Members Yet',
-                    message: pending ? 'No pending requests.' : 'No active members.',
+                    message: pending
+                        ? 'No pending requests.'
+                        : 'No active members.',
                   ),
                 for (final member in members ?? <Membership>[])
                   Padding(
@@ -189,14 +202,21 @@ class _MemberList extends StatelessWidget {
                                   label: 'Approve',
                                   style: AppActionStyle.tonal,
                                   busy: model.processing.contains(member.uid),
-                                  onPressed: () => _review(context, model, member, true),
+                                  onPressed: () =>
+                                      _review(context, model, member, true),
                                 ),
                                 AppActionButton(
                                   label: 'Reject',
                                   style: AppActionStyle.outlined,
-                                  onPressed: model.processing.contains(member.uid)
+                                  onPressed:
+                                      model.processing.contains(member.uid)
                                       ? null
-                                      : () => _review(context, model, member, false),
+                                      : () => _review(
+                                          context,
+                                          model,
+                                          member,
+                                          false,
+                                        ),
                                 ),
                               ],
                             )
@@ -225,93 +245,114 @@ class MembershipMemberCard extends StatelessWidget {
   final Membership member;
   final bool pending;
   final Widget? actions;
-  
+
   @override
   Widget build(BuildContext context) => AppSurfaceCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ExcludeSemantics(
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.tonal,
-                  borderRadius: AppShape.card,
-                ),
-                child: const Icon(
-                  Icons.person_outline,
-                  color: AppColors.brandBlue,
-                ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    member.applicantName.isEmpty ? member.uid : member.applicantName,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.brandMidnight,
-                    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExcludeSemantics(
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.tonal,
+                    borderRadius: AppShape.card,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Role: ${displayIdentifier(member.role)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.muted,
-                    ),
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: AppColors.brandBlue,
                   ),
-                ],
+                ),
               ),
-            ),
-            AppStatusChip(
-              label: displayMembershipStatus(member.status),
-              tone: membershipStatusTone(member.status),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        
-        // Info Rows
-        Row(
-          children: [
-            const Icon(Icons.badge_outlined, size: 14, color: AppColors.muted),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                'Position: ${member.positionTitle ?? 'Not Assigned'}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      member.applicantName.isEmpty
+                          ? member.uid
+                          : member.applicantName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.brandMidnight,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Role: ${displayIdentifier(member.role)}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.muted),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                pending
-                    ? 'Requested: ${displayDate(member.requestedAt)}'
-                    : 'Joined: ${displayDate(member.joinedAt)}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth * 0.45,
+                ),
+                child: AppStatusChip(
+                  label: displayMembershipStatus(member.status),
+                  tone: membershipStatusTone(member.status),
+                ),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          // Info Rows
+          Row(
+            children: [
+              const Icon(
+                Icons.badge_outlined,
+                size: 14,
+                color: AppColors.muted,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Position: ${member.positionTitle ?? 'Not Assigned'}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(
+                Icons.calendar_today_outlined,
+                size: 14,
+                color: AppColors.muted,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  pending
+                      ? 'Requested: ${displayDate(member.requestedAt)}'
+                      : 'Joined: ${displayDate(member.joinedAt)}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                ),
+              ),
+            ],
+          ),
+
+          if (actions != null) ...[
+            const Divider(height: AppSpacing.xl),
+            actions!,
           ],
-        ),
-        
-        if (actions != null) ...[
-          const Divider(height: AppSpacing.xl),
-          actions!,
         ],
-      ],
+      ),
     ),
   );
 }

@@ -551,14 +551,18 @@ class LiveEventCard extends StatelessWidget {
       color: Colors.transparent,
       borderRadius: AppShape.action,
       child: InkWell(
-        onTap: () => context.push(AppRoutes.event(event.organizationId, event.id)),
+        onTap: () =>
+            context.push(AppRoutes.event(event.organizationId, event.id)),
         borderRadius: AppShape.action,
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
-            color: AppColors.error.withOpacity(0.08),
+            color: AppColors.error.withValues(alpha: 0.08),
             borderRadius: AppShape.action,
-            border: Border.all(color: AppColors.error.withOpacity(0.3), width: 1.5),
+            border: Border.all(
+              color: AppColors.error.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,7 +571,10 @@ class LiveEventCard extends StatelessWidget {
                 children: [
                   // Pulsing "Live" badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.error,
                       borderRadius: BorderRadius.circular(4),
@@ -627,17 +634,27 @@ class LiveEventCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
-                  const Icon(Icons.location_on_outlined, size: 16, color: AppColors.muted),
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 16,
+                    color: AppColors.muted,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       event.venue,
-                      style: theme.textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.muted,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_rounded, size: 18, color: AppColors.brandMidnight),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: AppColors.brandMidnight,
+                  ),
                 ],
               ),
             ],

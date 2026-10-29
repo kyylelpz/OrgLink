@@ -105,10 +105,8 @@ void main() {
       expect(find.text('No pending requests.'), findsOneWidget);
       router.go(AppRoutes.memberRoster('robotics'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Role: Member | Status: Approved (Active)'),
-        findsOneWidget,
-      );
+      expect(find.text('Role: Member'), findsOneWidget);
+      expect(find.text('Approved (Active)'), findsOneWidget);
       authRepository.controller.add(student);
       await tester.pump();
       profileRepository.controller.add(profile());

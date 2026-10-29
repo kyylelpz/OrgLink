@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
@@ -13,7 +14,7 @@ import '../widgets/organization_widgets.dart';
 class MyOrganizationsScreen extends StatelessWidget {
   const MyOrganizationsScreen({super.key, this.requestsOnly = false});
   final bool requestsOnly;
-  
+
   @override
   Widget build(BuildContext context) {
     final model = context.watch<OrganizationHubViewModel>();
@@ -26,9 +27,7 @@ class MyOrganizationsScreen extends StatelessWidget {
         // We move the nav bar down here
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            OrganizationNavigation(requestsOnly ? 2 : 1),
-          ],
+          children: [OrganizationNavigation(requestsOnly ? 2 : 1)],
         ),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,19 +57,22 @@ class MyOrganizationsScreen extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          IconButton(
-                            onPressed: () => context.pop(),
-                            icon: const Icon(Icons.arrow_back, color: AppColors.white),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
+                          const IconTheme(
+                            data: IconThemeData(color: AppColors.white),
+                            child: AppBackButton(color: AppColors.white),
                           ),
                           const SizedBox(width: AppSpacing.md),
-                          Text(
-                            requestsOnly ? 'Membership Requests' : 'My Organizations',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: AppColors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          Expanded(
+                            child: Text(
+                              requestsOnly
+                                  ? 'Membership Requests'
+                                  : 'My Organizations',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: AppColors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
                           ),
                         ],
                       ),
@@ -87,16 +89,22 @@ class MyOrganizationsScreen extends StatelessWidget {
                 builder: (records) {
                   final memberships =
                       (records ?? [])
-                          .where((member) => !requestsOnly || member.role != 'manager')
+                          .where(
+                            (member) =>
+                                !requestsOnly || member.role != 'manager',
+                          )
                           .toList()
-                        ..sort((a, b) => a.organizationId.compareTo(b.organizationId));
+                        ..sort(
+                          (a, b) =>
+                              a.organizationId.compareTo(b.organizationId),
+                        );
                   final membershipIds = memberships
                       .map((member) => member.organizationId)
                       .toSet();
                   final assignedOnly = (model.managed.value ?? [])
                       .where((org) => !membershipIds.contains(org.id))
                       .toList();
-                      
+
                   return AppPageBody(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,7 +125,9 @@ class MyOrganizationsScreen extends StatelessWidget {
                               child: const Text('Retry Managed Organizations'),
                             ),
                           if (assignedOnly.isNotEmpty)
-                            const AppSectionHeading(title: 'Organizations You Manage'),
+                            const AppSectionHeading(
+                              title: 'Organizations You Manage',
+                            ),
                           for (final org in assignedOnly)
                             OrganizationCard(
                               organization: org,
@@ -141,7 +151,8 @@ class MyOrganizationsScreen extends StatelessWidget {
                         for (final member in memberships)
                           Builder(
                             builder: (context) {
-                              final query = model.associated[member.organizationId];
+                              final query =
+                                  model.associated[member.organizationId];
                               final org = query?.value;
                               final summary =
                                   'Role: ${displayIdentifier(member.role)} | Status: ${displayMembershipStatus(member.status)}\nPosition: ${member.positionTitle ?? 'Not Assigned'}\nRequested: ${displayDate(member.requestedAt)}';
@@ -150,7 +161,9 @@ class MyOrganizationsScreen extends StatelessWidget {
                                   organization: org,
                                   subtitle: summary,
                                   status: AppStatusChip(
-                                    label: displayMembershipStatus(member.status),
+                                    label: displayMembershipStatus(
+                                      member.status,
+                                    ),
                                     tone: membershipStatusTone(member.status),
                                   ),
                                 );
@@ -160,7 +173,8 @@ class MyOrganizationsScreen extends StatelessWidget {
                                   AppRoutes.organization(member.organizationId),
                                 ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     Text(
                                       query?.loading == true
@@ -182,7 +196,9 @@ class MyOrganizationsScreen extends StatelessWidget {
                                       label: 'View Organization',
                                       style: AppActionStyle.text,
                                       onPressed: () => context.go(
-                                        AppRoutes.organization(member.organizationId),
+                                        AppRoutes.organization(
+                                          member.organizationId,
+                                        ),
                                       ),
                                     ),
                                   ],

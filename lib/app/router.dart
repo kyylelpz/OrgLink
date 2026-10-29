@@ -58,15 +58,15 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
           path: AppRoutes.accountStatus,
           builder: (_, _) => const AccountStatusScreen(),
         ),
-        // GoRoute(
-        //   path: AppRoutes.calendar,
-        //   builder: (_, _) => const ComingSoonScreen(
-        //     title: 'Calendar',
-        //     message:
-        //         'The event calendar is coming soon. Browse current events from Home.',
-        //     icon: Icons.calendar_month_outlined,
-        //   ),
-        // ),
+        GoRoute(
+          path: AppRoutes.calendar,
+          builder: (_, _) => const ComingSoonScreen(
+            title: 'Calendar',
+            message:
+                'The event calendar is coming soon. Browse current events from Home.',
+            icon: Icons.calendar_month_outlined,
+          ),
+        ),
         GoRoute(
           path: AppRoutes.notifications,
           builder: (_, _) => const ComingSoonScreen(
@@ -279,7 +279,7 @@ String? authRedirect(
       path == AppRoutes.attendanceHub ||
       path == AppRoutes.completeProfile ||
       path == AppRoutes.home ||
-      //path == AppRoutes.calendar ||
+      path == AppRoutes.calendar ||
       path == AppRoutes.notifications ||
       path == AppRoutes.events ||
       path == AppRoutes.myEvents ||

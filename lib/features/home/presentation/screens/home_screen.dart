@@ -199,21 +199,29 @@ class _DashboardState extends State<_Dashboard> {
                                   organization: org,
                                   preview: true,
                                 ),
-                              ] else ...[
+                            ] else ...[
                               // 1. HAPPENING NOW (ONGOING EVENTS)
                               if (model.ongoing.isNotEmpty) ...[
                                 CommunitySectionHeading(
                                   title: 'Happening Now',
                                   actionLabel: 'View All',
-                                  onAction: () => context.push(AppRoutes.events),
+                                  onAction: () =>
+                                      context.push(AppRoutes.events),
                                 ),
                                 for (final event in model.ongoing)
                                   Padding(
-                                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.sm,
+                                    ),
                                     child: LiveEventCard(
                                       event: event,
                                       organizationName:
-                                          model.hub.availableOrganizations[event.organizationId]?.name ?? 'Organization',
+                                          model
+                                              .hub
+                                              .availableOrganizations[event
+                                                  .organizationId]
+                                              ?.name ??
+                                          'Organization',
                                     ),
                                   ),
                                 const SizedBox(height: AppSpacing.md),
@@ -224,27 +232,37 @@ class _DashboardState extends State<_Dashboard> {
                                 CommunitySectionHeading(
                                   title: 'Featured Event',
                                   actionLabel: 'Explore',
-                                  onAction: () => context.push(AppRoutes.events),
+                                  onAction: () =>
+                                      context.push(AppRoutes.events),
                                 ),
                                 EventCard(
                                   event: upcoming.first,
                                   organizationName:
-                                      model.hub.availableOrganizations[upcoming.first.organizationId]?.name ?? 'Organization',
+                                      model
+                                          .hub
+                                          .availableOrganizations[upcoming
+                                              .first
+                                              .organizationId]
+                                          ?.name ??
+                                      'Organization',
                                   style: EventCardStyle.featured,
                                 ),
                                 const SizedBox(height: AppSpacing.sm),
                               ],
 
                               // 3. EMPTY STATE (Only show if BOTH are empty)
-                              if (upcoming.isEmpty && model.ongoing.isEmpty) ...[
+                              if (upcoming.isEmpty &&
+                                  model.ongoing.isEmpty) ...[
                                 CommunitySectionHeading(
                                   title: 'Featured Event',
                                   actionLabel: 'Explore Orgs',
-                                  onAction: () => context.push(AppRoutes.organizations),
+                                  onAction: () =>
+                                      context.push(AppRoutes.organizations),
                                 ),
                                 const AppEmptyView(
                                   title: 'No Events Right Now',
-                                  message: 'Check back later or explore organizations to get involved.',
+                                  message:
+                                      'Check back later or explore organizations to get involved.',
                                 ),
                               ],
 
@@ -253,13 +271,19 @@ class _DashboardState extends State<_Dashboard> {
                                 CommunitySectionHeading(
                                   title: 'More Events',
                                   actionLabel: 'My Events',
-                                  onAction: () => context.push(AppRoutes.myEvents),
+                                  onAction: () =>
+                                      context.push(AppRoutes.myEvents),
                                 ),
                                 for (final event in upcoming.skip(1))
                                   EventCard(
                                     event: event,
                                     organizationName:
-                                        model.hub.availableOrganizations[event.organizationId]?.name ?? 'Organization',
+                                        model
+                                            .hub
+                                            .availableOrganizations[event
+                                                .organizationId]
+                                            ?.name ??
+                                        'Organization',
                                     style: EventCardStyle.compact,
                                   ),
                               ],
@@ -284,24 +308,33 @@ class _DashboardState extends State<_Dashboard> {
                             ],
                             const SizedBox(height: AppSpacing.xl),
                             // IMPROVED ORGANIZATION MANAGEMENT
-                            if (model.hub.managementOrganizations.isNotEmpty) ...[
+                            if (model
+                                .hub
+                                .managementOrganizations
+                                .isNotEmpty) ...[
                               const AppSectionHeading(
                                 title: 'Organization Management',
                                 description: 'Tools for your organizations',
                                 prominent: true,
                               ),
                               const SizedBox(height: AppSpacing.md),
-                              for (final org in model.hub.managementOrganizations)
+                              for (final org
+                                  in model.hub.managementOrganizations)
                                 Padding(
-                                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                  padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.md,
+                                  ),
                                   child: AppSurfaceCard(
-                                    onTap: () => context.push(AppRoutes.manageEvents(org.id)),
+                                    onTap: () => context.push(
+                                      AppRoutes.manageEvents(org.id),
+                                    ),
                                     child: Row(
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.all(10),
                                           decoration: BoxDecoration(
-                                            color: AppColors.brandMidnight.withOpacity(0.05),
+                                            color: AppColors.brandMidnight
+                                                .withValues(alpha: 0.05),
                                             borderRadius: AppShape.button,
                                           ),
                                           child: const Icon(
@@ -313,29 +346,43 @@ class _DashboardState extends State<_Dashboard> {
                                         const SizedBox(width: AppSpacing.md),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 org.name,
-                                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.w700,
-                                                  color: AppColors.brandMidnight,
-                                                ),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: AppColors
+                                                          .brandMidnight,
+                                                    ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
                                                 'Manage Events',
-                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                  color: AppColors.brandBlue,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color:
+                                                          AppColors.brandBlue,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                        const Icon(Icons.chevron_right, color: AppColors.muted),
+                                        const Icon(
+                                          Icons.chevron_right,
+                                          color: AppColors.muted,
+                                        ),
                                       ],
                                     ),
                                   ),

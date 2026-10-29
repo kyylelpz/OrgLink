@@ -27,7 +27,7 @@ String verificationLabel(AttendanceRecord? record) => record == null
 class AttendanceSelectionScreen extends StatelessWidget {
   const AttendanceSelectionScreen({super.key, this.initialOrganization});
   final String? initialOrganization;
-  
+
   @override
   Widget build(BuildContext context) {
     final hub = context.watch<EventHubViewModel>(), orgs = hub.organizations;
@@ -47,7 +47,7 @@ class AttendanceSelectionScreen extends StatelessWidget {
           (org) => canManageAttendance(org, orgs.membership(org.id), orgs.uid),
         )
         .toList();
-        
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -84,13 +84,13 @@ class AttendanceSelectionScreen extends StatelessWidget {
                   prominent: true,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 if (authorized.isEmpty)
                   const AppEmptyView(
                     title: 'No Permissions',
                     message: 'You have no attendance management permissions.',
                   ),
-                  
+
                 for (final org in authorized)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -106,7 +106,9 @@ class AttendanceSelectionScreen extends StatelessWidget {
                           key: ValueKey(org.id),
                           initiallyExpanded: org.id == initialOrganization,
                           tilePadding: EdgeInsets.zero,
-                          childrenPadding: const EdgeInsets.only(top: AppSpacing.sm),
+                          childrenPadding: const EdgeInsets.only(
+                            top: AppSpacing.sm,
+                          ),
                           iconColor: AppColors.brandBlue,
                           collapsedIconColor: AppColors.muted,
                           title: Row(
@@ -114,10 +116,16 @@ class AttendanceSelectionScreen extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppColors.brandBlue.withOpacity(0.1),
+                                  color: AppColors.brandBlue.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: AppShape.button,
                                 ),
-                                child: const Icon(Icons.groups_outlined, color: AppColors.brandBlue, size: 20),
+                                child: const Icon(
+                                  Icons.groups_outlined,
+                                  color: AppColors.brandBlue,
+                                  size: 20,
+                                ),
                               ),
                               const SizedBox(width: AppSpacing.md),
                               Expanded(
@@ -239,7 +247,8 @@ class AttendanceScreen extends StatelessWidget {
     } else {
       final event = model.context.event!.value!, summary = model.summary;
       body = AppPageBody(
-        child: SingleChildScrollView( // Added scroll for smaller screens
+        child: SingleChildScrollView(
+          // Added scroll for smaller screens
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -251,32 +260,31 @@ class AttendanceScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
               AppSurfaceCard(child: EventSummary(event: event)),
-              
+
               AppSurfaceCard(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: _MetricGroup(
                   children: [
                     _MetricTile(
                       label: 'Registered',
                       value: '${summary.registered}',
                       color: AppColors.brandBlue,
                     ),
-                    Container(width: 1, height: 40, color: AppColors.border),
                     _MetricTile(
                       label: 'Present',
                       value: '${summary.present}',
                       color: AppColors.success,
                     ),
-                    Container(width: 1, height: 40, color: AppColors.border),
                     _MetricTile(
                       label: 'Attendance',
-                      value: summary.rate == null ? '—' : '${summary.rate!.toStringAsFixed(1)}%',
+                      value: summary.rate == null
+                          ? '—'
+                          : '${summary.rate!.toStringAsFixed(1)}%',
                       color: AppColors.brandMidnight,
                     ),
                   ],
                 ),
               ),
-              
+
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
@@ -300,10 +308,13 @@ class AttendanceScreen extends StatelessWidget {
                   'Normal verification cannot replace an existing result. Authorized organizers use Correct Attendance separately.',
                 ),
               if (!report && model.manualUnavailableReason != null)
-                Text(model.manualUnavailableReason!, style: const TextStyle(color: AppColors.error)),
-                
+                Text(
+                  model.manualUnavailableReason!,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+
               const SizedBox(height: AppSpacing.lg),
-              
+
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -317,14 +328,20 @@ class AttendanceScreen extends StatelessWidget {
                   OutlinedButton(
                     onPressed: () => context.go(
                       report
-                          ? AppRoutes.attendance(model.context.organizationId, event.id)
-                          : AppRoutes.attendanceReport(model.context.organizationId, event.id),
+                          ? AppRoutes.attendance(
+                              model.context.organizationId,
+                              event.id,
+                            )
+                          : AppRoutes.attendanceReport(
+                              model.context.organizationId,
+                              event.id,
+                            ),
                     ),
                     child: Text(report ? 'Verification Mode' : 'View Report'),
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: AppSpacing.lg),
               TextField(
                 decoration: InputDecoration(
@@ -359,19 +376,26 @@ class AttendanceScreen extends StatelessWidget {
                     'absent': 'Absent',
                     'notMarked': 'Not Marked',
                   }.entries)
-                    DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
                 ],
                 onChanged: (v) => model.setFilter(status: v),
               ),
-              
-              if (model.busy) const Padding(
-                padding: EdgeInsets.only(top: AppSpacing.md),
-                child: LinearProgressIndicator(),
-              ),
-              if (model.failure != null) 
+
+              if (model.busy)
+                const Padding(
+                  padding: EdgeInsets.only(top: AppSpacing.md),
+                  child: LinearProgressIndicator(),
+                ),
+              if (model.failure != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.md),
-                  child: Text(model.failure!.message, style: const TextStyle(color: AppColors.error)),
+                  child: Text(
+                    model.failure!.message,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
                 ),
               if (model.correctionMessage != null)
                 Padding(
@@ -390,14 +414,14 @@ class AttendanceScreen extends StatelessWidget {
                         : 'Attendance saved: ${attendanceLabel(model.result!.record)}.',
                   ),
                 ),
-                
+
               const SizedBox(height: AppSpacing.lg),
               if (model.participants.isEmpty)
                 const AppEmptyView(
                   title: 'No Participants Found',
                   message: 'No participants match this view.',
                 ),
-                
+
               for (final registration in model.participants)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -411,23 +435,28 @@ class AttendanceScreen extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 model.nameFor(registration.uid),
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.brandMidnight,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.brandMidnight,
+                                    ),
                               ),
                             ),
-                            AttendanceStatusBadge(model.recordFor(registration.uid)),
+                            AttendanceStatusBadge(
+                              model.recordFor(registration.uid),
+                            ),
                           ],
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           'Registration: ${displayIdentifier(registration.status)}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
                         ),
                         Text(
                           verificationLabel(model.recordFor(registration.uid)),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
                         ),
                         if (!report && model.canCorrect(registration)) ...[
                           const SizedBox(height: AppSpacing.sm),
@@ -435,18 +464,22 @@ class AttendanceScreen extends StatelessWidget {
                             onPressed: model.busy
                                 ? null
                                 : () async {
-                                    final preview = await model.previewCorrection(registration);
-                                    if (!context.mounted || preview == null || !model.canCorrect(registration)) {
+                                    final preview = await model
+                                        .previewCorrection(registration);
+                                    if (!context.mounted ||
+                                        preview == null ||
+                                        !model.canCorrect(registration)) {
                                       return;
                                     }
                                     await showDialog<void>(
                                       context: context,
                                       barrierDismissible: false,
-                                      builder: (_) => AttendanceCorrectionDialog(
-                                        model: model,
-                                        registration: registration,
-                                        preview: preview,
-                                      ),
+                                      builder: (_) =>
+                                          AttendanceCorrectionDialog(
+                                            model: model,
+                                            registration: registration,
+                                            preview: preview,
+                                          ),
                                     );
                                   },
                             icon: const Icon(Icons.edit, size: 16),
@@ -468,12 +501,18 @@ class AttendanceScreen extends StatelessWidget {
                                                 context,
                                                 'Mark ${displayIdentifier(status.name)}?',
                                                 'This attendance result is final. Confirm the participant and status before continuing.',
-                                              ) || !context.mounted) {
+                                              ) ||
+                                              !context.mounted) {
                                             return;
                                           }
-                                          await model.mark(registration, status);
+                                          await model.mark(
+                                            registration,
+                                            status,
+                                          );
                                         },
-                                  child: Text('Mark ${displayIdentifier(status.name)}'),
+                                  child: Text(
+                                    'Mark ${displayIdentifier(status.name)}',
+                                  ),
                                 ),
                             ],
                           ),
@@ -487,7 +526,7 @@ class AttendanceScreen extends StatelessWidget {
         ),
       );
     }
-    
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -547,7 +586,7 @@ class MyAttendanceScreen extends StatelessWidget {
         .where((q) => q.value?.status == AttendanceStatus.absent)
         .length;
     final pending = values.any((q) => q.loading || q.failure != null);
-    
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -584,24 +623,21 @@ class MyAttendanceScreen extends StatelessWidget {
                   prominent: true,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 if (!pending)
                   AppSurfaceCard(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    child: _MetricGroup(
                       children: [
                         _MetricTile(
                           label: 'Present',
                           value: '$present',
                           color: AppColors.success,
                         ),
-                        Container(width: 1, height: 40, color: AppColors.border),
                         _MetricTile(
                           label: 'Absent',
                           value: '$absent',
                           color: AppColors.error,
                         ),
-                        Container(width: 1, height: 40, color: AppColors.border),
                         _MetricTile(
                           label: 'Not Marked',
                           value: '${values.length - present - absent}',
@@ -610,26 +646,26 @@ class MyAttendanceScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  
+
                 if (pending)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
                     child: Text('Loading participation summary...'),
                   ),
-                  
+
                 const SizedBox(height: AppSpacing.sm),
                 const Text(
                   'Not Marked means Pending: no active attendance result. Organizer corrections update this view automatically.',
                   style: TextStyle(fontSize: 12, color: AppColors.muted),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 if ((events.mine.value ?? []).isEmpty)
                   const AppEmptyView(
                     title: 'No Events',
                     message: 'You have no event registrations.',
                   ),
-                  
+
                 for (final reg in events.mine.value ?? [])
                   Builder(
                     builder: (context) {
@@ -637,86 +673,145 @@ class MyAttendanceScreen extends StatelessWidget {
                           attendance = model.records[key],
                           query = events.registeredEvents[key],
                           event = query?.value;
-                          
+
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: AppSurfaceCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          event?.title ?? 'Event Unavailable',
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.brandMidnight,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            event?.title ?? 'Event Unavailable',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                  color:
+                                                      AppColors.brandMidnight,
+                                                ),
                                           ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            events
+                                                    .availableOrganizations[reg
+                                                        .organizationId]
+                                                    ?.name ??
+                                                'Organization Unavailable',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: AppColors.brandBlue,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (attendance?.loading == false &&
+                                        attendance?.failure == null)
+                                      ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          maxWidth: constraints.maxWidth * 0.45,
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          events.availableOrganizations[reg.organizationId]?.name ?? 'Organization Unavailable',
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: AppColors.brandBlue,
-                                            fontWeight: FontWeight.w600,
+                                        child: AttendanceStatusBadge(
+                                          attendance?.value,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Wrap(
+                                  spacing: AppSpacing.md,
+                                  runSpacing: AppSpacing.xs,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.schedule,
+                                          size: 14,
+                                          color: AppColors.muted,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            schedule(event?.startAt),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: AppColors.muted,
+                                                ),
                                           ),
                                         ),
                                       ],
                                     ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.confirmation_num_outlined,
+                                          size: 14,
+                                          color: AppColors.muted,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            displayIdentifier(reg.status),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: AppColors.muted,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+
+                                if (query?.loading == true ||
+                                    attendance?.loading == true)
+                                  const Padding(
+                                    padding: EdgeInsets.only(
+                                      top: AppSpacing.sm,
+                                    ),
+                                    child: LinearProgressIndicator(),
                                   ),
-                                  if (attendance?.loading == false && attendance?.failure == null)
-                                    AttendanceStatusBadge(attendance?.value),
-                                ],
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Row(
-                                children: [
-                                  const Icon(Icons.schedule, size: 14, color: AppColors.muted),
-                                  const SizedBox(width: 4),
+                                if (query?.failure != null)
+                                  TextButton(
+                                    onPressed: query!.retry,
+                                    child: const Text('Retry Event Details'),
+                                  ),
+                                if (attendance?.failure != null)
+                                  AppErrorView(
+                                    message: attendance!.failure!.message,
+                                    onRetry: attendance.retry,
+                                  )
+                                else if (attendance?.value != null) ...[
+                                  const Divider(height: AppSpacing.xl),
                                   Text(
-                                    schedule(event?.startAt),
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                                  ),
-                                  const SizedBox(width: AppSpacing.md),
-                                  const Icon(Icons.confirmation_num_outlined, size: 14, color: AppColors.muted),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    displayIdentifier(reg.status),
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                                    verificationLabel(attendance?.value),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: AppColors.brandMidnight,
+                                        ),
                                   ),
                                 ],
-                              ),
-                              
-                              if (query?.loading == true || attendance?.loading == true)
-                                const Padding(
-                                  padding: EdgeInsets.only(top: AppSpacing.sm),
-                                  child: LinearProgressIndicator(),
-                                ),
-                              if (query?.failure != null)
-                                TextButton(
-                                  onPressed: query!.retry,
-                                  child: const Text('Retry Event Details'),
-                                ),
-                              if (attendance?.failure != null)
-                                AppErrorView(
-                                  message: attendance!.failure!.message,
-                                  onRetry: attendance.retry,
-                                )
-                              else if (attendance?.value != null) ...[
-                                const Divider(height: AppSpacing.xl),
-                                Text(
-                                  verificationLabel(attendance?.value),
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.brandMidnight,
-                                  ),
-                                ),
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       );
@@ -731,8 +826,41 @@ class MyAttendanceScreen extends StatelessWidget {
   }
 }
 
+/// Preserve the approved three-column summary; stack only when enlarged text needs room.
+class _MetricGroup extends StatelessWidget {
+  const _MetricGroup({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+      return Column(
+        children: [
+          for (final entry in children.indexed) ...[
+            if (entry.$1 > 0) const SizedBox(height: AppSpacing.lg),
+            entry.$2,
+          ],
+        ],
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        for (final entry in children.indexed) ...[
+          if (entry.$1 > 0)
+            Container(width: 1, height: 40, color: AppColors.border),
+          Expanded(child: entry.$2),
+        ],
+      ],
+    );
+  }
+}
+
 class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.label, required this.value, required this.color});
+  const _MetricTile({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   final String label, value;
   final Color color;
 
@@ -743,17 +871,17 @@ class _MetricTile extends StatelessWidget {
         Text(
           value,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w800,
-              ),
+            color: color,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.muted,
-                fontWeight: FontWeight.w600,
-              ),
+            color: AppColors.muted,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );

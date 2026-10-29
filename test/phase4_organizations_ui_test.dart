@@ -149,9 +149,13 @@ void main() {
                 '${route.$1}-${width.toInt()}-${scale.toInt()}x',
               );
             }
-            final scrollables = find.byType(Scrollable);
+            final scrollables = find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            );
             if (scrollables.evaluate().isNotEmpty) {
-              await tester.drag(scrollables.last, const Offset(0, -1600));
+              await tester.drag(scrollables.first, const Offset(0, -1600));
               await tester.pumpAndSettle();
               expect(
                 tester.takeException(),
@@ -298,6 +302,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byIcon(Icons.groups_outlined), findsOneWidget);
       expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'direct membership pages use safe Back without a pushed navigator entry',
+    (tester) async {
+      final app = OrganizationApp();
+      addTearDown(() => app.close(tester));
+      await app.mount(tester);
+      app.accounts.controller.add(student);
+      await tester.pump();
+      app.profiles.controller.add(profile());
+      await tester.pumpAndSettle();
+      for (final path in [
+        AppRoutes.myOrganizations,
+        AppRoutes.membershipRequests,
+      ]) {
+        app.router.go(path);
+        await tester.pumpAndSettle();
+        expect(app.router.canPop(), isFalse);
+        final back = find.byTooltip('Back');
+        expect(tester.getSize(back).shortestSide, greaterThanOrEqualTo(48));
+        expect(
+          tester
+              .widget<Icon>(
+                find.descendant(
+                  of: back,
+                  matching: find.byIcon(Icons.arrow_back),
+                ),
+              )
+              .color,
+          Colors.white,
+        );
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(
+          app.router.routeInformationProvider.value.uri.path,
+          AppRoutes.home,
+        );
+        expect(tester.takeException(), isNull);
+      }
     },
   );
 }

@@ -51,10 +51,14 @@ class QRLandingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final hub = context.watch<EventHubViewModel>();
     final orgs = hub.organizations;
-    
+
     // Instantly check if they manage any org
-    final isManager = orgs.managed.value?.isNotEmpty == true || 
-                      orgs.mine.value?.any((m) => m.role == 'officer' || m.role == 'manager') == true;
+    final isManager =
+        orgs.managed.value?.isNotEmpty == true ||
+        orgs.mine.value?.any(
+              (m) => m.role == 'officer' || m.role == 'manager',
+            ) ==
+            true;
 
     // If they are a manager, take them straight to the camera
     if (isManager) {
@@ -82,7 +86,7 @@ class QRHubScreen extends StatelessWidget {
     final permissions = attendanceOrganizations(hub);
     final orgs = hub.organizations;
     final name = context.watch<AuthViewModel?>()?.profile?.details.fullName;
-    
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -108,7 +112,8 @@ class QRHubScreen extends StatelessWidget {
           title: const Text('QR Hub'),
         ),
         body: AppPageBody(
-          child: SingleChildScrollView( // Added scroll for smaller screens
+          child: SingleChildScrollView(
+            // Added scroll for smaller screens
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -131,17 +136,15 @@ class QRHubScreen extends StatelessWidget {
                       if (name?.isNotEmpty == true) ...[
                         Text(
                           name!,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleLarge?.copyWith(color: AppColors.white),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(color: AppColors.white),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                       ],
                       Text(
                         'Your registered events, ready to go.',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleMedium?.copyWith(color: AppColors.white),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppColors.white),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       const AppAssetIcon(
@@ -152,10 +155,11 @@ class QRHubScreen extends StatelessWidget {
                       const SizedBox(height: AppSpacing.lg),
                       Text(
                         "Show up.\nWe'll take it from here.",
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.white,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.white,
+                            ),
                       ),
                     ],
                   ),
@@ -178,16 +182,17 @@ class QRHubScreen extends StatelessWidget {
                     minimumSize: const Size(double.infinity, 48),
                   ),
                 ),
-                
+
                 // --- ORGANIZER TOOLS ---
                 if (permissions.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.lg),
                   const AppSectionHeading(title: 'Organizer Tools'),
                   const SizedBox(height: AppSpacing.sm),
-                  
+
                   // Primary: Scan QR Code
                   FilledButton.tonalIcon(
-                    onPressed: !attendancePermissionsReady(hub) || permissions.isEmpty
+                    onPressed:
+                        !attendancePermissionsReady(hub) || permissions.isEmpty
                         ? null
                         : () => context.go(AppRoutes.qrScan),
                     icon: const Icon(Icons.qr_code_scanner),
@@ -196,21 +201,26 @@ class QRHubScreen extends StatelessWidget {
                       minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
-                  
+
                   const SizedBox(height: AppSpacing.sm),
-                  
+
                   // Secondary: Attendance Management (Now colored!)
                   FilledButton.tonalIcon(
                     onPressed: () => context.go(AppRoutes.attendanceHub),
-                    icon: const Icon(Icons.analytics_outlined, color: AppColors.success),
+                    icon: const Icon(
+                      Icons.analytics_outlined,
+                      color: AppColors.success,
+                    ),
                     label: const Text('Attendance Management'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.success.withOpacity(0.15), // Soft green
+                      backgroundColor: AppColors.success.withValues(
+                        alpha: 0.15,
+                      ), // Soft green
                       foregroundColor: AppColors.success, // Green text
                       minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
-                  
+
                   if (orgs.mine.loading ||
                       orgs.managed.loading ||
                       orgs.associated.values.any((q) => q.loading))
@@ -240,7 +250,7 @@ class QRHubScreen extends StatelessWidget {
 
 class MyQRCodeScreen extends StatelessWidget {
   const MyQRCodeScreen({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     final model = context.watch<MyAttendanceViewModel>(), hub = model.events;
@@ -250,8 +260,7 @@ class MyQRCodeScreen extends StatelessWidget {
     final selected = model.selected;
     final event = hub.registeredEvents[selected]?.value;
     final record = model.records[selected];
-    final name = context.watch<AuthViewModel?>()?.profile?.details.fullName;
-    
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -293,11 +302,9 @@ class MyQRCodeScreen extends StatelessWidget {
                 prominent: true,
               ),
               const SizedBox(height: AppSpacing.sm),
-              const Text(
-                'Select a registered event.',
-              ),
+              const Text('Select a registered event.'),
               const SizedBox(height: AppSpacing.lg),
-              
+
               // Selector
               if (hub.mine.loading) const LinearProgressIndicator(),
               if (hub.mine.failure != null)
@@ -307,13 +314,14 @@ class MyQRCodeScreen extends StatelessWidget {
                 ),
               if (!hub.mine.loading && eligible.isEmpty)
                 const Text('You have no active event registrations.'),
-              
+
               if (eligible.isNotEmpty)
                 DropdownButtonFormField<String>(
                   key: ValueKey(selected),
-                  initialValue: eligible.any(
-                    (r) => '${r.organizationId}/${r.eventId}' == selected,
-                  )
+                  initialValue:
+                      eligible.any(
+                        (r) => '${r.organizationId}/${r.eventId}' == selected,
+                      )
                       ? selected
                       : null,
                   isExpanded: true,
@@ -326,7 +334,8 @@ class MyQRCodeScreen extends StatelessWidget {
                       DropdownMenuItem(
                         value: '${r.organizationId}/${r.eventId}',
                         child: Text(
-                          hub.registeredEvents['${r.organizationId}/${r.eventId}']
+                          hub
+                                  .registeredEvents['${r.organizationId}/${r.eventId}']
                                   ?.value
                                   ?.title ??
                               'Event details unavailable',
@@ -336,7 +345,7 @@ class MyQRCodeScreen extends StatelessWidget {
                   ],
                   onChanged: model.busy ? null : model.select,
                 ),
-                
+
               const SizedBox(height: AppSpacing.lg),
 
               // Premium Event Card
@@ -350,30 +359,39 @@ class MyQRCodeScreen extends StatelessWidget {
                         EventSummary(event: event),
                         const Divider(height: AppSpacing.xl),
                       ],
-                      
+
                       // Details
                       Text(
-                        hub.availableOrganizations[selected.split('/')[0]]?.name ?? 'Organization Unavailable',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.brandBlue,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        hub
+                                .availableOrganizations[selected.split('/')[0]]
+                                ?.name ??
+                            'Organization Unavailable',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: AppColors.brandBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Row(
                         children: [
-                          const Icon(Icons.schedule, size: 14, color: AppColors.muted),
+                          const Icon(
+                            Icons.schedule,
+                            size: 14,
+                            color: AppColors.muted,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               '${schedule(event?.startAt)} - ${schedule(event?.endAt)}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.muted),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      
+
                       // Status Chips
                       Wrap(
                         spacing: AppSpacing.sm,
@@ -383,7 +401,8 @@ class MyQRCodeScreen extends StatelessWidget {
                             label: 'Registered',
                             tone: AppStatusTone.success,
                           ),
-                          if (record?.loading == false && record?.failure == null)
+                          if (record?.loading == false &&
+                              record?.failure == null)
                             AttendanceStatusBadge(record?.value),
                         ],
                       ),
@@ -404,9 +423,9 @@ class MyQRCodeScreen extends StatelessWidget {
                           message: record!.failure!.message,
                           onRetry: record.retry,
                         ),
-                        
+
                       const SizedBox(height: AppSpacing.lg),
-                      
+
                       // QR Generation Area
                       if (record?.value != null) ...[
                         const Center(
@@ -428,14 +447,17 @@ class MyQRCodeScreen extends StatelessWidget {
                         // ],
                         if (model.windowMessage != null)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.md,
+                            ),
                             child: Text(
                               model.windowMessage!,
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: AppColors.error),
                             ),
                           ),
-                        if (model.credential != null && model.secondsRemaining > 0)
+                        if (model.credential != null &&
+                            model.secondsRemaining > 0)
                           LayoutBuilder(
                             builder: (context, constraints) => Center(
                               child: Container(
@@ -456,7 +478,9 @@ class MyQRCodeScreen extends StatelessWidget {
                           ),
                         if (model.credential != null)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm,
+                            ),
                             child: Text(
                               model.secondsRemaining > 0
                                   ? 'Expires in ${model.secondsRemaining} seconds. The server determines validity.'
@@ -485,7 +509,7 @@ class MyQRCodeScreen extends StatelessWidget {
               ),
               if (model.busy) const LinearProgressIndicator(),
               if (model.failure != null) Text(model.failure!.message),
-              
+
               const SizedBox(height: AppSpacing.md),
               FilledButton.tonalIcon(
                 onPressed: () => context.go(AppRoutes.myAttendance),
@@ -834,7 +858,7 @@ class _CameraScannerState extends State<_CameraScanner>
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.brandMidnight.withOpacity(0.05),
+                        color: AppColors.brandMidnight.withValues(alpha: 0.05),
                         borderRadius: AppShape.button,
                       ),
                       child: const Icon(
@@ -858,7 +882,7 @@ class _CameraScannerState extends State<_CameraScanner>
                   ],
                 ),
               ),
-              
+
               // OPTIMIZED MORE QR ACTIONS
               const SizedBox(height: AppSpacing.xl),
               Padding(
@@ -869,12 +893,12 @@ class _CameraScannerState extends State<_CameraScanner>
                     Text(
                       'More QR Actions',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    
+
                     // Action 1: My QR Code
                     AppSurfaceCard(
                       onTap: () => context.push(AppRoutes.myQRCode),
@@ -883,24 +907,34 @@ class _CameraScannerState extends State<_CameraScanner>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppColors.brandBlue.withOpacity(0.1),
+                              color: AppColors.brandBlue.withValues(alpha: 0.1),
                               borderRadius: AppShape.button,
                             ),
-                            child: const Icon(Icons.qr_code, color: AppColors.brandBlue, size: 20),
+                            child: const Icon(
+                              Icons.qr_code,
+                              color: AppColors.brandBlue,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.md),
                           const Expanded(
                             child: Text(
                               'My QR Code',
-                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
                             ),
                           ),
-                          const Icon(Icons.chevron_right, color: AppColors.muted),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.muted,
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    
+
                     // Action 2: My Attendance
                     AppSurfaceCard(
                       onTap: () => context.push(AppRoutes.myAttendance),
@@ -909,24 +943,34 @@ class _CameraScannerState extends State<_CameraScanner>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppColors.success.withOpacity(0.1),
+                              color: AppColors.success.withValues(alpha: 0.1),
                               borderRadius: AppShape.button,
                             ),
-                            child: const Icon(Icons.fact_check_outlined, color: AppColors.success, size: 20),
+                            child: const Icon(
+                              Icons.fact_check_outlined,
+                              color: AppColors.success,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.md),
                           const Expanded(
                             child: Text(
                               'My Attendance',
-                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
                             ),
                           ),
-                          const Icon(Icons.chevron_right, color: AppColors.muted),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.muted,
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    
+
                     // Action 3: QR Hub Actions
                     AppSurfaceCard(
                       onTap: () => context.go(AppRoutes.qrActions),
@@ -938,16 +982,26 @@ class _CameraScannerState extends State<_CameraScanner>
                               color: AppColors.tonal,
                               borderRadius: AppShape.button,
                             ),
-                            child: const Icon(Icons.search, color: AppColors.brandMidnight, size: 20),
+                            child: const Icon(
+                              Icons.search,
+                              color: AppColors.brandMidnight,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.md),
                           const Expanded(
                             child: Text(
                               'QR Hub Actions',
-                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
                             ),
                           ),
-                          const Icon(Icons.chevron_right, color: AppColors.muted),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.muted,
+                          ),
                         ],
                       ),
                     ),

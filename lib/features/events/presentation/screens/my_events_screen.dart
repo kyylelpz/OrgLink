@@ -20,17 +20,20 @@ class MyEventsScreen extends StatefulWidget {
 
 class _MyEventsScreenState extends State<MyEventsScreen> {
   String filter = 'All';
-  
+
   @override
   Widget build(BuildContext context) {
     final model = context.watch<EventHubViewModel>();
-    
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
-          toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
           elevation: 0,
           iconTheme: const IconThemeData(color: AppColors.white),
@@ -49,7 +52,10 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         bottomNavigationBar: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.sm,
+            ),
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -57,7 +63,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                 borderRadius: BorderRadius.circular(100),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.brandMidnight.withOpacity(0.05),
+                    color: AppColors.brandMidnight.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, -4),
                   ),
@@ -108,7 +114,12 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                     ),
                   ),
                   items: [
-                    for (final value in ['All', 'Upcoming', 'Past', 'Cancelled'])
+                    for (final value in [
+                      'All',
+                      'Upcoming',
+                      'Past',
+                      'Cancelled',
+                    ])
                       DropdownMenuItem(value: value, child: Text(value)),
                   ],
                   onChanged: (value) => setState(() => filter = value!),
@@ -127,7 +138,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                               event?.eventStatus == 'cancelled',
                         'Upcoming' =>
                           event?.startAt?.isAfter(DateTime.now()) == true,
-                        'Past' => event?.endAt?.isBefore(DateTime.now()) == true,
+                        'Past' =>
+                          event?.endAt?.isBefore(DateTime.now()) == true,
                         _ => true,
                       };
                     }).toList();
@@ -143,23 +155,31 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                         for (final record in matching)
                           Builder(
                             builder: (context) {
-                              final key = '${record.organizationId}/${record.eventId}',
+                              final key =
+                                      '${record.organizationId}/${record.eventId}',
                                   lookup = model.registeredEvents[key];
                               final event = lookup?.value;
                               if (event != null) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                  padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.md,
+                                  ),
                                   child: EventCard(
                                     event: event,
                                     organizationName:
-                                        model.availableOrganizations[event.organizationId]?.name ??
-                                            'Organization',
+                                        model
+                                            .availableOrganizations[event
+                                                .organizationId]
+                                            ?.name ??
+                                        'Organization',
                                     registrationStatus: record.status,
                                   ),
                                 );
                               }
                               return Padding(
-                                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.md,
+                                ),
                                 child: Card(
                                   child: Column(
                                     children: [
@@ -189,7 +209,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                       if (record.status == 'registered' &&
                                           lookup?.loading == false)
                                         TextButton(
-                                          onPressed: model.withdrawing.contains(key)
+                                          onPressed:
+                                              model.withdrawing.contains(key)
                                               ? null
                                               : () async {
                                                   if (!await confirmEventAction(
@@ -200,21 +221,28 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                                                       !context.mounted) {
                                                     return;
                                                   }
-                                                  final success = await model.withdraw(record);
+                                                  final success = await model
+                                                      .withdraw(record);
                                                   if (context.mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
                                                       SnackBar(
                                                         content: Text(
                                                           success
                                                               ? 'Registration withdrawn.'
-                                                              : model.actionFailure?.message ??
+                                                              : model
+                                                                        .actionFailure
+                                                                        ?.message ??
                                                                     'Withdrawal failed.',
                                                         ),
                                                       ),
                                                     );
                                                   }
                                                 },
-                                          child: const Text('Withdraw Registration'),
+                                          child: const Text(
+                                            'Withdraw Registration',
+                                          ),
                                         ),
                                     ],
                                   ),

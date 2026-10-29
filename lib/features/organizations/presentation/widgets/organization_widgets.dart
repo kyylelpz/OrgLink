@@ -215,13 +215,15 @@ class OrganizationNavigation extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F9), 
+        color: const Color(0xFFF3F4F9),
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(24), // Rounded top corners
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.brandMidnight.withOpacity(0.05), // Subtle shadow to lift it up
+            color: AppColors.brandMidnight.withValues(
+              alpha: 0.05,
+            ), // Subtle shadow to lift it up
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),

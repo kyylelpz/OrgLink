@@ -23,11 +23,14 @@ class EventDiscoveryScreen extends StatelessWidget {
         model.catalog.values.any((query) => query.loading);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
-          toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
           elevation: 0,
           iconTheme: const IconThemeData(color: AppColors.white),
@@ -68,7 +71,10 @@ class EventDiscoveryScreen extends StatelessWidget {
                     context.go(AppRoutes.manageEvents(id));
                   }
                 },
-                child: const Text('Manage', style: TextStyle(color: AppColors.white)),
+                child: const Text(
+                  'Manage',
+                  style: TextStyle(color: AppColors.white),
+                ),
               ),
           ],
         ),
@@ -76,7 +82,10 @@ class EventDiscoveryScreen extends StatelessWidget {
         bottomNavigationBar: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.sm,
+            ),
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -84,7 +93,7 @@ class EventDiscoveryScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(100),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.brandMidnight.withOpacity(0.05),
+                    color: AppColors.brandMidnight.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, -4),
                   ),

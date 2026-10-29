@@ -35,11 +35,12 @@ class AppBackScope extends InheritedWidget {
 }
 
 class AppBackButton extends StatelessWidget {
-  const AppBackButton({super.key});
+  const AppBackButton({super.key, this.color});
+  final Color? color;
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: 'Back',
-    icon: const Icon(Icons.arrow_back),
+    icon: Icon(Icons.arrow_back, color: color),
     onPressed: () async {
       final scope = context.getInheritedWidgetOfExactType<AppBackScope>();
       if (scope != null) {

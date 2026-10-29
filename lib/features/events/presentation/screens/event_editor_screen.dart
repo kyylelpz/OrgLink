@@ -18,11 +18,14 @@ class EventEditorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = context.watch<EventContextViewModel>();
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
-          toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
+          toolbarHeight:
+              56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
           elevation: 0,
           iconTheme: const IconThemeData(color: AppColors.white),
@@ -76,16 +79,22 @@ class _EventFormState extends State<_EventForm> {
     if (seeded) return;
     final model = context.read<EventContextViewModel>(),
         draft = context.read<EventContextViewModel>().event?.value?.draft;
-    start = draft?.startAt.toLocal() ?? DateTime.now().add(const Duration(days: 1));
+    start =
+        draft?.startAt.toLocal() ?? DateTime.now().add(const Duration(days: 1));
     end = draft?.endAt.toLocal() ?? start.add(const Duration(hours: 2));
-    deadline = draft?.registrationDeadline.toLocal() ?? start.subtract(const Duration(hours: 1));
+    deadline =
+        draft?.registrationDeadline.toLocal() ??
+        start.subtract(const Duration(hours: 1));
     title.text = draft?.title ?? '';
     description.text = draft?.description ?? '';
     venue.text = draft?.venue ?? '';
     capacity.text = '${draft?.capacity ?? 50}';
     poster.text = draft?.posterURL ?? '';
-    visibility = draft?.visibility ??
-        (model.organization.value?.visibility == 'private' ? 'private' : 'public');
+    visibility =
+        draft?.visibility ??
+        (model.organization.value?.visibility == 'private'
+            ? 'private'
+            : 'public');
     seeded = true;
   }
 
@@ -148,15 +157,24 @@ class _EventFormState extends State<_EventForm> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(schedule(value), style: const TextStyle(fontWeight: FontWeight.w500)),
-              const Icon(Icons.calendar_today, size: 18, color: AppColors.muted),
+              Expanded(
+                child: Text(
+                  schedule(value),
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+              const Icon(
+                Icons.calendar_today,
+                size: 18,
+                color: AppColors.muted,
+              ),
             ],
           ),
         ),
       ),
     ),
   );
-  
+
   @override
   Widget build(BuildContext context) {
     final model = context.watch<EventContextViewModel>();
@@ -182,7 +200,7 @@ class _EventFormState extends State<_EventForm> {
                 style: TextStyle(fontSize: 12, color: AppColors.muted),
               ),
               const SizedBox(height: AppSpacing.lg),
-              
+
               // EVENT DETAILS CARD
               AppSurfaceCard(
                 child: Column(
@@ -206,7 +224,10 @@ class _EventFormState extends State<_EventForm> {
                       ),
                       validator: (value) => EventDraft.requiredText(value),
                     ),
-                    CapitalizationSuggestion(controller: title, enabled: !model.busy),
+                    CapitalizationSuggestion(
+                      controller: title,
+                      enabled: !model.busy,
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: description,
@@ -222,7 +243,8 @@ class _EventFormState extends State<_EventForm> {
                           borderSide: BorderSide.none,
                         ),
                       ),
-                      validator: (value) => EventDraft.requiredText(value, maximum: 5000),
+                      validator: (value) =>
+                          EventDraft.requiredText(value, maximum: 5000),
                     ),
                   ],
                 ),
@@ -318,8 +340,14 @@ class _EventFormState extends State<_EventForm> {
                       ),
                       items: [
                         if (model.organization.value!.visibility == 'public')
-                          const DropdownMenuItem(value: 'public', child: Text('Public')),
-                        const DropdownMenuItem(value: 'private', child: Text('Members Only')),
+                          const DropdownMenuItem(
+                            value: 'public',
+                            child: Text('Public'),
+                          ),
+                        const DropdownMenuItem(
+                          value: 'private',
+                          child: Text('Members Only'),
+                        ),
                       ],
                       onChanged: model.busy
                           ? null
@@ -350,7 +378,7 @@ class _EventFormState extends State<_EventForm> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              
+
               if (model.event?.value != null) ...[
                 const AppSectionHeading(title: 'Current Poster'),
                 const SizedBox(height: AppSpacing.md),
@@ -360,7 +388,7 @@ class _EventFormState extends State<_EventForm> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
-              
+
               if (model.failure != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -369,7 +397,11 @@ class _EventFormState extends State<_EventForm> {
                     style: const TextStyle(color: AppColors.error),
                   ),
                 ),
-              if (model.busy) const Padding(padding: EdgeInsets.only(bottom: AppSpacing.md), child: LinearProgressIndicator()),
+              if (model.busy)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: AppSpacing.md),
+                  child: LinearProgressIndicator(),
+                ),
               FilledButton(
                 onPressed: model.busy
                     ? null
@@ -399,7 +431,9 @@ class _EventFormState extends State<_EventForm> {
                           context.go(AppRoutes.event(model.organizationId, id));
                         }
                       },
-                style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
                 child: const Text('Save Draft'),
               ),
               const SizedBox(height: AppSpacing.xl),
