@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AppLogoVariant { symbol, onMidnight, onLight }
+enum AppLogoVariant { symbol, onMidnight, onLight, main }
 
 /// Original official artwork, including its safe space and embedded backgrounds.
 /// The symbol has transparency; the two wordmarks have opaque square canvases.
@@ -18,6 +18,7 @@ class AppLogo extends StatelessWidget {
     AppLogoVariant.symbol => 'assets/icons/3.png',
     AppLogoVariant.onMidnight => 'assets/icons/1.png',
     AppLogoVariant.onLight => 'assets/icons/2.png',
+    AppLogoVariant.main => 'assets/icons/orglink_icon.png',
   };
 
   @override
