@@ -246,7 +246,7 @@ class _EventFormState extends State<_EventForm> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // Poster and details share the event information card.
+              // POSTER CARD (separate)
               AppSurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -336,7 +336,16 @@ class _EventFormState extends State<_EventForm> {
                       if (model.posterMessage != null)
                         Text(model.posterMessage!),
                     ],
-                    const SizedBox(height: AppSpacing.md),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // DETAILS CARD (separate)
+              AppSurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     const AppSectionHeading(title: 'Event Details'),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(

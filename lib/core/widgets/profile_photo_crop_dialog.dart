@@ -270,26 +270,6 @@ class _ProfilePhotoCropDialogState extends State<ProfilePhotoCropDialog> {
                 height: viewport / widget.aspectRatio,
                 child: _preview(context, viewport),
               ),
-              if (widget.secondaryAspectRatio case final ratio?) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Home Preview',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                SizedBox(
-                  width: viewport,
-                  height: viewport / ratio,
-                  child: _image == null || _crop == null
-                      ? const SizedBox.shrink()
-                      : CustomPaint(
-                          key: const ValueKey('event-poster-home-preview'),
-                          painter: _CropCoverPreview(
-                            _image!,
-                            _crop!.sourceRect,
-                          ),
-                        ),
-                ),
-              ],
               if (_busy) const LinearProgressIndicator(),
               if (_error != null)
                 Padding(
