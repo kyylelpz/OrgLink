@@ -1,5 +1,7 @@
 # Figma Migration — Phase 3
 
+> Historical migration snapshot. Current behavior and test evidence are documented in [UI/UX baseline](ui-ux-design.md) and [current QA](current-version-qa-audit.md); this file is not a current feature or deployment inventory.
+
 Completed 28 October 2026. Authentication and Profile only; Phase 4 not started.
 The user's removal of Home's Your Activity section remains intact. Sign-out and
 participation/community links are available in the authenticated Profile view.

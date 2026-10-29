@@ -140,10 +140,10 @@ class OrgLinkNavigationBar extends StatelessWidget {
   });
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
-  
+
   // Changed 'Calendar' to 'Events'
   static const labels = ['Home', 'Events', 'QR', 'Organizations', 'Profile'];
-  
+
   // Changed 'calendar' to 'calendar' (reusing the same icon, or change to 'event' if you have it)
   static const _icons = ['home', 'calendar', 'qr', 'organizations', 'profile'];
 

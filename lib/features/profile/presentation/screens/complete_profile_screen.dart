@@ -286,15 +286,19 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     for (final college in AcademicOptions.colleges)
                       DropdownMenuItem(
                         value: college,
-                        child: Text(college, overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          college,
+                          style: const TextStyle(fontWeight: FontWeight.normal), // 👈 like year level
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   onChanged: busy
                       ? null
                       : (value) => setState(() {
-                          _college = value;
-                          _program = null;
-                        }),
+                            _college = value;
+                            _program = null;
+                          }),
                   validator: AcademicOptions.validateCollege,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -307,27 +311,29 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     itemHeight: null,
                     decoration: const InputDecoration(labelText: 'Program'),
                     selectedItemBuilder: (context) => [
-                      for (final program in AcademicOptions.programsFor(
-                        _college,
-                      ))
-                        Text(program, overflow: TextOverflow.ellipsis),
+                      for (final program in AcademicOptions.programsFor(_college))
+                        Text(
+                          program,
+                          style: const TextStyle(fontWeight: FontWeight.normal), // 👈
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                     items: [
-                      for (final program in AcademicOptions.programsFor(
-                        _college,
-                      ))
+                      for (final program in AcademicOptions.programsFor(_college))
                         DropdownMenuItem(
                           value: program,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             child: Row(
                               children: [
-                                Expanded(child: Text(program)),
-                                if (_program == program)
-                                  const Icon(
-                                    Icons.check,
-                                    color: AppColors.brandBlue,
+                                Expanded(
+                                  child: Text(
+                                    program,
+                                    style: const TextStyle(fontWeight: FontWeight.normal), // 👈
                                   ),
+                                ),
+                                if (_program == program)
+                                  const Icon(Icons.check, color: AppColors.brandBlue),
                               ],
                             ),
                           ),
@@ -336,8 +342,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     onChanged: busy || _college == null
                         ? null
                         : (value) => setState(() => _program = value),
-                    validator: (value) =>
-                        AcademicOptions.validateProgram(_college, value),
+                    validator: (value) => AcademicOptions.validateProgram(_college, value),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),

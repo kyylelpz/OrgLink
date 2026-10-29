@@ -1,5 +1,7 @@
 # Figma Migration — Phase 1
 
+> Historical migration snapshot. Current behavior and test evidence are documented in [UI/UX baseline](ui-ux-design.md) and [current QA](current-version-qa-audit.md); this file is not a current feature or deployment inventory.
+
 The finalized [OrgLink Figma design](https://www.figma.com/design/9IIlHz8p1lc4aBAfep5UqH/OrgLink-Wireframes)
 supersedes earlier visual choices in `ui-ux-design.md`: use Inter and primary
 blue #152D97. Earlier implementation records are historical.

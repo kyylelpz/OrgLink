@@ -133,7 +133,9 @@ void main() {
       await tester.pumpAndSettle();
       final field = find.widgetWithText(TextFormField, 'Student ID');
       expect(field, findsOneWidget);
-      final widget = tester.widget<TextField>(find.descendant(of:field,matching:find.byType(TextField)));
+      final widget = tester.widget<TextField>(
+        find.descendant(of: field, matching: find.byType(TextField)),
+      );
       expect(widget.maxLength, 10);
       expect(
         tester
