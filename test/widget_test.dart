@@ -54,7 +54,10 @@ void main() {
       await tester.ensureVisible(find.text('Save Student Profile'));
       await tester.tap(find.text('Save Student Profile'));
       await tester.pumpAndSettle();
-      expect(find.text('Enter exactly 10 numeric digits (e.g. 2026000001).'), findsOneWidget);
+      expect(
+        find.text('Enter exactly 10 numeric digits (e.g. 2026000001).'),
+        findsOneWidget,
+      );
       expect(find.text('Select a year level.'), findsOneWidget);
       expect(find.text('Select a college.'), findsOneWidget);
       expect(find.text('Select a program.'), findsOneWidget);

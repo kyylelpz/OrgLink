@@ -1,5 +1,7 @@
 # Phase 4 — Organizations and Memberships
 
+> Historical migration snapshot. Current behavior and test evidence are documented in [UI/UX baseline](ui-ux-design.md) and [current QA](current-version-qa-audit.md); this file is not a current feature or deployment inventory.
+
 Completed: October 28, 2026. Presentation only; Phase 5 has not started.
 
 ## Design references

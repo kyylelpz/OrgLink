@@ -129,8 +129,8 @@ void main() {
             .toList();
         expect(slots.map((image) => image.height), [184, 184, 174]);
         expect(slots.map((image) => image.fit), [
-          BoxFit.contain,
-          BoxFit.contain,
+          BoxFit.cover,
+          BoxFit.cover,
           BoxFit.cover,
         ]);
         final detailsWidth = tester
@@ -168,7 +168,7 @@ void main() {
     },
   );
   testWidgets(
-    'landscape dialog supports pinch, drag, Reset and matching Home center trim',
+    'landscape dialog supports pinch, drag and Reset without a Home preview',
     (tester) async {
       final bytes = (await tester.runAsync(gradientImage))!;
       await tester.pumpWidget(
@@ -213,22 +213,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.getSize(raw), initialSize);
       expect(tester.getTopLeft(raw), initialOffset);
-      final painter = tester
-          .widget<CustomPaint>(
-            find.byKey(const ValueKey('event-poster-home-preview')),
-          )
-          .painter!;
-      await tester.runAsync(() async {
-        final recorder = ui.PictureRecorder();
-        painter.paint(ui.Canvas(recorder), const Size(100, 25));
-        final picture = recorder.endRecording();
-        final image = await picture.toImage(100, 25);
-        final pixels = (await image.toByteData())!.buffer.asUint8List();
-        // Main crop starts at y=25; Home's narrower center trim starts near y=62.5.
-        expect(pixels[1], inInclusiveRange(60, 67));
-        image.dispose();
-        picture.dispose();
-      });
+      expect(find.text('Home Preview'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('event-poster-home-preview')),
+        findsNothing,
+      );
     },
   );
   testWidgets(

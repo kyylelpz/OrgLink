@@ -1,0 +1,43 @@
+# Authentication, Roles and Permissions
+
+The existing filename is retained to avoid breaking links. Enforcement sources: [`firebase.rules`](../firebase/firebase.rules), Worker [`auth.js`](../workers/attendance/src/auth.js), [`admin.js`](../workers/attendance/src/admin.js), [`student_ids.js`](../workers/attendance/src/student_ids.js), [`attendance.js`](../workers/attendance/src/attendance.js), [`images.js`](../workers/attendance/src/images.js), and Flutter router/models. UI guards are presentation hints, not authorization substitutes.
+
+## Identity and Eligibility
+
+Firebase Authentication provides Google/email-password identity. Password-provider ID tokens must have `email_verified: true` for protected Rules/Worker operations. Owner profile reads remain possible before normal feature eligibility. Email action codes are validated by Firebase and cannot bypass account approval.
+
+The Worker checks RS256 signatures against Google's fixed Firebase public-key source, issuer/audience `orglink-dev`, subject and token time claims. It does not implement Firebase refresh-token revocation lookup; authorization also rereads authoritative application documents. Application `accountStatus` is separate from Firebase Auth's disabled flag. Admin account decisions change Firestore status, not Auth user deletion/disablement.
+
+An eligible app account has an active profile and valid existing student identity. New saves require strict numeric Student ID and controlled academic selection; legacy readable profiles are not silently migrated. `platformRole` supports `user` and `platformAdmin`. An organization manager is an assigned UID, not a platform role. An officer is an active organization membership with `membershipRole: officer` and explicit permission flags.
+
+## Permission Matrix
+
+All allowed actions below still require the relevant active account/org, record state, window and version checks.
+
+| Action | Ordinary eligible user/member | Assigned organization manager | Active officer/member with permission | Active Platform Admin |
+| --- | --- | --- | --- | --- |
+| Own profile read/save | Owner; creation/ID changes through Worker | Own only | Own only | Own only through normal flow |
+| Discover organizations | Public + active | Also assigned orgs | Also accessible joined/private orgs | Normal discovery; admin directory via Worker |
+| Request membership | Own request to accepting public active org | Cannot self-apply to assigned org | Same ordinary request restrictions | No special membership bypass |
+| Review membership | No | Pending others: approve/reject | No | No implicit manager power |
+| Read active roster | No by default | Yes | Active membership + `viewRoster: true` (role need not be officer) | No implicit roster power |
+| Create event | No | Yes | Officer + `manageEvents: true` | No implicit event power |
+| Edit/submit draft or change poster | No | Eligible editable drafts | Officer + `manageEvents`, own `createdBy` only | No implicit event power |
+| Approve/reject/publish/cancel/complete/archive | No | Yes, lifecycle restrictions apply | No | No implicit event power |
+| Register/withdraw | Own participation; private event requires active membership | Same participant eligibility; manager assignment alone is not private membership | Same participant eligibility | No bypass |
+| View participants | Not general access | Yes | Event editor for own event or attendance operator | No implicit access |
+| Manual mark/QR redeem/correct | No; eligible registered user may issue own pass | Yes; never own attendance | Officer + `manageAttendance: true`, independently of `manageEvents` | No implicit attendance power |
+| Change organization logo | No | Yes | No independent permission | Yes, active org via Worker |
+| Account/organization administration | No | No | No | Allowlisted Worker operations only |
+| Assign platform roles or officer powers in app | No | No | No | No general role/permission editor |
+
+## Enforcement Details
+
+- Firestore denies direct client profile creation, Student ID registry access, organization writes, protected image fields, privileged account fields, QR credential storage and audit mutation. Owner text-profile updates have a narrow allowlist; the normal profile service uses the Worker for validated saves.
+- Membership clients create only their own pending ordinary membership with empty permissions. Managers review others' pending records; no client path assigns officer powers, removes arbitrary users or rewrites managers.
+- Event creators start with draft/pending and no poster. Draft submission locks editing while review is pending. Managers may approve their own events. Private organizations require private events. Registered/cancelled participant relationships and counter deltas are paired transactionally.
+- First manual attendance requires registered eligible participant, approved published unarchived event and `startAt <= serverTime < endAt`. Existing results are not overwritten by ordinary marking. Corrections use Worker preview/apply revisions, a reason, and immutable audit writes; approved published/completed unarchived events that have started may be corrected, including after the event window.
+- Admin status changes target ordinary `user` accounts only, exclude self/other administrators, and enforce current state. Reactivate applies to eligible disabled profiles, not rejected/suspended profiles. Manager assignment resolves a unique active Student ID registry mapping and profile versions; historical membership role strings do not preserve former manager power.
+- Trusted operator credentials bypass client Rules and must be separately controlled. Bootstrap does not expose a public promotion endpoint. Demo ownership claims are inert, not privilege grants.
+
+See [database schema](database-schema.md) for private data boundaries and [module guides](README.md#detailed-module-and-operator-guides) for individual operations.

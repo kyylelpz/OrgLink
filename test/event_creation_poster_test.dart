@@ -317,7 +317,7 @@ void main() {
   }
 
   testWidgets(
-    'poster and optional text precede Event Details in the same card',
+    'poster and optional text precede Event Details in separate cards',
     (tester) async {
       await app(tester);
       final poster = find.text('Event Poster'),
@@ -334,7 +334,10 @@ void main() {
             matching: find.byType(AppSurfaceCard),
           )
           .first;
-      expect(tester.widget(posterCard), same(tester.widget(detailsCard)));
+      expect(
+        tester.widget(posterCard),
+        isNot(same(tester.widget(detailsCard))),
+      );
       expect(
         tester.widget(posterCard),
         isNot(same(tester.widget(scheduleCard))),

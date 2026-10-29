@@ -1,5 +1,7 @@
 # Figma Migration — Phase 2
 
+> Historical migration snapshot. Current behavior and test evidence are documented in [UI/UX baseline](ui-ux-design.md) and [current QA](current-version-qa-audit.md); this file is not a current feature or deployment inventory.
+
 Completed 28 October 2026. Presentation only; Phase 3 is not started.
 
 ## References and scope
