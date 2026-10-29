@@ -13,7 +13,10 @@ class AttendanceService {
     this.store,
     this.auth, {
     this.client,
-    this.apiUrl = const String.fromEnvironment('ATTENDANCE_API_URL'),
+    this.apiUrl = const String.fromEnvironment(
+      'ATTENDANCE_API_URL',
+      defaultValue: 'https://orglink-attendance.orglink-dev.workers.dev',
+    ),
   });
   final FirestoreService store;
   final FirebaseAuth auth;
