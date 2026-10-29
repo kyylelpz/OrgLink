@@ -6,80 +6,48 @@ import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
-import '../../../../core/widgets/app_logo.dart';
 import '../viewmodels/auth_view_model.dart';
 import '../../data/models/auth_user.dart';
 import '../widgets/auth_branding.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthViewModel>();
     final failed =
         auth.status == AuthStatus.error ||
         auth.profileStatus == ProfileStatus.error;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: failed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: failed ? AppColors.brandMist : AppColors.brandMidnight,
+        backgroundColor:
+            failed ? AppColors.brandMist : AppColors.splashBackground,
         body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: failed
-                    ? AppErrorView(
-                        message:
-                            auth.failure?.message ??
-                            'Unable to load your profile.',
-                        onRetry: auth.isBusy ? null : auth.retry,
-                      )
-                    : Center(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const AppLogo(
-                                variant: AppLogoVariant.onMidnight,
-                                size: 260,
-                              ),
-                              Text(
-                                'Connect. Participate. Grow.',
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodyLarge
-                                    ?.copyWith(color: AppColors.border),
-                              ),
-                            ],
-                          ),
-                        ),
+          child: failed
+              ? AppErrorView(
+                  message:
+                      auth.failure?.message ?? 'Unable to load your profile.',
+                  onRetry: auth.isBusy ? null : auth.retry,
+                )
+              : Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: 320,
+                        maxHeight: 320,
                       ),
-              ),
-              if (!failed)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 56),
-                  child: Column(
-                    children: [
-                      const SizedBox(
-                        width: 120,
-                        child: LinearProgressIndicator(
-                          minHeight: 3,
-                          color: AppColors.brandPurple,
-                          backgroundColor: AppColors.brandNavy,
-                          semanticsLabel: 'Loading OrgLink...',
-                        ),
+                      child: Image.asset(
+                        'assets/animations/loading_animation.webp',
+                        fit: BoxFit.contain,
+                        semanticLabel: 'Loading OrgLink...',
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Text(
-                        'Loading OrgLink...',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.border,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-            ],
-          ),
         ),
       ),
     );

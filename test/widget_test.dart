@@ -33,7 +33,7 @@ void main() {
           child: const OrgLinkApp(),
         ),
       );
-      expect(find.text('Loading OrgLink...'), findsOneWidget);
+      expect(find.bySemanticsLabel('Loading OrgLink...'), findsOneWidget);
       repository.controller.add(null);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);

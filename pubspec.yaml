@@ -71,6 +71,7 @@ flutter:
     - assets/fonts/inter/OFL.txt
     - assets/icons/
     - assets/illustrations/
+    - assets/animations/
   fonts:
     - family: Inter
       fonts:
