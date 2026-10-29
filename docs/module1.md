@@ -25,7 +25,8 @@ were added. Existing organization/event/navigation/attendance workflows remain.
 ## Authentication flows
 
 - Initial signed-out destination: Sign In (`/sign-in`). Google and email/password
-  share the existing theme and official OrgLink logo. Loading is unchanged.
+  share the existing theme and official OrgLink logo. Splash artwork is unchanged;
+  the minimum startup/login duration is described below.
 - Create an Account → `/sign-up`: email, new password, matching confirmation.
   Firebase creates the Auth user and sends verification; this creates no
   Firestore profile. Client validation requires 8 characters with a number or
@@ -63,6 +64,47 @@ local storage or application logs. Firebase handles persistence of auth sessions
 Error messages suppress raw SDK details and distinguish network/rate-limit/action
 code failures without exposing account existence. Password reset does not claim
 instant revocation on every device or a fixed email expiry.
+
+## Splash and Loading Timing
+
+The existing `loading_animation.webp` artwork, colors, sizing, and layout are
+preserved. The presentation clock enforces a minimum **two seconds from the first
+visible splash frame** on cold startup and after a successful Google or
+email/password login. The splash route has no entrance transition hiding that
+first frame. Reduced-animation preferences do not shorten the timing gate.
+
+`AppStartup` paints the existing splash before starting Firebase initialization.
+It passes the same `SplashGate` into dependency injection and the router, carrying
+elapsed display progress into initial authentication/profile resolution. New
+post-startup sign-ins start a new display cycle; restored identity/duplicate auth
+events during startup do not restart it. The clock runs alongside asynchronous
+work, so initialization or profile loading taking longer than two seconds adds
+no further fixed delay. AuthViewModel, repositories, Firebase calls, and backend
+services contain no added waits.
+
+Existing auth guards decide the destination after the gate: Sign In, email
+verification, profile completion, Account Status, or the permitted app route.
+Pending/suspended/disabled/rejected accounts never gain Home access from timing.
+Live status revocation remains immediate. Deferred navigation retains its URI
+and action-code query parameters and still goes through the existing guards.
+Google cancellation, failed credentials, interrupted sessions, existing retry
+errors, late initialization results, and disposed widgets are handled without
+late navigation or a fresh artificial login wait. Each display clock is disposed
+with its widget; the initial and post-login timing logic is presentation-only.
+
+Recorded local checks on 29 October 2026:
+
+- 25 focused timing tests passed (fast/slow initialization and login, startup
+  handoff, no premature clock start, reduced-animation settings, account-status
+  routing, verification/profile completion, error recovery, cancellation,
+  sign-out, navigation changes, and disposal).
+- 100 relevant auth/profile/navigation/timing tests passed.
+- Full Flutter suite: 279 passed; five existing poster layout/cropping assertions
+  fail independently of these splash changes. The affected poster code/tests
+  were not changed for this task.
+- Changed-file analysis is clean. Full analysis reports three existing warnings:
+  an unused poster preview painter and two unused profile-screen imports.
+- Formatting was run; no deployment or Firebase/backend configuration changes.
 
 ## Profile Photos
 
@@ -139,7 +181,8 @@ Inspected final Figma frames directly through MCP: `22:513` Sign In, `67:527`
 Sign Up, `67:559` Verification, `67:574` Forgot Password, `67:591` Reset Email
 Sent, `67:606` Reset Password and `67:625` Success; also existing profile,
 College/Program, inactive and error states. Existing Inter, #152D97, surfaces,
-radii, actions, feedback and official PNG logo are reused; loading is unchanged.
+radii, actions, feedback and official PNG logo are reused; splash artwork is unchanged
+and the presentation-only minimum duration is described above.
 Only auth/profile presentation was changed. Figma feedback icons were exported
 into the already registered assets/icons directory and rasterized locally;
 no image dependency or pubspec change was needed.

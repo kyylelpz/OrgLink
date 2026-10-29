@@ -37,7 +37,7 @@ Organization-scoped event/detail/management pages retain their existing URL clas
 
 | Area | Current presentation and behavior |
 |---|---|
-| Authentication | Unchanged loading, finalized Sign In/Sign Up, Google and Firebase email/password, verification/resend, forgot/reset/success and invalid-link states. Email actions use Firebase validation; verification does not bypass pending approval. See Module 1 for manual setup and linking acceptance. |
+| Authentication | Existing animated splash with a minimum two-second visible duration on cold startup and successful Google/email-password login, overlapping initialization/profile resolution; finalized Sign In/Sign Up, Google and Firebase email/password, verification/resend, forgot/reset/success and invalid-link states. Email actions use Firebase validation; verification does not bypass pending approval. See Module 1 for manual setup and linking acceptance. |
 | Profile | Change Photo/Remove Photo with interactive square crop (drag, pinch, Reset, Cancel, Confirm, Keep Original); identity/photo fallback, academic information and editable Full Name, Student Number, Year Level, Section, required controlled College/Program dropdowns on save; identity remains controlled by Firebase Authentication. Existing legacy academics stay readable. Verified Google users can explicitly Link Password after fresh Google reauthentication. Existing serialization/backward compatibility is unchanged. Stored spelling/case is preserved; suggestions are opt-in. |
 | Home | Midnight personalized greeting/search header, four shortcuts, live **Happening Now** cards when data permits, one featured upcoming event, additional upcoming preview, organization previews and role-aware organization management cards. Search navigates actual accessible event/organization records. No Your Activity section, fake statistics or mock production content. |
 | Organizations | Midnight identity/search header; white cards with dynamic logos, actual description/visibility/status and current membership labels. Join/View navigates to existing details; it does not bypass membership requests. |
@@ -85,6 +85,17 @@ folder paths, configuration, cleanup, and test evidence.
 - No attendance record means **Not Marked**, not Absent. Ordinary verification does not replace an existing result; authorized correction is separate and auditable. Pending correction removes the active result using the existing workflow.
 - Server-issued QR credentials, Worker redemption, duplicate detection and correction revision checks remain unchanged. Busy/stale responses and account switches retain their existing safeguards.
 - Architecture stays View → ChangeNotifier ViewModel → Repository → Service → Model, with Provider and go_router. The audit did not modify repositories, services, models, Firebase initialization/configuration, schemas, Firestore Rules, Worker code or profile persistence.
+
+## Splash Presentation Timing
+
+The existing animated splash design is unchanged. Its two-second minimum starts
+on the first visible frame and overlaps Firebase/auth/profile/account resolution.
+Startup bootstrap and initial session loading share the same interval. Slow
+loading exits immediately when resolved; failed/cancelled login does not create
+an unnecessary second splash. All verification, account-status, and authorization
+redirects are preserved. Timing is lifecycle-bound in the presentation/router
+layer, with no added repository or backend delay. See
+[Module 1 timing and validation](module1.md#splash-and-loading-timing).
 
 ## Responsiveness and accessibility
 

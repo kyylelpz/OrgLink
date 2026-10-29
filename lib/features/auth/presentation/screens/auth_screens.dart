@@ -1,3 +1,4 @@
+import '../../../../app/splash_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -11,7 +12,8 @@ import '../../data/models/auth_user.dart';
 import '../widgets/auth_branding.dart';
 
 class SplashScreen extends StatelessWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({super.key, this.gate});
+  final SplashGate? gate;
 
   @override
   Widget build(BuildContext context) {
@@ -20,37 +22,29 @@ class SplashScreen extends StatelessWidget {
         auth.status == AuthStatus.error ||
         auth.profileStatus == ProfileStatus.error;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: failed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor:
-            failed ? AppColors.brandMist : AppColors.splashBackground,
-        body: SafeArea(
-          child: failed
-              ? AppErrorView(
+    final error = failed
+        ? AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.dark,
+            child: Scaffold(
+              backgroundColor: AppColors.brandMist,
+              body: SafeArea(
+                child: AppErrorView(
                   message:
                       auth.failure?.message ?? 'Unable to load your profile.',
                   onRetry: auth.isBusy ? null : auth.retry,
-                )
-              : Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: 320,
-                        maxHeight: 320,
-                      ),
-                      child: Image.asset(
-                        'assets/animations/loading_animation.webp',
-                        fit: BoxFit.contain,
-                        semanticLabel: 'Loading OrgLink...',
-                      ),
-                    ),
-                  ),
                 ),
-        ),
-      ),
-    );
+              ),
+            ),
+          )
+        : null;
+    final timing = gate;
+    return timing == null
+        ? error ?? const AnimatedSplashView()
+        : MinimumSplash(
+            key: ValueKey(timing.cycle),
+            gate: timing,
+            error: error,
+          );
   }
 }
 

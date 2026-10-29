@@ -1,3 +1,4 @@
+import 'splash_gate.dart';
 import '../core/services/worker_api_service.dart';
 import '../features/admin/data/repositories/admin_repository.dart';
 import '../features/admin/data/services/admin_service.dart';
@@ -29,7 +30,8 @@ import 'app.dart';
 import 'router.dart';
 
 class AppDependencies extends StatelessWidget {
-  const AppDependencies({super.key});
+  const AppDependencies({super.key, this.splashGate});
+  final SplashGate? splashGate;
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +95,10 @@ class AppDependencies extends StatelessWidget {
           ),
         ),
         Provider<GoRouter>(
-          create: (context) => createAppRouter(context.read<AuthViewModel>()),
+          create: (context) => createAppRouter(
+            context.read<AuthViewModel>(),
+            splashGate: splashGate,
+          ),
           dispose: (_, router) => router.dispose(),
         ),
       ],

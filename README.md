@@ -56,6 +56,18 @@ Worker bindings, endpoints, permissions, cleanup, tests, troubleshooting, and
 manual deployment/Android acceptance. Changes are implemented and tested locally;
 no deployment or live Firestore changes were performed for these updates.
 
+## Splash and Login Loading
+
+Cold startup and successful Google/email-password sign-in display the existing
+animated splash for a minimum of two seconds, starting after its first visible
+frame. Firebase initialization, authentication, and profile/account resolution
+run concurrently with that presentation interval. Slow loading navigates as soon
+as it finishes, without starting another two-second wait. Firebase bootstrap and
+initial session resolution share one interval; cancellation/failure does not add
+a new login splash. Existing verification, profile-completion, and account-status
+guards remain authoritative. See [Module 1 splash timing](docs/module1.md#splash-and-loading-timing)
+for implementation and validation details. No animation asset was changed.
+
 ## Google Sign-In configuration diagnosis
 
 The configuration error was traced to a duplicate **android/app/src/google-services.json**.
@@ -77,8 +89,9 @@ resource and plugin implementation, rather than a preserved device log.
 The 7.2.0 API usage is correct. On Android the plugin reads the web OAuth client
 from the generated native resource, so no hardcoded serverClientId is necessary.
 The Android app ID matches the JSON and the local debug certificate SHA-1 matches
-the Android OAuth entry. Firebase initialization remains unchanged and precedes
-all authentication services.
+the Android OAuth entry. Firebase project/options remain unchanged. Initialization starts after the first
+splash frame and still completes before authentication/dependency services are
+created.
 
 The auth service now logs the operation stage, original Google code/description
 or Firebase code/message, and stack trace in debug mode before repository error

@@ -1,3 +1,4 @@
+import 'splash_gate.dart';
 import '../features/admin/presentation/screens/admin_screen.dart';
 import '../features/admin/presentation/viewmodels/admin_view_model.dart';
 import '../core/widgets/authenticated_shell.dart';
@@ -27,16 +28,13 @@ import '../features/home/presentation/screens/coming_soon_screen.dart';
 import '../features/attendance/presentation/scanner_route_observer.dart';
 import '../features/profile/presentation/screens/complete_profile_screen.dart';
 
-GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
+GoRouter createAppRouter(AuthViewModel auth, {SplashGate? splashGate}) =>
+    _createTimedRouter(auth, splashGate ?? SplashGate());
+
+GoRouter _createTimedRouter(AuthViewModel auth, SplashGate gate) => GoRouter(
   initialLocation: AppRoutes.splash,
-  refreshListenable: auth,
-  redirect: (_, state) => authRedirect(
-    auth.status,
-    state.uri.path,
-    profileStatus: auth.profileStatus,
-    eligible: auth.profile?.isEligible == true,
-    requiresEmailVerification: auth.user?.requiresEmailVerification == true,
-  ),
+  refreshListenable: Listenable.merge([auth, gate]),
+  redirect: (_, state) => _splashRedirect(auth, gate, state),
   routes: [
     GoRoute(
       path: AppRoutes.admin,
@@ -50,7 +48,14 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
       path: AppRoutes.adminOrganizations,
       builder: (_, _) => const AdminScreen(section: AdminSection.organizations),
     ),
-    GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),
+    GoRoute(
+      path: AppRoutes.splash,
+      // The minimum starts at a genuinely visible frame, not behind a route fade.
+      pageBuilder: (_, state) => NoTransitionPage(
+        key: state.pageKey,
+        child: SplashScreen(gate: gate),
+      ),
+    ),
     GoRoute(
       path: AppRoutes.onboarding,
       builder: (_, _) => const OnboardingScreen(),
@@ -293,6 +298,33 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     ),
   ),
 );
+
+String? _splashRedirect(
+  AuthViewModel auth,
+  SplashGate gate,
+  GoRouterState state,
+) {
+  String? guarded(String path) => authRedirect(
+    auth.status,
+    path,
+    profileStatus: auth.profileStatus,
+    eligible: auth.profile?.isEligible == true,
+    requiresEmailVerification: auth.user?.requiresEmailVerification == true,
+  );
+  gate.synchronize(auth);
+  if (gate.holding) {
+    if (state.uri.path != AppRoutes.splash) gate.pendingLocation = state.uri;
+    return state.uri.path == AppRoutes.splash ? null : AppRoutes.splash;
+  }
+  if (state.uri.path == AppRoutes.splash && gate.pendingLocation != null) {
+    final pending = gate.pendingLocation!;
+    final redirect = guarded(pending.path);
+    if (redirect == AppRoutes.splash) return null;
+    gate.pendingLocation = null;
+    return redirect ?? pending.toString();
+  }
+  return guarded(state.uri.path);
+}
 
 // Route-level exit handling also covers shell tabs and AppBackButton navigation.
 GoRoute _createEventRoute(AuthViewModel auth) {
