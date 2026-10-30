@@ -211,39 +211,44 @@ class OrganizationNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
-    child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F9),
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(24), // Rounded top corners
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brandMidnight.withValues(
-              alpha: 0.05,
-            ), // Subtle shadow to lift it up
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
+    child: Padding(
+      // This padding allows the mist background to show around the white pill
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.sm,
       ),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: AppSpacing.sm,
-        children: [
-          for (final entry in [
-            ('Discover', AppRoutes.organizations),
-            ('My Organizations', AppRoutes.myOrganizations),
-            ('Requests', AppRoutes.membershipRequests),
-          ].indexed)
-            AppFilterChip(
-              label: entry.$2.$1,
-              selected: index == entry.$1,
-              onSelected: (_) => context.go(entry.$2.$2),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(4), // Inner padding for the chips
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(100), // Pill shape
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brandMidnight.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
             ),
-        ],
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: AppFilterChip(
+                label: 'Discover',
+                selected: index == 0,
+                onSelected: (_) => context.go(AppRoutes.organizations),
+              ),
+            ),
+            Expanded(
+              child: AppFilterChip(
+                label: 'My Organizations',
+                selected: index == 1,
+                onSelected: (_) => context.go(AppRoutes.myOrganizations),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );

@@ -11,24 +11,27 @@ import '../../../../core/constants/app_routes.dart';
 import '../viewmodels/organization_hub_view_model.dart';
 import '../widgets/organization_widgets.dart';
 
-class MyOrganizationsScreen extends StatelessWidget {
-  const MyOrganizationsScreen({super.key, this.requestsOnly = false});
-  final bool requestsOnly;
+class MyOrganizationsScreen extends StatefulWidget {
+  const MyOrganizationsScreen({super.key});
+
+  @override
+  State<MyOrganizationsScreen> createState() => _MyOrganizationsScreenState();
+}
+
+class _MyOrganizationsScreenState extends State<MyOrganizationsScreen> {
+  String _activeTab = 'All';
 
   @override
   Widget build(BuildContext context) {
     final model = context.watch<OrganizationHubViewModel>();
+    
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
       ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
-        // We move the nav bar down here
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [OrganizationNavigation(requestsOnly ? 2 : 1)],
-        ),
+        bottomNavigationBar: const OrganizationNavigation(1),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -64,9 +67,7 @@ class MyOrganizationsScreen extends StatelessWidget {
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Text(
-                              requestsOnly
-                                  ? 'Membership Requests'
-                                  : 'My Organizations',
+                              'My Organizations',
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
                                     color: AppColors.white,
@@ -87,22 +88,26 @@ class MyOrganizationsScreen extends StatelessWidget {
               child: QueryContent(
                 query: model.mine,
                 builder: (records) {
-                  final memberships =
-                      (records ?? [])
-                          .where(
-                            (member) =>
-                                !requestsOnly || member.role != 'manager',
-                          )
-                          .toList()
-                        ..sort(
-                          (a, b) =>
-                              a.organizationId.compareTo(b.organizationId),
-                        );
+                  final memberships = (records ?? []).toList();
                   final membershipIds = memberships
                       .map((member) => member.organizationId)
                       .toSet();
+                      
                   final assignedOnly = (model.managed.value ?? [])
                       .where((org) => !membershipIds.contains(org.id))
+                      .toList();
+
+                  final pendingMemberships = memberships
+                      .where((m) => m.status == 'pending')
+                      .toList();
+
+                  final activeMemberships = memberships
+                      .where((m) => m.status == 'active')
+                      .toList();
+
+                  final inactiveMemberships = memberships
+                      .where((m) =>
+                          m.status != 'pending' && m.status != 'active')
                       .toList();
 
                   return AppPageBody(
@@ -110,24 +115,59 @@ class MyOrganizationsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: AppSpacing.md),
-                        OrganizationPageHeading(
-                          title: requestsOnly
-                              ? 'Membership Requests'
-                              : 'Your Communities',
-                          description: requestsOnly
-                              ? 'Track your existing membership requests.'
-                              : 'Your memberships and organizations you manage.',
+                        const OrganizationPageHeading(
+                          title: 'Your Communities',
+                          description: 'Your memberships and organizations you manage.',
                         ),
-                        if (!requestsOnly) ...[
-                          if (model.managed.failure != null)
-                            TextButton(
-                              onPressed: model.managed.retry,
-                              child: const Text('Retry Managed Organizations'),
+
+                        // ─── INTERNAL TABS ───
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppFilterChip(
+                                expanded: true,
+                                label: 'All',
+                                selected: _activeTab == 'All',
+                                onSelected: (_) => setState(() => _activeTab = 'All'),
+                              ),
                             ),
-                          if (assignedOnly.isNotEmpty)
-                            const AppSectionHeading(
-                              title: 'Organizations You Manage',
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: AppFilterChip(
+                                expanded: true,
+                                label: 'Active',
+                                selected: _activeTab == 'Active',
+                                onSelected: (_) => setState(() => _activeTab = 'Active'),
+                              ),
                             ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: AppFilterChip(
+                                expanded: true,
+                                label: 'Pending',
+                                selected: _activeTab == 'Pending',
+                                onSelected: (_) => setState(() => _activeTab = 'Pending'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+
+                        // ─── GLOBAL EMPTY STATE (Only on "All" tab) ───
+                        if (_activeTab == 'All' &&
+                            assignedOnly.isEmpty &&
+                            pendingMemberships.isEmpty &&
+                            activeMemberships.isEmpty &&
+                            inactiveMemberships.isEmpty)
+                          const AppEmptyView(
+                            title: 'No Organizations Yet',
+                            message: 'You have not joined or requested to join any organizations.',
+                          ),
+
+                        // ─── MANAGED ORGS (Visible on All or Active tabs if not empty) ───
+                        if ((_activeTab == 'All' || _activeTab == 'Active') &&
+                            assignedOnly.isNotEmpty) ...[
+                          const AppSectionHeading(title: 'Organizations You Manage'),
                           for (final org in assignedOnly)
                             OrganizationCard(
                               organization: org,
@@ -137,75 +177,46 @@ class MyOrganizationsScreen extends StatelessWidget {
                                 tone: AppStatusTone.info,
                               ),
                             ),
+                          const SizedBox(height: AppSpacing.md),
                         ],
-                        if (memberships.isEmpty &&
-                            (requestsOnly || assignedOnly.isEmpty))
-                          AppEmptyView(
-                            title: requestsOnly
-                                ? 'No Membership Requests'
-                                : 'No Memberships Yet',
-                            message: requestsOnly
-                                ? 'No membership requests yet.'
-                                : 'You have no organization memberships yet.',
-                          ),
-                        for (final member in memberships)
-                          Builder(
-                            builder: (context) {
-                              final query =
-                                  model.associated[member.organizationId];
-                              final org = query?.value;
-                              final summary =
-                                  'Role: ${displayIdentifier(member.role)} | Status: ${displayMembershipStatus(member.status)}\nPosition: ${member.positionTitle ?? 'Not Assigned'}\nRequested: ${displayDate(member.requestedAt)}';
-                              if (org != null) {
-                                return OrganizationCard(
-                                  organization: org,
-                                  subtitle: summary,
-                                  status: AppStatusChip(
-                                    label: displayMembershipStatus(
-                                      member.status,
-                                    ),
-                                    tone: membershipStatusTone(member.status),
-                                  ),
-                                );
-                              }
-                              return AppSurfaceCard(
-                                onTap: () => context.go(
-                                  AppRoutes.organization(member.organizationId),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Text(
-                                      query?.loading == true
-                                          ? 'Loading organization...'
-                                          : 'Organization Unavailable',
-                                    ),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Text(
-                                      '$summary\n${query?.failure?.message ?? 'Details may no longer be available to your account.'}',
-                                    ),
-                                    if (query?.failure != null)
-                                      AppActionButton(
-                                        label: 'Retry Organization',
-                                        icon: Icons.refresh,
-                                        style: AppActionStyle.outlined,
-                                        onPressed: query!.retry,
-                                      ),
-                                    AppActionButton(
-                                      label: 'View Organization',
-                                      style: AppActionStyle.text,
-                                      onPressed: () => context.go(
-                                        AppRoutes.organization(
-                                          member.organizationId,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+
+                        // ─── PENDING REQUESTS ───
+                        if (_activeTab == 'Pending' || 
+                           (_activeTab == 'All' && pendingMemberships.isNotEmpty)) ...[
+                          const AppSectionHeading(title: 'Pending Requests'),
+                          if (pendingMemberships.isEmpty)
+                            const AppEmptyView(
+                              title: 'No Pending Requests',
+                              message: 'You have no membership requests awaiting approval.',
+                            )
+                          else
+                            for (final member in pendingMemberships)
+                              _buildMembershipCard(context, model, member),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
+
+                        // ─── ACTIVE MEMBERSHIPS ───
+                        if (_activeTab == 'Active' || 
+                           (_activeTab == 'All' && activeMemberships.isNotEmpty)) ...[
+                          const AppSectionHeading(title: 'Active Memberships'),
+                          if (activeMemberships.isEmpty)
+                            const AppEmptyView(
+                              title: 'No Active Memberships',
+                              message: 'You are not an active member of any organization.',
+                            )
+                          else
+                            for (final member in activeMemberships)
+                              _buildMembershipCard(context, model, member),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
+
+                        // ─── PAST MEMBERSHIPS (Visible on All or Active tabs if not empty) ───
+                        if ((_activeTab == 'All' || _activeTab == 'Active') &&
+                            inactiveMemberships.isNotEmpty) ...[
+                          const AppSectionHeading(title: 'Past Memberships'),
+                          for (final member in inactiveMemberships)
+                            _buildMembershipCard(context, model, member),
+                        ],
                       ],
                     ),
                   );
@@ -215,6 +226,67 @@ class MyOrganizationsScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMembershipCard(
+    BuildContext context,
+    OrganizationHubViewModel model,
+    dynamic member,
+  ) {
+    return Builder(
+      builder: (context) {
+        final query = model.associated[member.organizationId];
+        final org = query?.value;
+        final summary =
+            'Role: ${displayIdentifier(member.role)} | Status: ${displayMembershipStatus(member.status)}\nPosition: ${member.positionTitle ?? 'Not Assigned'}\nRequested: ${displayDate(member.requestedAt)}';
+            
+        if (org != null) {
+          return OrganizationCard(
+            organization: org,
+            subtitle: summary,
+            status: AppStatusChip(
+              label: displayMembershipStatus(member.status),
+              tone: membershipStatusTone(member.status),
+            ),
+          );
+        }
+        return AppSurfaceCard(
+          onTap: () => context.go(
+            AppRoutes.organization(member.organizationId),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                query?.loading == true
+                    ? 'Loading organization...'
+                    : 'Organization Unavailable',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                '$summary\n${query?.failure?.message ?? 'Details may no longer be available to your account.'}',
+              ),
+              if (query?.failure != null)
+                AppActionButton(
+                  label: 'Retry Organization',
+                  icon: Icons.refresh,
+                  style: AppActionStyle.outlined,
+                  onPressed: query!.retry,
+                ),
+              AppActionButton(
+                label: 'View Organization',
+                style: AppActionStyle.text,
+                onPressed: () => context.go(
+                  AppRoutes.organization(
+                    member.organizationId,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
