@@ -179,6 +179,9 @@ void main() {
           Future<void> visit(String name, String path) async {
             app.router.go(path);
             await tester.pumpAndSettle();
+
+            debugPrint('>>> TESTING SCREEN: $name'); 
+
             expect(tester.takeException(), isNull, reason: name);
             if (scale == 1 || width == 320) {
               await app.screenshot(

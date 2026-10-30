@@ -177,7 +177,7 @@ class EventDetailsScreen extends StatelessWidget {
                       model.membership.value,
                       model.uid,
                     ))
-                      FilledButton.tonalIcon(
+                      FilledButton.icon(
                         onPressed: () => context.go(
                           AppRoutes.attendance(event.organizationId, event.id),
                         ),
@@ -263,6 +263,8 @@ class EventDetailsScreen extends StatelessWidget {
                                 },
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 48),
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
                           ),
                           child: const Text('Withdraw Registration'),
                         ),
@@ -344,6 +346,10 @@ class EventDetailsScreen extends StatelessWidget {
                             onPressed: model.busy
                                 ? null
                                 : () => _act(context, 'reject'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              side: const BorderSide(color: AppColors.error),
+                            ),
                             child: const Text('Reject Event'),
                           ),
                         ],
@@ -368,6 +374,8 @@ class EventDetailsScreen extends StatelessWidget {
                               : () => _act(context, 'cancel'),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 48),
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
                           ),
                           child: const Text('Cancel Event'),
                         ),
@@ -392,6 +400,8 @@ class EventDetailsScreen extends StatelessWidget {
                               : () => _act(context, 'archive'),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 48),
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
                           ),
                           child: const Text('Archive Event'),
                         ),

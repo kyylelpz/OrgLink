@@ -74,33 +74,41 @@ class _AttendanceCorrectionDialogState
                         widget.model.nameFor(widget.registration.uid),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      const Text('Before'),
-                      const SizedBox(height: AppSpacing.xs),
-                      AppStatusChip(
-                        label: displayIdentifier(
-                          widget.preview.previousStatus.name,
-                        ),
-                        tone:
-                            widget.preview.previousStatus ==
-                                AttendanceStatus.present
-                            ? AppStatusTone.success
-                            : AppStatusTone.error,
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Current Status:',
+                            style: TextStyle(color: AppColors.muted),
+                          ),
+                          AppStatusChip(
+                            label: displayIdentifier(
+                              widget.preview.previousStatus.name,
+                            ),
+                            tone:
+                                widget.preview.previousStatus ==
+                                    AttendanceStatus.present
+                                ? AppStatusTone.success
+                                : AppStatusTone.error,
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                Text(
-                  'Current status: ${displayIdentifier(widget.preview.previousStatus.name)}',
-                ),
-                const SizedBox(height: AppSpacing.md),
-                const Text(
-                  'This replaces the active result and permanently records your reason and identity in the correction history. Pending removes the active result; old QR passes will not work.',
-                ),
+                const SizedBox(height: AppSpacing.lg),
                 DropdownButtonFormField<AttendanceCorrectionStatus>(
                   initialValue: _status,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'New Status'),
+                  decoration: const InputDecoration(
+                    labelText: 'Correct Status To',
+                    filled: true,
+                    fillColor: AppColors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: AppShape.action,
+                    ),
+                  ),
                   items: [
                     for (final status in AttendanceCorrectionStatus.values)
                       if (status.name != widget.preview.previousStatus.name)
@@ -113,31 +121,43 @@ class _AttendanceCorrectionDialogState
                       ? null
                       : (value) => setState(() => _status = value!),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                AppStatusChip(
-                  label: 'After: ${displayIdentifier(_status.name)}',
-                  tone: _status == AttendanceCorrectionStatus.present
-                      ? AppStatusTone.success
-                      : _status == AttendanceCorrectionStatus.absent
-                      ? AppStatusTone.error
-                      : AppStatusTone.warning,
-                ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _reason,
                   enabled: !widget.model.busy,
                   maxLength: 1000,
                   maxLines: 3,
                   decoration: const InputDecoration(
-                    labelText: 'Correction Reason',
+                    labelText: 'Reason for Correction',
+                    alignLabelWithHint: true,
+                    filled: true,
+                    fillColor: AppColors.white,
                   ),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Enter a correction reason.'
                       : null,
                 ),
-                if (widget.model.busy) const LinearProgressIndicator(),
+                if (widget.model.busy)
+                  const Padding(
+                    padding: EdgeInsets.only(top: AppSpacing.sm),
+                    child: LinearProgressIndicator(),
+                  ),
                 if (widget.model.failure != null)
-                  Text(widget.model.failure!.message),
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(
+                      widget.model.failure!.message,
+                      style: const TextStyle(color: AppColors.error),
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'This replaces the active result and permanently records your reason. Pending removes the active result; old QR passes will not work.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.muted,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               ],
             ),
           ),

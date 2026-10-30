@@ -776,13 +776,13 @@ void main() {
       app.orgs.document.emit(managed);
       app.orgs.organizations.emit([managed, otherOrg]);
       await tester.pumpAndSettle();
-      expect(find.text('Manage Events'), findsOneWidget);
-      await tester.ensureVisible(find.text('Manage Events'));
+      expect(find.text('Manage'), findsOneWidget);
+      await tester.ensureVisible(find.text('Manage'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Manage Events'));
+      await tester.tap(find.text('Manage'));
       await tester.pumpAndSettle();
       expect(
-        find.widgetWithText(AppBar, 'Organization Event Management'),
+        find.widgetWithText(AppBar, 'Organization Details'),
         findsOneWidget,
       );
       expect(

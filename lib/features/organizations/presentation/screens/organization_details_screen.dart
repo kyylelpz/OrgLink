@@ -364,7 +364,14 @@ class OrganizationDetailsScreen extends StatelessWidget {
                         message: 'No upcoming published events.',
                       )
                     else
-                      for (final event in model.events.value!)
+                      for (final event in (List.of(model.events.value!)..sort((a, b) {
+                        final dateA = a.startAt;
+                        final dateB = b.startAt;
+                        if (dateA == null && dateB == null) return 0;
+                        if (dateA == null) return 1;
+                        if (dateB == null) return -1;
+                        return dateA.compareTo(dateB);
+                      })))
                         Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: AppSurfaceCard(

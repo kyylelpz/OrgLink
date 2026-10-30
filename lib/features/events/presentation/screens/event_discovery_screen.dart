@@ -7,7 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../data/models/event.dart';
 import '../viewmodels/event_hub_view_model.dart';
+import '../widgets/event_sort.dart';
 import '../widgets/event_widgets.dart';
 
 class EventDiscoveryScreen extends StatelessWidget {
@@ -78,7 +80,6 @@ class EventDiscoveryScreen extends StatelessWidget {
               ),
           ],
         ),
-        // Navigation Pill at Bottom
         bottomNavigationBar: SafeArea(
           top: false,
           child: Padding(
@@ -159,7 +160,7 @@ class EventDiscoveryScreen extends StatelessWidget {
                     ),
                   ),
                   items: [
-                    for (final value in ['Upcoming', 'Ongoing', 'Past', 'All'])
+                    for (final value in ['All', 'Ongoing', 'Upcoming', 'Past'])
                       DropdownMenuItem(value: value, child: Text(value)),
                   ],
                   onChanged: (value) => model.filter(time: value),
@@ -222,7 +223,7 @@ class EventDiscoveryScreen extends StatelessWidget {
                           message: 'No accessible events match these filters.',
                         )
                 else
-                  for (final event in model.results)
+                  for (final event in sortByChronology(model.results))
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.md),
                       child: EventCard(
