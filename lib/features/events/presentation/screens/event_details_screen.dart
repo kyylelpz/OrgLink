@@ -307,7 +307,7 @@ class EventDetailsScreen extends StatelessWidget {
                         padding: EdgeInsets.only(bottom: AppSpacing.md),
                         child: LinearProgressIndicator(),
                       ),
-                    if (model.canEdit)
+                    if (model.canEdit) ...[
                       OutlinedButton(
                         onPressed: model.busy
                             ? null
@@ -322,8 +322,10 @@ class EventDetailsScreen extends StatelessWidget {
                         ),
                         child: const Text('Edit Draft'),
                       ),
-                    if (canSubmit)
-                      FilledButton.tonal(
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (canSubmit) ...[
+                      FilledButton(
                         onPressed: model.busy
                             ? null
                             : () => _act(context, 'submit'),
@@ -332,29 +334,33 @@ class EventDetailsScreen extends StatelessWidget {
                         ),
                         child: const Text('Submit for Approval'),
                       ),
-                    if (model.canReview)
-                      Wrap(
-                        spacing: 12,
-                        children: [
-                          FilledButton(
-                            onPressed: model.busy
-                                ? null
-                                : () => _act(context, 'approve'),
-                            child: const Text('Approve Event'),
-                          ),
-                          OutlinedButton(
-                            onPressed: model.busy
-                                ? null
-                                : () => _act(context, 'reject'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.error,
-                              side: const BorderSide(color: AppColors.error),
-                            ),
-                            child: const Text('Reject Event'),
-                          ),
-                        ],
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (model.canReview) ...[
+                      FilledButton(
+                        onPressed: model.busy
+                            ? null
+                            : () => _act(context, 'approve'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
+                        child: const Text('Approve Event'),
                       ),
-                    if (model.canPublish)
+                      const SizedBox(height: AppSpacing.sm),
+                      OutlinedButton(
+                        onPressed: model.busy
+                            ? null
+                            : () => _act(context, 'reject'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                        ),
+                        child: const Text('Reject Event'),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (model.canPublish) ...[
                       FilledButton(
                         onPressed: model.busy
                             ? null
@@ -364,10 +370,12 @@ class EventDetailsScreen extends StatelessWidget {
                         ),
                         child: const Text('Publish Event'),
                       ),
+                      const SizedBox(height: AppSpacing.sm), // <-- ADDED
+                    ],
                     if (model.isManager &&
                         organization.status == 'active' &&
                         event.archivedAt == null) ...[
-                      if (['draft', 'published'].contains(event.eventStatus))
+                      if (['draft', 'published'].contains(event.eventStatus)) ...[
                         OutlinedButton(
                           onPressed: model.busy
                               ? null
@@ -379,8 +387,10 @@ class EventDetailsScreen extends StatelessWidget {
                           ),
                           child: const Text('Cancel Event'),
                         ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
                       if (event.eventStatus == 'published' &&
-                          event.endAt?.isBefore(DateTime.now()) == true)
+                          event.endAt?.isBefore(DateTime.now()) == true) ...[
                         OutlinedButton(
                           onPressed: model.busy
                               ? null
@@ -390,10 +400,12 @@ class EventDetailsScreen extends StatelessWidget {
                           ),
                           child: const Text('Mark Completed'),
                         ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
                       if ([
                         'completed',
                         'cancelled',
-                      ].contains(event.eventStatus))
+                      ].contains(event.eventStatus)) ...[
                         OutlinedButton(
                           onPressed: model.busy
                               ? null
@@ -405,6 +417,8 @@ class EventDetailsScreen extends StatelessWidget {
                           ),
                           child: const Text('Archive Event'),
                         ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
                     ],
                     if (model.canViewParticipants)
                       OutlinedButton(
@@ -585,6 +599,7 @@ class RegistrationConfirmationScreen extends StatelessWidget {
                       ),
                       child: const Text('Confirm Registration'),
                     ),
+                    const SizedBox(height: AppSpacing.sm), 
                     TextButton(
                       onPressed: model.busy
                           ? null
