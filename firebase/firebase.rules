@@ -92,6 +92,13 @@ service cloud.firestore {
           && request.resource.data.applicantName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fullName
           && request.resource.data.joinedAt == null && request.resource.data.reviewedAt == null && request.resource.data.reviewedBy == null
           && request.resource.data.requestedAt == request.time && request.resource.data.updatedAt == request.time;
+        // Owners may withdraw only their own unreviewed ordinary request.
+        // Removal permits a fresh request later; reviewed memberships stay immutable here.
+        allow delete: if eligible() && owner(uid)
+          && resource.data.uid == uid && resource.data.organizationId == orgId
+          && resource.data.membershipRole == 'member' && resource.data.membershipStatus == 'pending'
+          && resource.data.permissions is map && resource.data.permissions.size() == 0
+          && resource.data.joinedAt == null && resource.data.reviewedAt == null && resource.data.reviewedBy == null;
         allow update: if manager(orgId) && uid != request.auth.uid && organization(orgId).status == 'active'
           && resource.data.uid == uid && resource.data.organizationId == orgId
           && resource.data.membershipStatus == 'pending'

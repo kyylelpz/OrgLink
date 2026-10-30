@@ -51,9 +51,9 @@ class TestOrganizationRepository implements OrganizationRepository {
   final document = TestFeed<Organization?>(demoOrg);
   final own = TestFeed<Membership?>(null);
   final events = TestFeed<List<PublishedEvent>>([]);
-  int requestCalls = 0, reviewCalls = 0, discoverCalls = 0;
-  Completer<void>? requestGate, reviewGate;
-  Object? requestError, reviewError;
+  int requestCalls = 0, reviewCalls = 0, discoverCalls = 0, cancelCalls = 0;
+  Completer<void>? requestGate, reviewGate, cancelGate;
+  Object? requestError, reviewError, cancelError;
   @override
   Stream<List<Organization>> discover() {
     discoverCalls++;
@@ -111,6 +111,25 @@ class TestOrganizationRepository implements OrganizationRepository {
     );
     own.emit(member);
     allMemberships.emit([...allMemberships.value, member]);
+  }
+
+  @override
+  Future<void> cancelMembershipRequest(String id, String uid) async {
+    cancelCalls++;
+    await cancelGate?.future;
+    if (cancelError case final error?) throw error;
+    final matches = allMemberships.value.where(
+      (member) => member.uid == uid && member.organizationId == id,
+    );
+    if (matches.isEmpty) return;
+    if (matches.single.status != 'pending' || matches.single.role != 'member') {
+      throw const AppFailure('This request is no longer pending.');
+    }
+    allMemberships.emit([
+      for (final member in allMemberships.value)
+        if (member.uid != uid || member.organizationId != id) member,
+    ]);
+    own.emit(null);
   }
 
   @override

@@ -15,6 +15,18 @@ The PDF is a source document, not an implemented-feature inventory.
 
 ## Implemented workflow
 
+Eligible students can use **Cancel Request** on Organization Details for their own
+pending ordinary membership, including after reopening the screen. Cancellation
+deletes only the unreviewed request in a Firestore transaction; it introduces no
+new membership status or audit record. Manager review and cancellation compete
+atomically: an approved/rejected membership cannot be deleted by the applicant.
+Successful cancellation removes the request from personal/manager lists and
+allows a fresh application if the organization still accepts requests. Errors
+retain the request and allow retry; duplicate taps are blocked while busy.
+Other users, managers and officers cannot cancel someone else's request. These
+Rules changes require an approved manual deployment; local implementation alone
+does not update the live policy.
+
 An active account with a completed student profile can discover public active
 organizations, search their names locally, open details, request membership,
 and track pending/active/rejected/removed records. Firestore streams update the
@@ -322,7 +334,9 @@ were not performed automatically.
   accounts. Custom membership requirement strings are informational, not a
   programmable enrollment-verification policy. Private organizations can be
   opened by provisioned active members/managers; students cannot request them.
-- Reapplication is deliberately unavailable. There is no automatic status reset.
+- Reapplication after rejection/removal is deliberately unavailable. Cancelling
+  an unreviewed request deletes it and permits a fresh application; it does not
+  reset any reviewed status.
 - Search filters the loaded discovery list. Full-text search and pagination are
   deferred for the small academic dataset.
 - Positions/public officers are optional publication-safe extensions. No private

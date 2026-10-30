@@ -224,9 +224,7 @@ class OrganizationDetailsScreen extends StatelessWidget {
                             if (model.membership.value == null &&
                                 !model.isManager) ...[
                               const SizedBox(height: AppSpacing.md),
-                              AppActionButton(
-                                busy: model.busy,
-                                busyLabel: 'Submitting membership request',
+                              FilledButton(
                                 onPressed: model.canRequest
                                     ? () async {
                                         final success = await model.request();
@@ -243,11 +241,50 @@ class OrganizationDetailsScreen extends StatelessWidget {
                                         }
                                       }
                                     : null,
-                                label: model.busy
-                                    ? 'Submitting...'
-                                    : model.submitted
-                                    ? 'Request Pending'
-                                    : 'Request to Join',
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 48),
+                                ),
+                                child: Text(
+                                  model.busy
+                                      ? 'Submitting...'
+                                      : model.submitted
+                                      ? 'Request Pending'
+                                      : 'Request to Join',
+                                ),
+                              ),
+                            ],
+                            if (!model.isManager &&
+                                (model.membership.value?.status == 'pending' ||
+                                    (model.submitted &&
+                                        model.membership.value == null))) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              TextButton(
+                                onPressed: model.canCancelRequest
+                                    ? () async {
+                                        final success = await model
+                                            .cancelRequest();
+                                        if (context.mounted && success) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Membership request cancelled.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    : null,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.error,
+                                  minimumSize: const Size(double.infinity, 48),
+                                ),
+                                child: Text(
+                                  model.busy
+                                      ? 'Cancelling...'
+                                      : 'Cancel Request',
+                                ),
                               ),
                             ],
                             if (!org.acceptsRequests)
@@ -364,14 +401,15 @@ class OrganizationDetailsScreen extends StatelessWidget {
                         message: 'No upcoming published events.',
                       )
                     else
-                      for (final event in (List.of(model.events.value!)..sort((a, b) {
-                        final dateA = a.startAt;
-                        final dateB = b.startAt;
-                        if (dateA == null && dateB == null) return 0;
-                        if (dateA == null) return 1;
-                        if (dateB == null) return -1;
-                        return dateA.compareTo(dateB);
-                      })))
+                      for (final event
+                          in (List.of(model.events.value!)..sort((a, b) {
+                            final dateA = a.startAt;
+                            final dateB = b.startAt;
+                            if (dateA == null && dateB == null) return 0;
+                            if (dateA == null) return 1;
+                            if (dateB == null) return -1;
+                            return dateA.compareTo(dateB);
+                          })))
                         Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: AppSurfaceCard(

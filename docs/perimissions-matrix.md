@@ -20,6 +20,7 @@ All allowed actions below still require the relevant active account/org, record 
 | Discover organizations | Public + active | Also assigned orgs | Also accessible joined/private orgs | Normal discovery; admin directory via Worker |
 | Request membership | Own request to accepting public active org | Cannot self-apply to assigned org | Same ordinary request restrictions | No special membership bypass |
 | Review membership | No | Pending others: approve/reject | No | No implicit manager power |
+| Cancel membership request | Owner's unreviewed ordinary pending request only | No authority over others' cancellation | No authority over others' cancellation | No special cancellation privilege |
 | Read active roster | No by default | Yes | Active membership + `viewRoster: true` (role need not be officer) | No implicit roster power |
 | Create event | No | Yes | Officer + `manageEvents: true` | No implicit event power |
 | Edit/submit draft or change poster | No | Eligible editable drafts | Officer + `manageEvents`, own `createdBy` only | No implicit event power |

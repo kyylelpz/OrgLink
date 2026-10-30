@@ -45,6 +45,15 @@ class FirestoreOrganizationRepository implements OrganizationRepository {
   }
 
   @override
+  Future<void> cancelMembershipRequest(String id, String uid) async {
+    try {
+      await _service.cancelMembershipRequest(id, uid);
+    } catch (error) {
+      throw AppFailure.from(error);
+    }
+  }
+
+  @override
   Future<void> reviewMembership(
     String id,
     String applicantUid,

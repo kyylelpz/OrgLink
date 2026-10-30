@@ -56,6 +56,38 @@ class OrganizationDetailsViewModel extends ChangeNotifier {
     }
   }
 
+  bool get canCancelRequest =>
+      !busy &&
+      !isManager &&
+      !membership.loading &&
+      membership.failure == null &&
+      organization.failure == null &&
+      ((membership.value?.uid == uid &&
+              membership.value?.organizationId == id &&
+              membership.value?.role == 'member' &&
+              membership.value?.status == 'pending') ||
+          (submitted && membership.value == null));
+
+  Future<bool> cancelRequest() async {
+    if (!canCancelRequest) return false;
+    busy = true;
+    actionFailure = null;
+    notifyListeners();
+    try {
+      await repository.cancelMembershipRequest(id, uid);
+      if (!_disposed) submitted = false;
+      return true;
+    } catch (error) {
+      if (!_disposed) actionFailure = AppFailure.from(error);
+      return false;
+    } finally {
+      if (!_disposed) {
+        busy = false;
+        notifyListeners();
+      }
+    }
+  }
+
   void retry() {
     organization.retry();
     membership.retry();

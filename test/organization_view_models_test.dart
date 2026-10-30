@@ -11,6 +11,117 @@ import 'support/test_organization_repository.dart';
 
 Future<void> flush() => Future<void>.delayed(Duration.zero);
 void main() {
+  test(
+    'restored pending request can be cancelled and requested again',
+    () async {
+      final repo = TestOrganizationRepository();
+      await repo.requestMembership('robotics', 'student');
+      final model = OrganizationDetailsViewModel(repo, 'robotics', 'student');
+      await flush();
+      expect(model.submitted, isFalse);
+      expect(model.canCancelRequest, isTrue);
+      expect(await model.cancelRequest(), isTrue);
+      await flush();
+      expect(repo.allMemberships.value, isEmpty);
+      expect(model.canCancelRequest, isFalse);
+      expect(model.canRequest, isTrue);
+      expect(await model.request(), isTrue);
+      await flush();
+      expect(model.membership.value?.status, 'pending');
+      model.dispose();
+      await repo.close();
+    },
+  );
+  test(
+    'cancel prevents duplicates and retains pending state on failure',
+    () async {
+      final repo = TestOrganizationRepository();
+      await repo.requestMembership('robotics', 'student');
+      final model = OrganizationDetailsViewModel(repo, 'robotics', 'student');
+      await flush();
+      repo.cancelGate = Completer<void>();
+      repo.cancelError = const AppFailure('Cancellation failed.');
+      final first = model.cancelRequest();
+      expect(model.busy, isTrue);
+      expect(await model.cancelRequest(), isFalse);
+      repo.cancelGate!.complete();
+      expect(await first, isFalse);
+      expect(repo.cancelCalls, 1);
+      expect(model.membership.value?.status, 'pending');
+      expect(model.actionFailure?.message, 'Cancellation failed.');
+      expect(model.canCancelRequest, isTrue);
+      repo.cancelError = null;
+      expect(await model.cancelRequest(), isTrue);
+      model.dispose();
+      await repo.close();
+    },
+  );
+  test(
+    'reviewed requests and failed membership reads cannot be cancelled',
+    () async {
+      final repo = TestOrganizationRepository();
+      final model = OrganizationDetailsViewModel(repo, 'robotics', 'student');
+      await flush();
+      for (final status in ['active', 'rejected', 'removed']) {
+        repo.allMemberships.emit([
+          Membership(
+            uid: 'student',
+            organizationId: 'robotics',
+            role: 'member',
+            status: status,
+          ),
+        ]);
+        await flush();
+        expect(await model.cancelRequest(), isFalse);
+      }
+      repo.allMemberships.fail(const AppFailure('Offline'));
+      await flush();
+      expect(model.canCancelRequest, isFalse);
+      expect(repo.cancelCalls, 0);
+      model.dispose();
+      await repo.close();
+    },
+  );
+  test(
+    'manager approval during cancellation preserves the active membership',
+    () async {
+      final repo = TestOrganizationRepository();
+      await repo.requestMembership('robotics', 'student');
+      final model = OrganizationDetailsViewModel(repo, 'robotics', 'student');
+      await flush();
+      repo.cancelGate = Completer<void>();
+      final cancellation = model.cancelRequest();
+      await repo.reviewMembership(
+        'robotics',
+        'student',
+        'manager',
+        approve: true,
+      );
+      repo.cancelGate!.complete();
+      expect(await cancellation, isFalse);
+      await flush();
+      expect(model.membership.value?.status, 'active');
+      expect(model.canCancelRequest, isFalse);
+      expect(model.actionFailure, isNotNull);
+      model.dispose();
+      await repo.close();
+    },
+  );
+  test(
+    'cancellation completion after disposal does not notify the disposed model',
+    () async {
+      final repo = TestOrganizationRepository();
+      await repo.requestMembership('robotics', 'student');
+      final model = OrganizationDetailsViewModel(repo, 'robotics', 'student');
+      await flush();
+      repo.cancelGate = Completer<void>();
+      final cancellation = model.cancelRequest();
+      model.dispose();
+      repo.cancelGate!.complete();
+      expect(await cancellation, isTrue);
+      await repo.close();
+    },
+  );
   test('typed model round trips timestamps and optional fields', () {
     final org = Organization.fromMap('id', {
       'name': 'Demo',

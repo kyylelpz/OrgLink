@@ -65,9 +65,13 @@ class OrganizationApp {
 
 const longName = "IEEE / iOS Builders of de la Cruz and McDonald University";
 const applicant = "Alexandria-McDonald de la Cruz O'Neil";
-Organization organization({String? logo}) => Organization(
-  id: 'robotics',
-  name: longName,
+Organization organization({
+  String? logo,
+  String id = 'robotics',
+  String name = longName,
+}) => Organization(
+  id: id,
+  name: name,
   description: 'Build skills. Share ideas. Find your people.',
   visibility: 'public',
   status: 'active',
@@ -124,7 +128,10 @@ void main() {
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
           final app = OrganizationApp();
           addTearDown(() => app.close(tester));
-          app.orgs.organizations.emit([organization()]);
+          app.orgs.organizations.emit([
+            organization(),
+            organization(id: 'creative', name: 'Discover: $longName'),
+          ]);
           app.orgs.document.emit(organization());
           app.orgs.allMemberships.emit([activeMember, pendingMember]);
           await app.mount(tester);
@@ -142,7 +149,13 @@ void main() {
             app.router.go(route.$2);
             await tester.pumpAndSettle();
             expect(tester.takeException(), isNull, reason: route.$1);
-            expect(find.text(longName), findsWidgets);
+            expect(
+              find.text(
+                route.$1 == 'discovery' ? 'Discover: $longName' : longName,
+              ),
+              findsWidgets,
+              reason: route.$1,
+            );
             if (scale == 1 || width == 320) {
               await app.screenshot(
                 tester,

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:orglink/app/app.dart';
 import 'package:orglink/app/router.dart';
 import 'package:orglink/core/constants/app_routes.dart';
+import 'package:orglink/core/errors/app_failure.dart';
 import 'package:orglink/features/auth/data/models/auth_user.dart';
 import 'package:orglink/features/auth/presentation/viewmodels/auth_view_model.dart';
 import 'package:orglink/features/organizations/data/repositories/organization_repository.dart';
@@ -14,6 +15,72 @@ import 'support/test_auth_repository.dart';
 import 'support/test_organization_repository.dart';
 
 void main() {
+  testWidgets('persisted pending request can retry cancellation and reapply', (
+    tester,
+  ) async {
+    final accounts = TestAuthRepository(), profiles = TestProfileRepository();
+    final organizations = TestOrganizationRepository(),
+        events = TestEventRepository();
+    await organizations.requestMembership('robotics', 'student');
+    final auth = AuthViewModel(accounts, profiles);
+    final appRouter = createAppRouter(auth);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      appRouter.dispose();
+      auth.dispose();
+      await organizations.close();
+      await events.close();
+      await accounts.controller.close();
+      await profiles.controller.close();
+    });
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: auth),
+          Provider<GoRouter>.value(value: appRouter),
+          Provider<EventRepository>.value(value: events),
+          Provider<OrganizationRepository>.value(value: organizations),
+        ],
+        child: const OrgLinkApp(),
+      ),
+    );
+    accounts.controller.add(student);
+    await tester.pump();
+    profiles.controller.add(profile());
+    await tester.pumpAndSettle();
+    appRouter.go(AppRoutes.organization('robotics'));
+    await tester.pumpAndSettle();
+    expect(find.text('Membership: Pending'), findsOneWidget);
+    await Scrollable.ensureVisible(
+      tester.element(find.text('Cancel Request')),
+      alignment: .5,
+    );
+    await tester.pumpAndSettle();
+    organizations.cancelError = const AppFailure(
+      'Cancellation failed. Try again.',
+    );
+    await tester.tap(find.text('Cancel Request'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancellation failed. Try again.'), findsOneWidget);
+    expect(find.text('Membership: Pending'), findsOneWidget);
+    organizations.cancelError = null;
+    await tester.tap(find.text('Cancel Request'));
+    await tester.pumpAndSettle();
+    expect(organizations.cancelCalls, 2);
+    expect(organizations.allMemberships.value, isEmpty);
+    expect(find.text('Membership request cancelled.'), findsOneWidget);
+    expect(find.text('Cancel Request'), findsNothing);
+    await Scrollable.ensureVisible(
+      tester.element(find.text('Request to Join')),
+      alignment: .5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Request to Join'));
+    await tester.pumpAndSettle();
+    expect(organizations.requestCalls, 2);
+    expect(find.text('Membership: Pending'), findsOneWidget);
+    expect(find.text('Cancel Request'), findsOneWidget);
+  });
   testWidgets(
     'student joins, assigned manager confirms approval, student sees active membership',
     (tester) async {

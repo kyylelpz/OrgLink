@@ -391,7 +391,7 @@ void main() {
     },
   );
   testWidgets(
-    'Home search navigates real results and organization filter chips remain functional',
+    'Home search navigates real results and organization navigation separates joined from discover',
     (tester) async {
       final app = _App();
       addTearDown(() => app.close(tester));
@@ -420,11 +420,15 @@ void main() {
         ),
       ]);
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilterChip, 'Joined'));
+      expect(find.text('Demo Creative'), findsOneWidget);
+      expect(find.text('Demo Robotics'), findsNothing);
+      await tester.tap(find.widgetWithText(FilterChip, 'My Organizations'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilterChip, 'Active'));
       await tester.pumpAndSettle();
       expect(find.text('Demo Robotics'), findsOneWidget);
       expect(find.text('Demo Creative'), findsNothing);
-      await tester.tap(find.widgetWithText(FilterChip, 'Discover').first);
+      await tester.tap(find.widgetWithText(FilterChip, 'Discover'));
       await tester.pumpAndSettle();
       expect(find.text('Demo Creative'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsNothing);

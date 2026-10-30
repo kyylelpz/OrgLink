@@ -137,12 +137,69 @@ test('active members can open private details but outsiders cannot',async()=>{
   await assertSucceeds(getDoc(doc(db(),'organizations/private')));
   await assertFails(getDoc(doc(db('officer'),'organizations/private')));
 });
-test('no client can create organizations, assign managers, grant roles or delete memberships',async()=>{
+test('no client can create organizations, assign managers, grant roles or delete another membership',async()=>{
   for(const uid of ['student','manager']) {
     await assertFails(setDoc(doc(db(uid),'organizations/new'),organization('new')));
     await assertFails(updateDoc(doc(db(uid),'organizations/public'),{managerUid:uid}));
     await assertFails(updateDoc(doc(db(uid),'organizations/public'),{description:'Edited'}));
     await assertFails(deleteDoc(ref(db(uid),'officer')));
+  }
+});
+
+test('owner can cancel a pending request and submit a fresh request',async()=>{
+  await assertSucceeds(setDoc(ref(db()),request()));
+  await assertSucceeds(deleteDoc(ref(db())));
+  assert.equal((await getDoc(ref(db()))).exists(),false);
+  await assertSucceeds(setDoc(ref(db()),request()));
+  assert.equal((await getDoc(ref(db()))).data().membershipStatus,'pending');
+});
+test('other students, managers, officers and anonymous users cannot cancel another request',async()=>{
+  await setDoc(ref(db()),request());
+  for(const uid of ['other','manager','officer'])await assertFails(deleteDoc(ref(db(uid))));
+  await assertFails(deleteDoc(ref(env.unauthenticatedContext().firestore())));
+  assert.equal((await getDoc(ref(db()))).data().membershipStatus,'pending');
+});
+for(const status of ['active','rejected','removed']) {
+  test(`owner cannot delete a ${status} membership`,async()=>{
+    await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:status});
+    await assertFails(deleteDoc(ref(db())));
+  });
+}
+test('ineligible and unverified owners cannot cancel pending requests',async()=>{
+  await adminWrite('organizations/public/memberships/suspended',request('suspended'));
+  await assertFails(deleteDoc(ref(db('suspended'),'suspended')));
+  await adminWrite('organizations/public/memberships/student',request());
+  const unverified=env.authenticatedContext('student',{email:'student@example.test',email_verified:false,firebase:{sign_in_provider:'password'}}).firestore();
+  await assertFails(deleteDoc(ref(unverified)));
+});
+test('cancellation cannot delete privileged or reviewed pending records',async()=>{
+  for(const patch of [{membershipRole:'officer'},{permissions:{manageEvents:true}},{joinedAt:Timestamp.now()},{reviewedAt:Timestamp.now()},{reviewedBy:'manager'},{uid:'other'},{organizationId:'other'}]) {
+    await adminWrite('organizations/public/memberships/student',{...request(),...patch});
+    await assertFails(deleteDoc(ref(db())));
+  }
+});
+test('owner may cancel even after the organization stops accepting requests',async()=>{
+  await setDoc(ref(db()),request());
+  await adminWrite('organizations/public',organization('public',{approvalSettings:{acceptsRequests:false}}));
+  await assertSucceeds(deleteDoc(ref(db())));
+});
+test('concurrent manager review and cancellation never delete an approved membership',async()=>{
+  await setDoc(ref(db()),request());
+  const cancel=()=>runTransaction(db(),async t=>{
+    const snapshot=await t.get(ref(db()));
+    if(!snapshot.exists())return;
+    if(snapshot.data().membershipStatus!=='pending')throw Error('No longer pending');
+    t.delete(ref(db()));
+  });
+  const [cancelled,reviewed]=await Promise.allSettled([cancel(),updateDoc(ref(db('manager')),decision('active'))]);
+  const final=await getDoc(ref(db()));
+  if(final.exists()) {
+    assert.equal(final.data().membershipStatus,'active');
+    assert.equal(reviewed.status,'fulfilled');
+    assert.equal(cancelled.status,'rejected');
+  } else {
+    assert.equal(cancelled.status,'fulfilled');
+    assert.equal(reviewed.status,'rejected');
   }
 });
 test('published event summaries remain readable; malformed event and registration writes are denied',async()=>{

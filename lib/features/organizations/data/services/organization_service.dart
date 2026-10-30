@@ -133,6 +133,25 @@ class OrganizationService {
     });
   });
 
+  Future<void> cancelMembershipRequest(
+    String id,
+    String uid,
+  ) => _store.runTransaction((transaction) async {
+    final reference = _members(id).doc(uid);
+    final record = await transaction.get(reference);
+    if (!record.exists) return;
+    final data = record.data()!;
+    if (data['uid'] != uid ||
+        data['organizationId'] != id ||
+        data['membershipStatus'] != 'pending' ||
+        data['membershipRole'] != 'member') {
+      throw const AppFailure(
+        'This request is no longer pending. Refresh your membership status.',
+      );
+    }
+    transaction.delete(reference);
+  });
+
   Future<void> reviewMembership(
     String id,
     String applicantUid,
