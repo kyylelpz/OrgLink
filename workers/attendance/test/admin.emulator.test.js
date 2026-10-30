@@ -30,12 +30,18 @@ test('Firestore REST admin MVP: real queries/counts, concurrent decisions, manag
     const first=await api.list(as(admin,{collection:'users',field:'fullName',search:`Page ${suffix}`}));assert.equal(first.items.length,25);
     const second=await api.list(as(admin,{collection:'users',field:'fullName',search:`Page ${suffix}`,cursor:first.nextCursor}));assert.equal(second.items.length,3);
     assert.equal(new Set([...first.items,...second.items].map(p=>p.id)).size,28);
+    const surname=await api.list(as(admin,{collection:'users',field:'fullName',search:`  ${suffix.toUpperCase()}  `}));assert.equal(surname.items.length,25);
+    const surnameNext=await api.list(as(admin,{collection:'users',field:'fullName',search:suffix,cursor:surname.nextCursor}));assert.equal(surnameNext.items.length,7);
+    const emailPart=await api.list(as(admin,{collection:'users',field:'email',search:manager.toUpperCase()}));assert.equal(emailPart.items[0].id,manager);
+    assert.equal((await api.list(as(admin,{collection:'users',field:'studentNumber',search:'00003'}))).items[0].id,manager);
     const data={operation:'accountStatus',targetId:pending,version:(await snapshot('users/'+pending)).updateTime,action:'approve',requestId:'approve_'+suffix};
     const results=await Promise.allSettled([api.mutate(as(admin,data)),api.mutate(as(admin,{...data,requestId:'reject_'+suffix,action:'reject'}))]);
     assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'conflict');
     const audits=await db.query({from:[{collectionId:'activityLogs'}],where:{fieldFilter:{field:{fieldPath:'actorUid'},op:'EQUAL',value:{stringValue:admin}}}});assert.equal(audits.length,1);
     const winner=results[0].status==='fulfilled'?data:{...data,requestId:'reject_'+suffix,action:'reject'};assert.equal((await api.mutate(as(admin,winner))).duplicate,true);
     await api.mutate(as(admin,{operation:'createOrganization',targetId:org,requestId:'create_'+suffix,changes:{name:'IEEE iOS Society',description:'Synthetic integration organization',managerStudentId:'2026000003',managerProfileVersion:(await api.manager(as(admin,{studentId:'2026000003'}))).version,managerRegistryVersion:(await api.manager(as(admin,{studentId:'2026000003'}))).registryVersion,visibility:'public',status:'active'}}));
+    assert.equal((await api.list(as(admin,{collection:'organizations',field:'name',search:'ios so'}))).items[0].id,org);
+    assert.equal((await api.list(as(admin,{collection:'organizations',field:'__name__',search:org.toUpperCase()}))).items[0].id,org);
     await db.runTransaction(async t=>{t.set(db.doc(`organizations/${org}/events/event`),{title:'Existing Event'});t.set(db.doc(`organizations/${org}/events/event/attendance/participant`),{attendanceStatus:'present'});t.set(db.doc(`organizations/${org}/memberships/${manager}`),{membershipRole:'manager',membershipStatus:'active'});});
     const managerBefore=(await snapshot('users/'+manager)).data();
     await api.mutate(as(admin,{operation:'accountStatus',targetId:manager,requestId:'disable_'+suffix,version:(await snapshot('users/'+manager)).updateTime,action:'deactivate'}));

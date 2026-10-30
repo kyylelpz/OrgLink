@@ -1,3 +1,4 @@
+import { createDirectorySearchCache } from './admin_search.js';
 import { membershipBackend } from './memberships.js';
 import { imageBackend } from './images.js';
 import { profileBackend } from "./student_ids.js";
@@ -73,6 +74,7 @@ export function createHandler({
 } = {}) {
   const verify = firebaseVerifier({ fetchImpl, clock, returnClaims: true }),
     oauth = googleAccessToken({ fetchImpl, clock });
+  const searchCache = createDirectorySearchCache(clock);
   return async (request, env) => {
     const path = new URL(request.url).pathname;
     if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate", "/admin/manager", "/profile/save", "/images/sign", "/images/upload", "/images/finalize", "/images/remove", "/memberships/preview", "/memberships/mutate"].includes(path))
@@ -114,7 +116,7 @@ export function createHandler({
       const isProfile = path.startsWith("/profile/");
       const isImage = path.startsWith("/images/");
       const isMembership = path.startsWith("/memberships/");
-      const backend = isMembership ? membershipBackend(db, clock) : isImage ? imageBackend(db, env, clock, fetchImpl) : isAdmin ? adminBackend(db, clock) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
+      const backend = isMembership ? membershipBackend(db, clock) : isImage ? imageBackend(db, env, clock, fetchImpl) : isAdmin ? adminBackend(db, clock, searchCache, origin) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
       const operation = isMembership ? path.slice(13) : isImage ? path.slice(8) : isAdmin ? path.slice(7) : isProfile ? path.slice(9) : path.slice(1);
       stage = `${isMembership ? "memberships" : isImage ? "images" : isAdmin ? "platform-admin" : isProfile ? "profile" : "attendance"}.${operation}`;
       const result = await backend[operation]({

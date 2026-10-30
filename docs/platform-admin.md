@@ -63,12 +63,75 @@ Organizations counts saved organization documents, regardless of status. Counts
 are a transactionally consistent snapshot and refresh on request; not a new
 analytics collection or polling feed.
 
-Lists fetch 26 records to display **25 per page**, with Next/Previous cursors.
-Queries order by name then document ID for deterministic ties. Search supports a
-case-sensitive name prefix; accounts also support exact Student ID and exact email. Organization IDs remain exact-searchable. No
-normalized values are written back, and no unbounded client filtering is used.
-Refreshing/new searches reset or reload pages; concurrent inserts may require a
-new search/refresh to appear before an existing cursor.
+Lists display **25 records per page**, with Next/Previous cursors. An empty query
+restores the normal directory (26-record bounded Firestore queries, ordered by
+the default name field and document ID). Search is **manual**: the Search button
+and keyboard Search/Enter submit it. Typing or changing Search By does not fetch,
+filter or replace displayed results. No debounce or background search is used.
+
+Search By supports Account **Name**, **Email**, **Student ID** and Organization
+**Name** / **Organization ID**. Names use the full stored `fullName`, so a first,
+middle, surname or full-name substring matches regardless of its position.
+Matching trims outer whitespace and ignores case on the selected field. Partial
+email addresses and Student IDs are supported. Organization IDs (document IDs)
+also support substrings. The existing backend UID field selector remains
+allowlisted for compatible clients. Displayed spelling/values are unchanged;
+no normalized search fields are written to Firestore.
+
+Search/new empty submission resets pagination. Clear empties the input and
+restores the default first page. Refresh reloads the **last submitted** query and
+current page with a fresh server search snapshot; unsubmitted edits remain only
+in the input. Successful admin mutations invalidate the corresponding cached
+directory and reload current results. Previous/Next retain the submitted field
+and query, not whatever is currently being typed.
+
+### Bounded Substring Search and Limitations
+
+Firestore has no arbitrary substring operator. The Worker therefore builds a
+private, in-memory directory snapshot using a projected, document-ID-ordered
+query capped at **2,001 records**, accepting directories of at most **2,000**.
+It searches the whole accepted snapshot, not the currently loaded 25-row page,
+sorts by the case-normalized selected value and document ID for deterministic
+ties, and returns 25 results plus the existing cursor. Flutter never downloads
+the whole snapshot. Snapshot projections include only fields needed for directory
+cards, search and existing eligibility hints; cached data never authorizes writes.
+
+Each Worker handler/isolate caches a directory for **five minutes**, with at most
+four cache entries across collections/origins and coalesced concurrent misses.
+Normal repeated searches and pagination reuse it; explicit Refresh rebuilds it.
+Every request, including cache hits, independently verifies the current active,
+complete Platform Admin profile. Cache contents are never an authorization or
+account-status bypass. Manager assignment still uses the live, exact registry
+lookup below; mutation versions/status checks and atomic audit behavior remain
+unchanged. No new collection, Rules, index, migration, secret or paid service is
+needed for search.
+
+An over-limit directory returns an explicit `resource-exhausted` error, **not
+incomplete matches**. The normal paginated directory remains available. For
+larger datasets, replace this MVP mechanism with a separately reviewed maintained
+search index; do not increase scans without a quota/design review. A cold cache
+reads up to 2,001 documents; regular authorized requests and organization manager
+enrichment also consume reads. Worker restarts/eviction/multiple isolates and
+frequent manual Refresh can rebuild snapshots more often. This bounds work for
+the current small dataset, but does not guarantee free-tier quotas for heavy use.
+
+Changes made outside this admin handler can remain absent/stale until expiry or
+Refresh (up to five minutes within an existing isolate). Record versions still
+prevent stale mutations; the authoritative backend rechecks every account action.
+Concurrent changes/refresh may move pagination boundaries, so return to the first
+page if necessary. Matching is a literal substring of at most 128 input
+characters: case-insensitive, but not accent-insensitive, fuzzy, token-based or
+multi-field OR search. Internal whitespace and name order are not rewritten.
+
+Search validation (30 October 2026): **24** targeted admin/Student ID Flutter
+tests passed; the full Flutter suite passed **296** tests; Worker unit/runtime
+tests passed **104**, including nine dedicated search cases; the local real
+Firestore REST admin integration passed **one** test covering projection,
+substring pagination and unchanged administration behavior. Worker bundle
+dry-run passed. Analysis retains four pre-existing warnings and one style hint;
+no new analyzer findings were introduced. No deployment or live-data operation
+was performed. Deploy the reviewed Worker before distributing the updated app;
+this search update requires no Firestore Rules/index or data migration.
 
 Account decisions:
 
@@ -145,7 +208,7 @@ All operations use POST JSON and Firebase `Authorization: Bearer <ID token>`:
 | Endpoint | Payload |
 | --- | --- |
 | `/admin/stats` | `{}` |
-| `/admin/list` | `collection: users or organizations`, allowed `field`, `search`, optional `{id,value}` cursor |
+| `/admin/list` | `collection: users or organizations`, allowed `field`, `search`, optional `{id,value}` cursor, optional boolean `refresh` |
 | `/admin/mutate` | `requestId`, `operation`, `targetId`, operation-specific fields below |
 
 Mutation operations: `accountStatus` takes `action` (`approve`, `reject`, `deactivate`, or `reactivate`) and `version`;
@@ -281,7 +344,7 @@ claims; ordinary/manager/pending/disabled admin denial; pending approval/rejecti
 active deactivation, disabled reactivation, self/admin protection, profile preservation; complete eligible
 manager validation; create/edit/reassign and child history preservation; stale
 versions/ownership and racing decisions; idempotency, audit atomicity/failure;
-real aggregation, exact/prefix queries and cursor pages; direct-client profile,
+real aggregation, bounded case-insensitive substring queries and cursor pages; direct-client profile,
 manager and audit forgery denial; confirmed/declined/idempotent provisioning and
 UID/email mismatches; responsive UI, confirmation cancellation, session/role
 revocation, loading/error/empty components and Back behavior.
@@ -405,8 +468,9 @@ dialog. Firebase UID remains the hidden internal target for status operations,
 self checks, document paths and audit actor references. No reference migration or
 UID replacement occurred. Names/email/status remain visible under admin-only
 access. Missing/invalid legacy Student IDs require operator correction; no display
-padding or guessed value is persisted. Exact ID search uses stored studentNumber,
-accepts precisely 10 numeric digits and retains existing cursor pagination.
+padding or guessed value is persisted. Directory search uses stored studentNumber
+with partial, trimmed matching and existing pagination. This does not relax
+Student ID validation when saving profiles or resolving a manager.
 
 Organization cards show manager name/Student ID instead of manager UID. The editor
 uses a numeric 10-character **Manager Student ID** field and **Find Manager**.

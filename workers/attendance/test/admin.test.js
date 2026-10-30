@@ -63,7 +63,7 @@ test('ineligible manager, arbitrary fields, invalid logo/protocol and oversized 
     assert.equal(db.get('organizations/org'),undefined);
   }
 });
-test('real counts, ordered cursor pages, prefix/exact searches and allowlisted collections',async()=>{
+test('real counts, ordered cursor pages, substring searches and allowlisted collections',async()=>{
   const {db,api}=fixture();for(let i=0;i<30;i++)db.seed('users/member'+i,{...profile('member'+i),fullName:'Prefix Student '+String(i).padStart(2,'0')});
   const stats=await api.stats(as('admin',{}));assert.deepEqual(stats,{users:33,pending:1,organizations:0});
   const first=await api.list(as('admin',{collection:'users',field:'fullName',search:'Prefix'}));assert.equal(first.items.length,25);assert.ok(first.nextCursor);

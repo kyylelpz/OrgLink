@@ -7,13 +7,15 @@ abstract interface class AdminRepository {
   Future<AdminPage<AdminAccount>> accounts(
     String field,
     String search,
-    Map<String, dynamic>? cursor,
-  );
+    Map<String, dynamic>? cursor, {
+    bool refresh = false,
+  });
   Future<AdminPage<AdminOrganization>> organizations(
     String field,
     String search,
-    Map<String, dynamic>? cursor,
-  );
+    Map<String, dynamic>? cursor, {
+    bool refresh = false,
+  });
   Future<void> mutate(Map<String, dynamic> data);
 }
 
@@ -32,13 +34,15 @@ class WorkerAdminRepository implements AdminRepository {
     String field,
     String search,
     Map<String, dynamic>? cursor,
-    T Function(Map<String, dynamic>) parse,
-  ) async {
+    T Function(Map<String, dynamic>) parse, {
+    bool refresh = false,
+  }) async {
     final result = await service.call('list', {
       'collection': collection,
       'field': field,
       'search': search,
       'cursor': ?cursor,
+      if (refresh) 'refresh': true,
     });
     return AdminPage(
       (result['items'] as List)
@@ -54,14 +58,30 @@ class WorkerAdminRepository implements AdminRepository {
   Future<AdminPage<AdminAccount>> accounts(
     String field,
     String search,
-    Map<String, dynamic>? cursor,
-  ) => _page('users', field, search, cursor, AdminAccount.fromMap);
+    Map<String, dynamic>? cursor, {
+    bool refresh = false,
+  }) => _page(
+    'users',
+    field,
+    search,
+    cursor,
+    AdminAccount.fromMap,
+    refresh: refresh,
+  );
   @override
   Future<AdminPage<AdminOrganization>> organizations(
     String field,
     String search,
-    Map<String, dynamic>? cursor,
-  ) => _page('organizations', field, search, cursor, AdminOrganization.fromMap);
+    Map<String, dynamic>? cursor, {
+    bool refresh = false,
+  }) => _page(
+    'organizations',
+    field,
+    search,
+    cursor,
+    AdminOrganization.fromMap,
+    refresh: refresh,
+  );
   @override
   Future<void> mutate(Map<String, dynamic> data) async {
     await service.call('mutate', data);

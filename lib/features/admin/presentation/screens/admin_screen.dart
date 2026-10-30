@@ -111,6 +111,13 @@ class _AdminContentState extends State<_AdminContent> {
   Widget build(BuildContext context) {
     final vm = context.watch<AdminViewModel>();
     final accounts = vm.section == AdminSection.accounts;
+    Future<void> executeSearch() async {
+      if (search.text.trim().isEmpty) {
+        setState(() => searchField = accounts ? 'fullName' : 'name');
+      }
+      await vm.find(searchField ?? vm.field, search.text);
+    }
+
     final title = switch (vm.section) {
       AdminSection.dashboard => 'Platform Admin',
       AdminSection.accounts => 'Account Management',
@@ -183,23 +190,22 @@ class _AdminContentState extends State<_AdminContent> {
               DropdownButtonFormField<String>(
                 isExpanded: true,
                 itemHeight: null,
+                key: ValueKey(searchField ?? vm.field),
                 initialValue: searchField ?? vm.field,
                 decoration: const InputDecoration(labelText: 'Search By'),
                 items: [
                   DropdownMenuItem(
                     value: accounts ? 'fullName' : 'name',
-                    child: const Text('Name Prefix'),
+                    child: const Text('Name'),
                   ),
                   if (accounts)
                     const DropdownMenuItem(
                       value: 'email',
-                      child: Text('Exact Email'),
+                      child: Text('Email'),
                     ),
                   DropdownMenuItem(
                     value: accounts ? 'studentNumber' : '__name__',
-                    child: Text(
-                      accounts ? 'Exact Student ID' : 'Exact Organization ID',
-                    ),
+                    child: Text(accounts ? 'Student ID' : 'Organization ID'),
                   ),
                 ],
                 onChanged: vm.busy
@@ -210,9 +216,8 @@ class _AdminContentState extends State<_AdminContent> {
               TextField(
                 controller: search,
                 enabled: !vm.busy,
-                maxLength: (searchField ?? vm.field) == 'studentNumber'
-                    ? 10
-                    : 128,
+                maxLength: 128,
+                textInputAction: TextInputAction.search,
                 keyboardType: (searchField ?? vm.field) == 'studentNumber'
                     ? TextInputType.number
                     : TextInputType.text,
@@ -220,10 +225,11 @@ class _AdminContentState extends State<_AdminContent> {
                   labelText: 'Search',
                   helperMaxLines: 4,
                   helperText:
-                      'Names use a case-sensitive prefix; email and IDs use an exact match.',
+                      'Search any part of the selected field, ignoring case. Press Search to update results.',
                 ),
-                onSubmitted: (v) => vm.find(searchField ?? vm.field, v),
+                onSubmitted: (_) => executeSearch(),
               ),
+              const SizedBox(height: AppSpacing.md),
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
@@ -231,13 +237,22 @@ class _AdminContentState extends State<_AdminContent> {
                   AppActionButton(
                     label: 'Search',
                     busy: vm.busy,
-                    onPressed: () =>
-                        vm.find(searchField ?? vm.field, search.text),
+                    onPressed: executeSearch,
                   ),
                   AppActionButton(
                     label: 'Refresh',
                     style: AppActionStyle.outlined,
-                    onPressed: vm.busy ? null : vm.load,
+                    onPressed: vm.busy ? null : () => vm.load(refresh: true),
+                  ),
+                  AppActionButton(
+                    label: 'Clear',
+                    style: AppActionStyle.text,
+                    onPressed: vm.busy
+                        ? null
+                        : () {
+                            search.clear();
+                            executeSearch();
+                          },
                   ),
                   if (!accounts)
                     AppActionButton(
