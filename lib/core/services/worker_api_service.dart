@@ -43,6 +43,8 @@ class WorkerApiService {
           '/admin/mutate',
           '/admin/manager',
           '/profile/save',
+          '/memberships/preview',
+          '/memberships/mutate',
           '/images/sign',
           '/images/upload',
           '/images/finalize',

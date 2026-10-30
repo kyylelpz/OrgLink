@@ -523,7 +523,7 @@ void main() {
       await repo.close();
     },
   );
-  testWidgets(
+    testWidgets(
     'global QR Hub opens centrally; student scanner route guarded; history clears on account switch',
     (tester) async {
       final authRepo = TestAuthRepository(),
@@ -551,16 +551,23 @@ void main() {
       await tester.pump();
       profiles.controller.add(profile());
       await tester.pumpAndSettle();
+      
+      // 1. Verify QR Hub opens normally for a student
       await tester.tap(find.text('QR'));
       await tester.pumpAndSettle();
       expect(find.text('QR Hub'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Scan QR Code'), findsNothing);
+
+      // 2. Guarded route: When a student tries to go straight to the scanner, 
+      // they are redirected to QRHubScreen and shown the new banner.
       appRouter.go(AppRoutes.qrScan);
       await tester.pumpAndSettle();
       expect(
-        find.text('Attendance scanning permission is required.'),
+        find.textContaining('Attendance scanning permission is required'),
         findsOneWidget,
       );
+      
+      // 3. Attendance history clears on switch
       appRouter.go(AppRoutes.myAttendance);
       await tester.pumpAndSettle();
       expect(

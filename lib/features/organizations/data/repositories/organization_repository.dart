@@ -11,6 +11,10 @@ abstract interface class OrganizationRepository {
   Stream<List<PublishedEvent>> upcomingEvents(String id);
   Future<void> requestMembership(String id, String uid);
   Future<void> cancelMembershipRequest(String id, String uid);
+  Future<Map<String, dynamic>> membershipCommand(
+    String operation,
+    Map<String, dynamic> data,
+  );
   Future<void> reviewMembership(
     String id,
     String applicantUid,

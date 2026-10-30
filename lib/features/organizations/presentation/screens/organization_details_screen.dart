@@ -212,7 +212,6 @@ class OrganizationDetailsScreen extends StatelessWidget {
                             ),
                             if ([
                               'rejected',
-                              'removed',
                             ].contains(model.membership.value?.status))
                               const Padding(
                                 padding: EdgeInsets.only(top: AppSpacing.xs),
@@ -221,7 +220,9 @@ class OrganizationDetailsScreen extends StatelessWidget {
                                   style: TextStyle(color: AppColors.error),
                                 ),
                               ),
-                            if (model.membership.value == null &&
+                            if ((model.membership.value == null ||
+                                    model.membership.value?.status ==
+                                        'removed') &&
                                 !model.isManager) ...[
                               const SizedBox(height: AppSpacing.md),
                               FilledButton(

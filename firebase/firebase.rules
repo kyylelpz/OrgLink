@@ -99,6 +99,17 @@ service cloud.firestore {
           && resource.data.membershipRole == 'member' && resource.data.membershipStatus == 'pending'
           && resource.data.permissions is map && resource.data.permissions.size() == 0
           && resource.data.joinedAt == null && resource.data.reviewedAt == null && resource.data.reviewedBy == null;
+        allow update: if eligible() && owner(uid)
+          && resource.data.uid == uid && resource.data.organizationId == orgId
+          && resource.data.membershipStatus == 'removed'
+          && organization(orgId).status == 'active' && organization(orgId).visibility == 'public'
+          && organization(orgId).managerUid != request.auth.uid && organization(orgId).approvalSettings.acceptsRequests == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['membershipRole','membershipStatus','positionTitle','permissions','applicantName','requestedAt','joinedAt','updatedAt','reviewedAt','reviewedBy'])
+          && request.resource.data.membershipStatus == 'pending' && request.resource.data.membershipRole == 'member'
+          && request.resource.data.positionTitle == null && request.resource.data.permissions is map && request.resource.data.permissions.size() == 0
+          && request.resource.data.applicantName == get(/databases/$(database)/documents/users/$(uid)).data.fullName
+          && request.resource.data.joinedAt == null && request.resource.data.reviewedAt == null && request.resource.data.reviewedBy == null
+          && request.resource.data.requestedAt == request.time && request.resource.data.updatedAt == request.time;
         allow update: if manager(orgId) && uid != request.auth.uid && organization(orgId).status == 'active'
           && resource.data.uid == uid && resource.data.organizationId == orgId
           && resource.data.membershipStatus == 'pending'
@@ -108,6 +119,10 @@ service cloud.firestore {
           && request.resource.data.reviewedAt == request.time && request.resource.data.updatedAt == request.time
           && ((request.resource.data.membershipStatus == 'active' && request.resource.data.joinedAt == request.time)
             || (request.resource.data.membershipStatus == 'rejected' && request.resource.data.joinedAt == null));
+      }
+      match /membershipAudits/{auditId} {
+        allow read: if manager(orgId);
+        allow write: if false;
       }
       match /events/{eventId} {
         // Eligibility is checked once at each allow boundary.

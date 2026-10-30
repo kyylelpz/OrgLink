@@ -166,7 +166,7 @@ void main() {
     await repo.close();
   });
   test(
-    'duplicate join submissions and terminal memberships stay blocked',
+    'duplicate joins stay blocked and only ended memberships can reapply',
     () async {
       final repo = TestOrganizationRepository();
       final model = OrganizationDetailsViewModel(repo, 'robotics', 'student');
@@ -189,7 +189,7 @@ void main() {
           ),
         ]);
         await flush();
-        expect(model.canRequest, isFalse);
+        expect(model.canRequest, status == 'removed');
       }
       model.dispose();
       await repo.close();

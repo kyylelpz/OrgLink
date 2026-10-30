@@ -210,3 +210,40 @@ test('published event summaries remain readable; malformed event and registratio
   await assertFails(setDoc(doc(db('manager'),'organizations/public/events/new'),{title:'Event'}));
   await assertFails(setDoc(doc(db(),'organizations/public/events/live/registrations/student'),{uid:'student'}));
 });
+
+test('role, permission and termination writes require the trusted membership backend',async()=>{
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'active'});
+  for(const uid of ['student','manager','officer'])for(const changes of [
+    {membershipRole:'officer',positionTitle:'President'},
+    {permissions:{manageEvents:true,manageAttendance:true,viewRoster:true}},
+    {membershipStatus:'removed',endedBy:uid,endedAt:serverTimestamp()},
+  ])await assertFails(updateDoc(ref(db(uid)),changes));
+});
+const reapply=()=>({membershipStatus:'pending',membershipRole:'member',positionTitle:null,permissions:{},applicantName:'Demo student',requestedAt:serverTimestamp(),joinedAt:null,updatedAt:serverTimestamp(),reviewedAt:null,reviewedBy:null});
+test('ended membership reuses its UID document for a permission-free request and preserves end metadata',async()=>{
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed',membershipRole:'officer',permissions:{manageEvents:true},positionTitle:'President',endedBy:'manager',endReason:'Completed service',endedAt:Timestamp.fromMillis(1000)});
+  await assertSucceeds(updateDoc(ref(db()),reapply()));
+  const value=(await getDoc(ref(db()))).data();assert.equal(value.membershipRole,'member');assert.deepEqual(value.permissions,{});assert.equal(value.endedBy,'manager');assert.equal(value.endReason,'Completed service');
+  await assertSucceeds(updateDoc(ref(db('manager')),decision('active')));
+  assert.equal((await getDoc(ref(db()))).data().membershipStatus,'active');
+});
+test('reapplication cannot forge role, history, identity or skip pending approval',async()=>{
+  for(const changes of [{membershipStatus:'active'},{membershipRole:'officer'},{permissions:{viewRoster:true}},{uid:'other'},{endedBy:'student'},{endReason:'forged'},{reviewedBy:'manager'}]){
+    await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed',endedBy:'manager',endReason:'original'});
+    await assertFails(updateDoc(ref(db()),{...reapply(),...changes}));
+  }
+  for(const status of ['active','pending','rejected']){
+    await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:status});
+    await assertFails(updateDoc(ref(db()),reapply()));
+  }
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed'});
+  await assertFails(updateDoc(ref(db('other')),reapply()));
+});
+test('former roster is manager-only; active roster permission does not expose former members',async()=>{
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed'});
+  await adminWrite('organizations/public/memberships/officer',{...request('officer'),membershipStatus:'active',permissions:{viewRoster:true}});
+  const former=database=>query(collection(database,'organizations/public/memberships'),where('membershipStatus','==','removed'));
+  assert.equal((await assertSucceeds(getDocs(former(db('manager'))))).size,1);
+  await assertFails(getDocs(former(db('officer'))));
+  await assertSucceeds(getDoc(ref(db())));
+});

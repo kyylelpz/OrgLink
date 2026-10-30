@@ -15,11 +15,16 @@ class Membership {
     this.updatedAt,
     this.reviewedAt,
     this.reviewedBy,
+    this.endedAt,
+    this.endedBy,
+    this.endReason,
   });
   final String uid, organizationId, role, status, applicantName;
   final String? positionTitle, reviewedBy;
   final Map<String, dynamic> permissions;
   final DateTime? requestedAt, joinedAt, updatedAt, reviewedAt;
+  final DateTime? endedAt;
+  final String? endedBy, endReason;
   bool get canViewRoster =>
       status == 'active' && permissions['viewRoster'] == true;
   String get statusLabel => status == 'active' ? 'Approved (active)' : status;
@@ -40,6 +45,9 @@ class Membership {
     reviewedBy: data['reviewedBy'] is String
         ? data['reviewedBy'] as String
         : null,
+    endedAt: firestoreDate(data['endedAt']),
+    endedBy: data['endedBy'] as String?,
+    endReason: data['endReason'] as String?,
   );
   Map<String, dynamic> toMap() => {
     'uid': uid,
@@ -54,6 +62,9 @@ class Membership {
     'updatedAt': _timestamp(updatedAt),
     'reviewedAt': _timestamp(reviewedAt),
     'reviewedBy': reviewedBy,
+    if (endedAt != null) 'endedAt': _timestamp(endedAt),
+    if (endedBy != null) 'endedBy': endedBy,
+    if (endReason != null) 'endReason': endReason,
   };
   static Timestamp? _timestamp(DateTime? value) =>
       value == null ? null : Timestamp.fromDate(value);

@@ -71,4 +71,16 @@ class FirestoreOrganizationRepository implements OrganizationRepository {
       throw AppFailure.from(error);
     }
   }
+
+  @override
+  Future<Map<String, dynamic>> membershipCommand(
+    String operation,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      return await _service.membershipCommand(operation, data);
+    } catch (error) {
+      throw AppFailure.from(error);
+    }
+  }
 }

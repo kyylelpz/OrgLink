@@ -50,22 +50,7 @@ class QRLandingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hub = context.watch<EventHubViewModel>();
-    final orgs = hub.organizations;
-
-    // Instantly check if they manage any org
-    final isManager =
-        orgs.managed.value?.isNotEmpty == true ||
-        orgs.mine.value?.any(
-              (m) => m.role == 'officer' || m.role == 'manager',
-            ) ==
-            true;
-
-    // If they are a manager, take them straight to the camera
-    if (isManager) {
-      return const ScannerScreen();
-    }
-
-    // If permissions are still loading, show a blank loading screen (no flash of Hub)
+    
     if (!attendancePermissionsReady(hub)) {
       return const Scaffold(
         backgroundColor: AppColors.brandMidnight,
@@ -73,7 +58,15 @@ class QRLandingScreen extends StatelessWidget {
       );
     }
 
-    // Otherwise, show the QR Hub (Student pass)
+    // Instantly check if they have any valid attendance permissions
+    final permissions = attendanceOrganizations(hub);
+
+    // If they have permissions, take them straight to the camera
+    if (permissions.isNotEmpty) {
+      return const ScannerScreen();
+    }
+
+    // Otherwise, show the QR Hub (Member view)
     return const QRHubScreen();
   }
 }
@@ -87,6 +80,12 @@ class QRHubScreen extends StatelessWidget {
     final orgs = hub.organizations;
     final name = context.watch<AuthViewModel?>()?.profile?.details.fullName;
 
+    // Check if they hold an officer/manager role but lack attendance permissions
+    final isOfficer = orgs.mine.value?.any(
+          (m) => m.role == 'officer' || m.role == 'manager',
+        ) ==
+        true;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -94,6 +93,7 @@ class QRHubScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
         appBar: AppBar(
+          // ... (Keep your existing AppBar code)
           toolbarHeight:
               56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           backgroundColor: AppColors.brandMidnight,
@@ -113,7 +113,6 @@ class QRHubScreen extends StatelessWidget {
         ),
         body: AppPageBody(
           child: SingleChildScrollView(
-            // Added scroll for smaller screens
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -124,6 +123,8 @@ class QRHubScreen extends StatelessWidget {
                   prominent: true,
                 ),
                 const SizedBox(height: AppSpacing.lg),
+                
+                // ... (Keep your existing dark Event Pass Card)
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: const BoxDecoration(
@@ -165,6 +166,8 @@ class QRHubScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
+                
+                // ... (Keep your existing buttons)
                 FilledButton.icon(
                   onPressed: () => context.go(AppRoutes.myQRCode),
                   icon: const Icon(Icons.qr_code),
@@ -183,28 +186,21 @@ class QRHubScreen extends StatelessWidget {
                   ),
                 ),
 
-                // --- ORGANIZER TOOLS ---
+                // ─── ORGANIZER TOOLS ───
                 if (permissions.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.lg),
                   const AppSectionHeading(title: 'Organizer Tools'),
                   const SizedBox(height: AppSpacing.sm),
 
-                  // Primary: Scan QR Code
                   FilledButton.tonalIcon(
-                    onPressed:
-                        !attendancePermissionsReady(hub) || permissions.isEmpty
-                        ? null
-                        : () => context.go(AppRoutes.qrScan),
+                    onPressed: () => context.go(AppRoutes.qrScan),
                     icon: const Icon(Icons.qr_code_scanner),
                     label: const Text('Scan QR Code'),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
-
                   const SizedBox(height: AppSpacing.sm),
-
-                  // Secondary: Attendance Management (Now colored!)
                   FilledButton.tonalIcon(
                     onPressed: () => context.go(AppRoutes.attendanceHub),
                     icon: const Icon(
@@ -213,31 +209,44 @@ class QRHubScreen extends StatelessWidget {
                     ),
                     label: const Text('Attendance Management'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.success.withValues(
-                        alpha: 0.15,
-                      ), // Soft green
-                      foregroundColor: AppColors.success, // Green text
+                      backgroundColor: AppColors.success.withValues(alpha: 0.15),
+                      foregroundColor: AppColors.success,
                       minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
+                ],
 
-                  if (orgs.mine.loading ||
-                      orgs.managed.loading ||
-                      orgs.associated.values.any((q) => q.loading))
-                    const Padding(
-                      padding: EdgeInsets.only(top: AppSpacing.sm),
-                      child: LinearProgressIndicator(),
-                    ),
-                  if (orgs.mine.failure != null ||
-                      orgs.managed.failure != null ||
-                      orgs.associated.values.any((q) => q.failure != null))
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
-                      child: AppErrorView(
-                        message: 'Unable to load attendance permissions.',
-                        onRetry: orgs.retry,
+                // ─── OFFICER WITHOUT PERMISSION NOTICE ───
+                if (isOfficer && permissions.isEmpty) ...[
+                  const SizedBox(height: AppSpacing.xl),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.brandMidnight.withValues(alpha: 0.05),
+                      borderRadius: AppShape.card,
+                      border: Border.all(
+                        color: AppColors.brandMidnight.withValues(alpha: 0.1),
                       ),
                     ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          color: AppColors.brandMidnight,
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        const Expanded(
+                          child: Text(
+                            'Attendance scanning permission is required. Contact your organization manager to request access.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.brandMidnight,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ],
             ),
