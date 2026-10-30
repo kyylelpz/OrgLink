@@ -199,10 +199,10 @@ class _AttendanceEventsState extends State<_AttendanceEvents> {
         );
       }
       if (query.value!.isEmpty) return const Text('No events available.');
-        return Column(
-          children: [
-            for (final event in sortByChronology(query.value!))
-              ListTile(
+      return Column(
+        children: [
+          for (final event in sortByChronology(query.value!))
+            ListTile(
               title: Text(event.title),
               subtitle: Text(
                 '${schedule(event.startAt)} | ${displayIdentifier(event.eventStatus)}',
@@ -439,7 +439,7 @@ class AttendanceScreen extends StatelessWidget {
                               ),
                             ),
                             Flexible(
-                              AttendanceStatusBadge(
+                              child: AttendanceStatusBadge(
                                 model.recordFor(registration.uid),
                               ),
                             ),

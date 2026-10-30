@@ -75,8 +75,11 @@ class _AttendanceCorrectionDialogState
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
                         children: [
                           const Text(
                             'Current Status:',
@@ -105,9 +108,7 @@ class _AttendanceCorrectionDialogState
                     labelText: 'Correct Status To',
                     filled: true,
                     fillColor: AppColors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: AppShape.action,
-                    ),
+                    border: OutlineInputBorder(borderRadius: AppShape.action),
                   ),
                   items: [
                     for (final status in AttendanceCorrectionStatus.values)
