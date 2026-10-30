@@ -1,6 +1,6 @@
 # OrgLink V1 Documentation
 
-Audited **30 October 2026 (Asia/Manila)** at commit `9b1e0536b98b5325fc90d189eb1327c08fc1dfef`. Verdict: **Conditionally Ready for the implemented core demonstration**, subject to deployment and physical-device acceptance. The complete original specification is **not complete**. See the [audit report](v1-audit-report.md) before presenting or releasing.
+Audited **30 October 2026 (Asia/Manila)**. Verdict: **Conditionally Ready for the implemented core demonstration**, subject to deployment and physical-device acceptance. The complete original specification is **not complete**. See the [audit report](docs\new\v1-audit-report.md) before presenting or releasing.
 
 OrgLink is a Flutter Android student organization application using Firebase Authentication, Cloud Firestore, a Cloudflare Worker and Cloudinary. Only the existing `orglink-dev` project is configured and authorized. App version is `1.0.0+1`.
 
@@ -32,7 +32,7 @@ npm.cmd test --prefix tools/admin
 flutter run --dart-define=ATTENDANCE_API_URL=https://orglink-attendance.orglink-dev.workers.dev
 ```
 
-The ordinary app uses configured Firebase services, even in debug mode. Running it can access live development data; emulator isolation applies to the named test harnesses, not automatically to `flutter run`. Follow [deployment](deployment.md) for setup commands and manual release gates.
+The ordinary app uses configured Firebase services, even in debug mode. Running it can access live development data; emulator isolation applies to the named test harnesses, not automatically to `flutter run`. Follow [deployment](docs\new\deployment.md) for setup commands and manual release gates.
 
 ## Evidence and Document Reuse
 
