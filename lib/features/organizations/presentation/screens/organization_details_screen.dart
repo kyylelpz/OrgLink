@@ -450,13 +450,6 @@ class OrganizationDetailsScreen extends StatelessWidget {
                         ),
 
                     const SizedBox(height: AppSpacing.lg),
-                    OutlinedButton(
-                      onPressed: () => context.go(AppRoutes.events),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 48),
-                      ),
-                      child: const Text('Browse All Events'),
-                    ),
 
                     if (model.isManager ||
                         (model.membership.value?.role == 'officer' &&
