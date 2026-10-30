@@ -455,12 +455,28 @@ void main() {
           await tester.ensureVisible(find.text('Create Organization'));
           await tester.tap(find.text('Create Organization'));
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Review and Save'));
+          await tester.tap(find.text('Preview'));
           await tester.pumpAndSettle();
-          expect(find.text('Enter organization name.'), findsOneWidget);
+          expect(
+            find.text('Enter organization name (at least 2 characters).'),
+            findsOneWidget,
+          );
+          expect(
+            find.text('Enter a description (at least 10 characters).'),
+            findsOneWidget,
+          );
+          expect(find.text('Preview New Organization'), findsNothing);
+          expect(repo.mutations, isEmpty);
           await tester.enterText(
             find.byKey(const ValueKey('admin-name')),
             'IEEE iOS New Organization',
+          );
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('admin-description')),
+          );
+          await tester.enterText(
+            find.byKey(const ValueKey('admin-description')),
+            'A student organization for IEEE and iOS projects.',
           );
           await tester.ensureVisible(
             find.byKey(const ValueKey('admin-managerStudentId')),
@@ -472,6 +488,16 @@ void main() {
           FocusManager.instance.primaryFocus?.unfocus();
           tester.testTextInput.hide();
           await tester.pumpAndSettle();
+          await tester.tap(find.text('Preview'));
+          await tester.pumpAndSettle();
+          expect(
+            find.text(
+              'Find and review an eligible manager by Student ID before previewing.',
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('Preview New Organization'), findsNothing);
+          expect(repo.mutations, isEmpty);
           await tester.ensureVisible(find.text('Find Manager'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Find Manager'));
@@ -485,14 +511,62 @@ void main() {
           FocusManager.instance.primaryFocus?.unfocus();
           tester.testTextInput.hide();
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Review and Save'));
+          await tester.tap(find.text('Preview'));
+          await tester.pumpAndSettle();
+          expect(find.text('Preview New Organization'), findsOneWidget);
+          expect(find.text('IEEE iOS New Organization'), findsOneWidget);
+          expect(find.text('Manager: Synthetic Manager'), findsOneWidget);
+          expect(repo.mutations, isEmpty);
+          expect(tester.takeException(), isNull);
+          // Native Back returns to the form without discarding the draft.
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('admin-name')), findsOneWidget);
+          expect(
+            tester
+                .widget<TextFormField>(find.byKey(const ValueKey('admin-name')))
+                .controller!
+                .text,
+            'IEEE iOS New Organization',
+          );
+          await tester.tap(find.text('Preview'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Back to Edit'));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('admin-name')), findsOneWidget);
+          await tester.tap(find.text('Preview'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Publish'));
+          await tester.pumpAndSettle();
+          expect(find.text('Publish Organization'), findsOneWidget);
+          await tester.tap(find.text('Cancel'));
+          await tester.pumpAndSettle();
+          expect(find.text('Preview New Organization'), findsOneWidget);
+          expect(repo.mutations, isEmpty);
+          await tester.tap(find.text('Publish'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Confirm'));
           await tester.pumpAndSettle();
-          expect(repo.mutations.last['operation'], 'createOrganization');
+          expect(repo.mutations.single['operation'], 'createOrganization');
           expect(
             (repo.mutations.last['changes'] as Map)['name'],
             'IEEE iOS New Organization',
+          );
+          expect(
+            (repo.mutations.single['changes'] as Map)['description'],
+            'A student organization for IEEE and iOS projects.',
+          );
+          expect(
+            (repo.mutations.single['changes'] as Map)['managerStudentId'],
+            '2026000003',
+          );
+          expect(
+            (repo.mutations.single['changes'] as Map)['managerProfileVersion'],
+            'manager-v1',
+          );
+          expect(
+            (repo.mutations.single['changes'] as Map)['managerRegistryVersion'],
+            'registry-v1',
           );
           expect(tester.takeException(), isNull);
           await tester.binding.handlePopRoute();
@@ -510,6 +584,82 @@ void main() {
         },
       );
     }
+  }
+  for (final scenario in ['save failure and retry', 'access revocation']) {
+    testWidgets('organization preview handles $scenario safely', (
+      tester,
+    ) async {
+      final app = fixture.ProfileApp(), repo = FakeAdminRepository();
+      addTearDown(() => app.close(tester));
+      await mount(tester, app, repo);
+      app.router.go(AppRoutes.adminOrganizations);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Create Organization'));
+      await tester.tap(find.text('Create Organization'));
+      await tester.pumpAndSettle();
+      for (final entry in {
+        'name': 'IEEE iOS Preview Organization',
+        'description': 'A student organization for engineering projects.',
+        'managerStudentId': '2026000003',
+      }.entries) {
+        final field = find.byKey(ValueKey('admin-${entry.key}'));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, entry.value);
+      }
+      FocusManager.instance.primaryFocus?.unfocus();
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Find Manager'));
+      await tester.tap(find.text('Find Manager'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Preview'));
+      await tester.pumpAndSettle();
+      expect(find.text('Preview New Organization'), findsOneWidget);
+      expect(repo.mutations, isEmpty);
+
+      if (scenario == 'access revocation') {
+        app.profiles.controller.add(profile());
+        await tester.pumpAndSettle();
+        expect(find.text('Access Denied'), findsOneWidget);
+        expect(find.text('Publish'), findsNothing);
+        expect(find.text('IEEE iOS Preview Organization'), findsNothing);
+        expect(repo.mutations, isEmpty);
+      } else {
+        repo.failure = const AdminFailure('Save unavailable.', 'unavailable');
+        await tester.tap(find.text('Publish'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirm'));
+        await tester.pumpAndSettle();
+        expect(find.text('Preview New Organization'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text('Save unavailable.'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('IEEE iOS Preview Organization'), findsOneWidget);
+        expect(
+          find.text('Changes saved and recorded in the audit log.'),
+          findsNothing,
+        );
+        final failedCommand = Map<String, dynamic>.from(repo.mutations.single);
+        repo.failure = null;
+        await tester.tap(find.text('Publish'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirm'));
+        await tester.pumpAndSettle();
+        expect(repo.mutations, hasLength(2));
+        // Retrying the unchanged draft retains its target and idempotency key.
+        expect(repo.mutations.last, equals(failedCommand));
+        expect(find.text('Preview New Organization'), findsNothing);
+        expect(
+          find.text('Changes saved and recorded in the audit log.'),
+          findsOneWidget,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
   }
   testWidgets(
     'revocation replaces an open privileged confirmation with access denied',

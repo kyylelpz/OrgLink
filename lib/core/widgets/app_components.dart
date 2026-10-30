@@ -100,6 +100,47 @@ class AppSurfaceCard extends StatelessWidget {
 
 enum AppStatusTone { neutral, info, success, warning, error }
 
+({Color background, Color foreground}) statusColors(String status) {
+  return switch (status.trim().toLowerCase()) {
+    'active' => (
+      background: const Color(0xFFDCFCE7),
+      foreground: const Color(0xFF166534),
+    ),
+    'inactive' => (
+      background: const Color(0xFFF1F5F9),
+      foreground: const Color(0xFF475569),
+    ),
+    'public' => (
+      background: const Color(0xFFDBEAFE),
+      foreground: const Color(0xFF1D4ED8),
+    ),
+    'private' => (
+      background: const Color(0xFFF3E8FF),
+      foreground: const Color(0xFF6B21A8),
+    ),
+    'pending' => (
+      background: const Color(0xFFFEF3C7),
+      foreground: const Color(0xFF92400E),
+    ),
+    'disabled' => (
+      background: const Color(0xFFE5E7EB),
+      foreground: const Color(0xFF374151),
+    ),
+    'suspended' => (
+      background: const Color(0xFFFEE2E2),
+      foreground: const Color(0xFF991B1B),
+    ),
+    'platform admin' || 'platformadmin' => (
+      background: const Color(0xFFFEF3C7),
+      foreground: const Color(0xFF854D0E),
+    ),
+    _ => (
+      background: const Color(0xFFF1F5F9),
+      foreground: const Color(0xFF334155),
+    ),
+  };
+}
+
 /// Presentation only: callers supply display labels, never authorization values.
 class AppStatusChip extends StatelessWidget {
   const AppStatusChip({
@@ -107,11 +148,13 @@ class AppStatusChip extends StatelessWidget {
     required this.label,
     this.tone = AppStatusTone.neutral,
   });
+
   final String label;
   final AppStatusTone tone;
+
   @override
   Widget build(BuildContext context) {
-    final (foreground, background, icon) = switch (tone) {
+    final (defaultForeground, defaultBackground, icon) = switch (tone) {
       AppStatusTone.neutral => (
         AppColors.muted,
         AppColors.brandMist,
@@ -138,6 +181,33 @@ class AppStatusChip extends StatelessWidget {
         Icons.error_outline,
       ),
     };
+
+    final status = label.trim().toLowerCase();
+
+    final isSemanticStatus = {
+      'active',
+      'inactive',
+      'public',
+      'private',
+      'pending',
+      'disabled',
+      'suspended',
+      'platform admin',
+      'platformadmin',
+    }.contains(status);
+
+    // Apply semantic colors only to the four specified statuses
+    // when no explicit tone was supplied.
+    final semanticColors = statusColors(status);
+
+    final foreground = isSemanticStatus && tone == AppStatusTone.neutral
+        ? semanticColors.foreground
+        : defaultForeground;
+
+    final background = isSemanticStatus && tone == AppStatusTone.neutral
+        ? semanticColors.background
+        : defaultBackground;
+
     return Semantics(
       container: true,
       label: label,
@@ -160,9 +230,10 @@ class AppStatusChip extends StatelessWidget {
                 Flexible(
                   child: Text(
                     label,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelMedium?.copyWith(color: foreground),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],

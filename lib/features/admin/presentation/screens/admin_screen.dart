@@ -568,8 +568,10 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
   final newId = adminRequestId();
   late String visibility, status;
   bool accepts = true, saving = false, lookingUp = false;
+  bool _previewing = false;
   AdminManager? matched;
   String? error;
+
   @override
   void initState() {
     super.initState();
@@ -599,10 +601,19 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
     super.dispose();
   }
 
+  bool _managerReady() {
+    final manager = matched;
+    return manager != null &&
+        manager.eligible &&
+        manager.studentId ==
+            controllers['managerStudentId']!.text.trim();
+  }
+
   Future<void> findManager() async {
     final value = controllers['managerStudentId']!.text;
-    if (StudentDetails.validateStudentNumber(value) != null) {
-      setState(() => error = StudentDetails.validateStudentNumber(value));
+    final formatError = StudentDetails.validateStudentNumber(value);
+    if (formatError != null) {
+      setState(() => error = formatError);
       return;
     }
     setState(() {
@@ -615,11 +626,14 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
       if (mounted && controllers['managerStudentId']!.text == value) {
         setState(() {
           matched = result;
-          if (!result.eligible) {
-            error =
-                'Only active accounts with complete profiles can become managers.';
-          }
+          error = result.eligible
+              ? null
+              : 'Only active accounts with complete profiles can become managers.';
         });
+
+        if (result.eligible) {
+          form.currentState?.validate();
+        }
       }
     } catch (e) {
       if (mounted) setState(() => error = AppFailure.from(e).message);
@@ -628,13 +642,29 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
     }
   }
 
+  void _showPreview() {
+    setState(() => error = null);
+    if (!form.currentState!.validate()) return;
+    if (!_managerReady()) {
+      setState(
+        () => error =
+            'Find and review an eligible manager by Student ID before previewing.',
+      );
+      return;
+    }
+    setState(() => _previewing = true);
+  }
+
   Future<void> save() async {
-    if (saving || !form.currentState!.validate()) return;
+      if (saving) return;
+
+      // Validate only while the form is mounted.
+      if (!_previewing && !(form.currentState?.validate() ?? false)) {
+        return;
+      }
     final org = widget.record?.organization;
     final manager = matched;
-    if (manager == null ||
-        !manager.eligible ||
-        manager.studentId != controllers['managerStudentId']!.text) {
+    if (!_managerReady() || manager == null) {
       setState(
         () => error =
             'Find and review an eligible manager by Student ID before saving.',
@@ -643,8 +673,11 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
     }
     final confirmed = await _confirm(
       context,
-      org == null ? 'Create Organization' : 'Save Organization',
-      'Save ${controllers['name']!.text.trim()} with ${manager.name}, Student ID ${manager.studentId}, ${displayIdentifier(manager.status)}? Existing memberships, events and attendance records are retained.',
+      org == null ? 'Publish Organization' : 'Save Changes',
+      '${org == null ? 'Publish' : 'Save'} '
+          '${controllers['name']!.text.trim()} with ${manager.name}, '
+          'Student ID ${manager.studentId}, ${displayIdentifier(manager.status)}? '
+          'Existing memberships, events and attendance records are retained.',
     );
     if (!mounted ||
         !confirmed ||
@@ -691,169 +724,311 @@ class _OrganizationEditorState extends State<_OrganizationEditor> {
     context,
     widget.actorUid,
     PopScope(
-      canPop: !saving && !lookingUp,
+      canPop: !saving && !lookingUp && !_previewing,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _previewing && !saving && !lookingUp) {
+          setState(() => _previewing = false);
+        }
+      },
       child: AlertDialog(
         insetPadding: const EdgeInsets.all(16),
         scrollable: true,
         title: Text(
-          widget.record == null ? 'Create Organization' : 'Edit Organization',
+          _previewing
+              ? (widget.record == null
+                  ? 'Preview New Organization'
+                  : 'Preview Changes')
+              : (widget.record == null
+                  ? 'Create Organization'
+                  : 'Edit Organization'),
         ),
         content: SizedBox(
           width: 520,
-          child: Form(
-            key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (error != null)
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      error!,
-                      style: const TextStyle(color: AppColors.error),
-                    ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_previewing && error != null) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    error!,
+                    style: const TextStyle(color: AppColors.error),
                   ),
-                for (final entry in [
-                  ('name', 'Organization Name', 100),
-                  ('description', 'Description', 1500),
-                  ('mission', 'Mission', 1000),
-                  ('vision', 'Vision', 1000),
-                  ('goals', 'Goals (One per Line)', 1210),
-                  (
-                    'membershipRequirements',
-                    'Membership Requirements (One per Line)',
-                    1210,
-                  ),
-                  ('managerStudentId', 'Manager Student ID', 10),
-                ]) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  TextFormField(
-                    key: ValueKey('admin-${entry.$1}'),
-                    controller: controllers[entry.$1],
-                    enabled: !saving && !lookingUp,
-                    maxLength: entry.$1 == 'managerStudentId' ? 10 : null,
-                    keyboardType: entry.$1 == 'managerStudentId'
-                        ? TextInputType.number
-                        : TextInputType.text,
-                    onChanged: entry.$1 == 'managerStudentId'
-                        ? (_) => setState(() => matched = null)
-                        : null,
-                    minLines: 1,
-                    maxLines:
-                        [
-                          'description',
-                          'mission',
-                          'vision',
-                          'goals',
-                          'membershipRequirements',
-                        ].contains(entry.$1)
-                        ? 4
-                        : 1,
-                    decoration: InputDecoration(
-                      labelText: entry.$2,
-                      helperMaxLines: 4,
-                      helperText: entry.$1 == 'managerStudentId'
-                          ? 'Enter the BulSU Student ID, then find and review the matched account.'
-                          : null,
-                    ),
-                    validator: (value) {
-                      final v = value?.trim() ?? '';
-                      if (['name'].contains(entry.$1) && v.length < 2) {
-                        return 'Enter ${entry.$2.toLowerCase()}.';
-                      }
-                      if (v.length > entry.$3) {
-                        return 'Use at most ${entry.$3} characters.';
-                      }
-                      if (entry.$1 == 'managerStudentId') {
-                        return StudentDetails.validateStudentNumber(value);
-                      }
-
-                      return null;
-                    },
-                  ),
-                  if (entry.$1 == 'managerStudentId') ...[
-                    AppActionButton(
-                      label: 'Find Manager',
-                      busy: lookingUp,
-                      onPressed: saving ? null : findManager,
-                    ),
-                    if (matched case final manager?)
-                      AppSurfaceCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(manager.name),
-                            Text('Student ID: ${manager.studentId}'),
-                            AppStatusChip(
-                              label: displayIdentifier(manager.status),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                  if (entry.$1 == 'name')
-                    CapitalizationSuggestion(
-                      controller: controllers['name']!,
-                      enabled: !saving && !lookingUp,
-                    ),
-                ],
-                const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  itemHeight: null,
-                  initialValue: visibility,
-                  decoration: const InputDecoration(labelText: 'Visibility'),
-                  items: [
-                    for (final v in ['public', 'private'])
-                      DropdownMenuItem(
-                        value: v,
-                        child: Text(displayIdentifier(v)),
-                      ),
-                  ],
-                  onChanged: saving
-                      ? null
-                      : (v) => setState(() => visibility = v!),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  itemHeight: null,
-                  initialValue: status,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: [
-                    for (final v in ['active', 'inactive'])
-                      DropdownMenuItem(
-                        value: v,
-                        child: Text(displayIdentifier(v)),
-                      ),
-                  ],
-                  onChanged: saving ? null : (v) => setState(() => status = v!),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Accept Membership Requests'),
-                  value: accepts,
-                  onChanged: saving ? null : (v) => setState(() => accepts = v),
-                ),
               ],
-            ),
+              _previewing ? _buildPreview() : _buildForm(),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: saving || lookingUp
-                ? null
-                : () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          AppActionButton(
-            label: 'Review and Save',
-            busy: saving || lookingUp,
-            onPressed: save,
-          ),
-        ],
+        actions: _previewing ? _previewActions() : _formActions(),
       ),
     ),
+  );
+
+  List<Widget> _formActions() => [
+    TextButton(
+      onPressed: saving || lookingUp ? null : () => Navigator.pop(context),
+      child: const Text('Cancel'),
+    ),
+    AppActionButton(
+      label: widget.record == null ? 'Preview' : 'Review and Save',
+      busy: lookingUp,
+      onPressed: saving || lookingUp
+          ? null
+          : (widget.record == null ? _showPreview : save),
+    ),
+  ];
+
+  List<Widget> _previewActions() => [
+    TextButton(
+      onPressed: saving || lookingUp
+          ? null
+          : () => setState(() => _previewing = false),
+      child: const Text('Back to Edit'),
+    ),
+    AppActionButton(
+      label: widget.record == null ? 'Publish' : 'Save',
+      busy: saving || lookingUp,
+      onPressed: save,
+    ),
+  ];
+
+  Widget _buildForm() => Form(
+    key: form,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (error != null)
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              error!,
+              style: const TextStyle(color: AppColors.error),
+            ),
+          ),
+        for (final entry in [
+          ('name', 'Organization Name', 100),
+          ('description', 'Description', 1500),
+          ('mission', 'Mission', 1000),
+          ('vision', 'Vision', 1000),
+          ('goals', 'Goals (One per Line)', 1210),
+          (
+            'membershipRequirements',
+            'Membership Requirements (One per Line)',
+            1210,
+          ),
+          ('managerStudentId', 'Manager Student ID', 10),
+        ]) ...[
+          const SizedBox(height: AppSpacing.md),
+          Builder(builder: (context) {
+            final isMultiline = const {
+              'description',
+              'mission',
+              'vision',
+              'goals',
+              'membershipRequirements',
+            }.contains(entry.$1);
+            return TextFormField(
+              key: ValueKey('admin-${entry.$1}'),
+              controller: controllers[entry.$1],
+              enabled: !saving && !lookingUp,
+              maxLength: entry.$3,
+              keyboardType: entry.$1 == 'managerStudentId'
+                  ? TextInputType.number
+                  : isMultiline
+                      ? TextInputType.multiline
+                      : TextInputType.text,
+              textInputAction: isMultiline
+                  ? TextInputAction.newline
+                  : TextInputAction.done,
+              onChanged: entry.$1 == 'managerStudentId'
+                ? (_) => setState(() => matched = null)
+                : null,
+              minLines: isMultiline ? 3 : 1,
+              maxLines: isMultiline ? 6 : 1,
+              decoration: InputDecoration(
+                labelText: entry.$2,
+                helperMaxLines: 4,
+                helperText: entry.$1 == 'managerStudentId'
+                    ? 'Enter the BulSU Student ID, then find and review the matched account.'
+                    : 'Up to ${entry.$3} characters.',
+                // Declarative red state — updates whenever `matched` changes.
+                errorText: entry.$1 == 'managerStudentId' &&
+                        matched != null &&
+                        !matched!.eligible
+                    ? 'This account is not eligible to be a manager.'
+                    : null,
+              ),
+              validator: (value) {
+                final v = value?.trim() ?? '';
+                if (entry.$1 == 'name' && v.length < 2) {
+                  return 'Enter ${entry.$2.toLowerCase()} (at least 2 characters).';
+                }
+                if (entry.$1 == 'description' && v.length < 10) {
+                  return 'Enter a description (at least 10 characters).';
+                }
+                if (v.length > entry.$3) {
+                  return 'Use at most ${entry.$3} characters.';
+                }
+                if (entry.$1 == 'managerStudentId') {
+                  // Only format validation here. Verification is enforced via
+                  // `_managerReady()` in `_showPreview` / `save`.
+                  return StudentDetails.validateStudentNumber(value);
+                }
+                if (isMultiline) {
+                  final lines = v.split('\n').where((l) => l.trim().isNotEmpty);
+                  if (lines.any((l) => l.length > 200)) {
+                    return 'Each line must be at most 200 characters.';
+                  }
+                }
+                return null;
+              },
+            );
+          }),
+          if (entry.$1 == 'managerStudentId') ...[
+            AppActionButton(
+              label: 'Find Manager',
+              busy: lookingUp,
+              onPressed: saving ? null : findManager,
+            ),
+            if (matched case final manager?)
+              AppSurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(manager.name),
+                    Text('Student ID: ${manager.studentId}'),
+                    AppStatusChip(
+                      label: displayIdentifier(manager.status),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          if (entry.$1 == 'name')
+            CapitalizationSuggestion(
+              controller: controllers['name']!,
+              enabled: !saving && !lookingUp,
+            ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          itemHeight: null,
+          initialValue: visibility,
+          decoration: const InputDecoration(labelText: 'Visibility'),
+          items: [
+            for (final v in ['public', 'private'])
+              DropdownMenuItem(
+                value: v,
+                child: Text(displayIdentifier(v)),
+              ),
+          ],
+          onChanged: saving ? null : (v) => setState(() => visibility = v!),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          itemHeight: null,
+          initialValue: status,
+          decoration: const InputDecoration(labelText: 'Status'),
+          items: [
+            for (final v in ['active', 'inactive'])
+              DropdownMenuItem(
+                value: v,
+                child: Text(displayIdentifier(v)),
+              ),
+          ],
+          onChanged: saving ? null : (v) => setState(() => status = v!),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Accept Membership Requests'),
+          value: accepts,
+          onChanged: saving ? null : (v) => setState(() => accepts = v),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildPreview() {
+    final manager = matched;
+    String val(String key) => controllers[key]!.text.trim();
+    List<String> lines(String key) => val(key)
+        .split('\n')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Review how this organization will appear to students.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppSurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                val('name'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  AppStatusChip(label: displayIdentifier(status)),
+                  AppStatusChip(label: displayIdentifier(visibility)),
+                  if (accepts) const AppStatusChip(label: 'Accepts Requests'),
+                ],
+              ),
+              if (manager != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text('Manager: ${manager.name}'),
+                SelectableText('Student ID: ${manager.studentId}'),
+              ],
+              if (val('description').isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _previewHeading('Description'),
+                Text(val('description')),
+              ],
+              if (val('mission').isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _previewHeading('Mission'),
+                Text(val('mission')),
+              ],
+              if (val('vision').isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _previewHeading('Vision'),
+                Text(val('vision')),
+              ],
+              if (lines('goals').isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _previewHeading('Goals'),
+                for (final g in lines('goals')) Text('• $g'),
+              ],
+              if (lines('membershipRequirements').isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _previewHeading('Membership Requirements'),
+                for (final r in lines('membershipRequirements')) Text('• $r'),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _previewHeading(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
   );
 }
