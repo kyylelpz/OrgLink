@@ -33,16 +33,26 @@ class AdminViewModel extends ChangeNotifier {
         ['unauthenticated', 'permission-denied'].contains(e.code);
   }
 
-  Future<void> _fetch() async {
+  Future<void> _fetch({bool refresh = false}) async {
     switch (section) {
       case AdminSection.dashboard:
         stats = await repository.stats();
       case AdminSection.accounts:
-        final result = await repository.accounts(field, search, cursor);
+        final result = await repository.accounts(
+          field,
+          search,
+          cursor,
+          refresh: refresh,
+        );
         accounts = result.items;
         nextCursor = result.nextCursor;
       case AdminSection.organizations:
-        final result = await repository.organizations(field, search, cursor);
+        final result = await repository.organizations(
+          field,
+          search,
+          cursor,
+          refresh: refresh,
+        );
         organizations = result.items;
         nextCursor = result.nextCursor;
     }
@@ -51,14 +61,14 @@ class AdminViewModel extends ChangeNotifier {
   Future<AdminManager> manager(String studentId) =>
       repository.manager(studentId);
 
-  Future<void> load() async {
+  Future<void> load({bool refresh = false}) async {
     if (busy || disposed) return;
     busy = true;
     error = null;
     unauthorized = false;
     _notify();
     try {
-      await _fetch();
+      await _fetch(refresh: refresh);
     } catch (e) {
       _failure(e);
     } finally {
@@ -69,8 +79,12 @@ class AdminViewModel extends ChangeNotifier {
 
   Future<void> find(String field, String value) async {
     if (busy) return;
-    this.field = field;
-    search = field == 'studentNumber' ? value : value.trim();
+    search = value.trim();
+    this.field = search.isEmpty
+        ? section == AdminSection.accounts
+              ? 'fullName'
+              : 'name'
+        : field;
     cursor = null;
     nextCursor = null;
     _previous.clear();
@@ -106,7 +120,7 @@ class AdminViewModel extends ChangeNotifier {
       await repository.mutate(request);
       saved = true;
       message = 'Changes saved and recorded in the audit log.';
-      await _fetch();
+      await _fetch(refresh: true);
     } catch (e) {
       _failure(e);
     } finally {

@@ -1,3 +1,4 @@
+import 'member_management_dialog.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../core/widgets/app_feedback.dart';
@@ -62,11 +63,15 @@ class MemberListScreen extends StatelessWidget {
               );
             }
             return ChangeNotifierProvider(
+              key: ValueKey(
+                '${details.id}/${details.uid}/${details.isManager}',
+              ),
               create: (_) => MemberListViewModel(
                 details.repository,
                 details.id,
                 details.uid,
                 pending: pending,
+                manager: details.isManager && org.status == 'active',
               ),
               child: _MemberList(pending: pending, organizationName: org.name),
             );
@@ -157,7 +162,7 @@ class _MemberList extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = context.watch<MemberListViewModel>();
     return QueryContent(
-      query: model.records,
+      query: model.view == 'Former Members' ? model.former! : model.records,
       builder: (members) {
         return AppPageBody(
           child: SingleChildScrollView(
@@ -170,6 +175,33 @@ class _MemberList extends StatelessWidget {
                   description: organizationName,
                 ),
                 const SizedBox(height: AppSpacing.lg),
+                if (!pending) ...[
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Search Members',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) => model.filter(text: value),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      for (final view in [
+                        'Active',
+                        'Officers',
+                        if (model.manager) 'Former Members',
+                      ])
+                        AppFilterChip(
+                          label: view,
+                          selected: model.view == view,
+                          onSelected: (_) => model.filter(view: view),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 if (model.failure != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.lg),
@@ -180,14 +212,18 @@ class _MemberList extends StatelessWidget {
                       ),
                     ),
                   ),
-                if ((members ?? []).isEmpty)
+                if (model.visibleMembers.isEmpty)
                   AppEmptyView(
                     title: pending ? 'Requests Reviewed' : 'No Members Yet',
                     message: pending
                         ? 'No pending requests.'
+                        : model.view == 'Former Members'
+                        ? 'No former members match this view.'
+                        : model.view == 'Officers'
+                        ? 'No officers match this view.'
                         : 'No active members.',
                   ),
-                for (final member in members ?? <Membership>[])
+                for (final member in model.visibleMembers)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.md),
                     child: MembershipMemberCard(
@@ -222,6 +258,47 @@ class _MemberList extends StatelessWidget {
                             )
                           : pending
                           ? const Text('You cannot review your own request.')
+                          : !pending && model.manager
+                          ? Align(
+                              alignment: Alignment.centerRight,
+                              child: PopupMenuButton<String>(
+                                tooltip: 'Membership Actions',
+                                enabled: !model.processing.contains(member.uid),
+                                onSelected: (action) => showMemberManagement(
+                                  context,
+                                  model,
+                                  member,
+                                  action,
+                                  context
+                                          .read<OrganizationDetailsViewModel>()
+                                          .organization
+                                          .value
+                                          ?.positions ??
+                                      [],
+                                ),
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(
+                                    value: 'details',
+                                    child: Text('View Details'),
+                                  ),
+                                  if (model.canManage(member)) ...[
+                                    const PopupMenuItem(
+                                      value: 'role',
+                                      child: Text('Assign/Change Role'),
+                                    ),
+                                    if (member.role == 'officer')
+                                      const PopupMenuItem(
+                                        value: 'permissions',
+                                        child: Text('Manage Permissions'),
+                                      ),
+                                    const PopupMenuItem(
+                                      value: 'end',
+                                      child: Text('End Membership'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
                           : null,
                     ),
                   ),

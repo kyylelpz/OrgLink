@@ -118,14 +118,14 @@ class CommunityDashboardHeader extends StatelessWidget {
   const CommunityDashboardHeader({
     super.key,
     required this.greeting,
-    required this.initials,
+    required this.name,
     required this.search,
     required this.onNotifications,
     required this.onProfile,
     this.imageUrl,
   });
 
-  final String greeting, initials;
+  final String greeting, name;
   final String? imageUrl;
   final Widget search;
   final VoidCallback onNotifications, onProfile;
@@ -267,11 +267,13 @@ class CommunitySectionHeading extends StatelessWidget {
   const CommunitySectionHeading({
     super.key,
     required this.title,
-    required this.actionLabel,
-    required this.onAction,
+    this.actionLabel,
+    this.onAction,
   });
-  final String title, actionLabel;
-  final VoidCallback onAction;
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
   @override
   Widget build(BuildContext context) => Wrap(
     spacing: AppSpacing.md,
@@ -286,14 +288,15 @@ class CommunitySectionHeading extends StatelessWidget {
           ).textTheme.titleLarge?.copyWith(color: AppColors.brandMidnight),
         ),
       ),
-      TextButton(
-        onPressed: onAction,
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-          textStyle: Theme.of(context).textTheme.labelMedium,
+      if (actionLabel != null && onAction != null)
+        TextButton(
+          onPressed: onAction,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            textStyle: Theme.of(context).textTheme.labelMedium,
+          ),
+          child: Text(actionLabel!),
         ),
-        child: Text(actionLabel),
-      ),
     ],
   );
 }

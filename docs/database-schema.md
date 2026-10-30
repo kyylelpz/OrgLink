@@ -51,6 +51,14 @@ Fields: `uid`, `organizationId`, `membershipRole`, `membershipStatus`, `position
 
 Roles recognized by models/permissions include member, officer and manager; status values include pending, active, rejected, removed. Permission keys used are `manageEvents`, `manageAttendance`, `viewRoster`. Client requests always create member/pending with empty permissions; position titles do not grant power. Clients cannot provision officer/manager roles. Managers may approve/reject another pending applicant. Membership role `manager` alone never replaces organization ownership. Applicant names are scoped snapshots; email/Student Number are not copied into the roster.
 
+Membership cancellation uses deletion of the owner's unreviewed `member` /
+`pending` document, not a new `cancelled` membership status. Empty permissions
+and null joined/review metadata are required by Rules. Active, rejected, removed
+or privileged records cannot be deleted through this path. The transaction
+rechecks pending status so a concurrent approval is preserved; a later fresh
+request is permitted through the normal creation checks. No cancellation history
+is retained after deletion.
+
 ### `organizations/{orgId}/events/{eventId}`
 
 Fields: `eventId`, `organizationId`, `title` (1–200), `description` (1–5000), `venue` (1–200), `startAt`, `endAt`, `registrationDeadline`, `capacity` (integer 1–100000), `registrationCount`, `visibility: public|private`, `eventStatus`, `approvalStatus`, `createdBy`, `posterURL`, optional `posterPublicId` / `imageRevision`, `createdAt`, `updatedAt`, `submittedAt`, `reviewedAt`, `reviewedBy`, `publishedAt`, `cancelledAt`, `completedAt`, `archivedAt`.

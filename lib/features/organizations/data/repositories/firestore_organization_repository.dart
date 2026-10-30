@@ -45,6 +45,15 @@ class FirestoreOrganizationRepository implements OrganizationRepository {
   }
 
   @override
+  Future<void> cancelMembershipRequest(String id, String uid) async {
+    try {
+      await _service.cancelMembershipRequest(id, uid);
+    } catch (error) {
+      throw AppFailure.from(error);
+    }
+  }
+
+  @override
   Future<void> reviewMembership(
     String id,
     String applicantUid,
@@ -58,6 +67,18 @@ class FirestoreOrganizationRepository implements OrganizationRepository {
         managerUid,
         approve: approve,
       );
+    } catch (error) {
+      throw AppFailure.from(error);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> membershipCommand(
+    String operation,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      return await _service.membershipCommand(operation, data);
     } catch (error) {
       throw AppFailure.from(error);
     }

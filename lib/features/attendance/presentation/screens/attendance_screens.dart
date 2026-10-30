@@ -17,6 +17,7 @@ import '../../data/models/attendance.dart';
 import '../viewmodels/attendance_view_model.dart';
 import '../viewmodels/my_attendance_view_model.dart';
 import 'attendance_correction_dialog.dart';
+import '../../../events/presentation/widgets/event_sort.dart';
 
 String attendanceLabel(AttendanceRecord? record) =>
     record == null ? 'Not Marked' : displayIdentifier(record.status.name);
@@ -200,7 +201,7 @@ class _AttendanceEventsState extends State<_AttendanceEvents> {
       if (query.value!.isEmpty) return const Text('No events available.');
       return Column(
         children: [
-          for (final event in query.value!)
+          for (final event in sortByChronology(query.value!))
             ListTile(
               title: Text(event.title),
               subtitle: Text(
@@ -315,9 +316,8 @@ class AttendanceScreen extends StatelessWidget {
 
               const SizedBox(height: AppSpacing.lg),
 
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (!report)
                     FilledButton.icon(
@@ -325,20 +325,16 @@ class AttendanceScreen extends StatelessWidget {
                       icon: const Icon(Icons.qr_code_scanner),
                       label: const Text('Scan QR Code'),
                     ),
-                  OutlinedButton(
-                    onPressed: () => context.go(
-                      report
-                          ? AppRoutes.attendance(
-                              model.context.organizationId,
-                              event.id,
-                            )
-                          : AppRoutes.attendanceReport(
-                              model.context.organizationId,
-                              event.id,
-                            ),
+                  if (report)
+                    OutlinedButton(
+                      onPressed: () => context.go(
+                        AppRoutes.attendance(
+                          model.context.organizationId,
+                          event.id,
+                        ),
+                      ),
+                      child: const Text('Verification Mode'),
                     ),
-                    child: Text(report ? 'Verification Mode' : 'View Report'),
-                  ),
                 ],
               ),
 
@@ -442,8 +438,10 @@ class AttendanceScreen extends StatelessWidget {
                                     ),
                               ),
                             ),
-                            AttendanceStatusBadge(
-                              model.recordFor(registration.uid),
+                            Flexible(
+                              child: AttendanceStatusBadge(
+                                model.recordFor(registration.uid),
+                              ),
                             ),
                           ],
                         ),

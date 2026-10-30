@@ -15,6 +15,7 @@ import '../../../../core/widgets/app_feedback.dart';
 import '../viewmodels/event_context_view_model.dart';
 import '../widgets/event_access_view.dart';
 import '../widgets/event_widgets.dart';
+import '../widgets/event_sort.dart';
 
 class EventManagementScreen extends StatelessWidget {
   const EventManagementScreen({super.key});
@@ -146,7 +147,10 @@ class _ManagementListState extends State<_ManagementList> {
                                       event.eventStatus == filter)),
                   )
                   .toList();
-              if (events.isEmpty) {
+
+              final sortedEvents = sortByChronology(events);
+
+              if (sortedEvents.isEmpty) {
                 return const AppEmptyView(
                   title: 'No Events Found',
                   message: 'No events match this view.',
@@ -155,7 +159,7 @@ class _ManagementListState extends State<_ManagementList> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final event in events)
+                  for (final event in sortedEvents)
                     EventCard(
                       event: event,
                       style: EventCardStyle.managed,

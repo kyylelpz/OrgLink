@@ -9,7 +9,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../organizations/presentation/widgets/organization_widgets.dart';
+import '../../data/models/event.dart';
 import '../viewmodels/event_hub_view_model.dart';
+import '../widgets/event_sort.dart';
 import '../widgets/event_widgets.dart';
 
 class MyEventsScreen extends StatefulWidget {
@@ -116,6 +118,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                   items: [
                     for (final value in [
                       'All',
+                      'Ongoing',
                       'Upcoming',
                       'Past',
                       'Cancelled',
@@ -128,22 +131,68 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                 QueryContent(
                   query: model.mine,
                   builder: (records) {
+                    final now = DateTime.now();
+
                     final matching = (records ?? []).where((record) {
                       final event = model
-                          .registeredEvents['${record.organizationId}/${record.eventId}']
+                          .registeredEvents[
+                              '${record.organizationId}/${record.eventId}']
                           ?.value;
                       return switch (filter) {
+                        'Ongoing' =>
+                          event?.startAt != null &&
+                              !event!.startAt!.isAfter(now) &&
+                              (event.endAt?.isAfter(now) ?? false),
                         'Cancelled' =>
                           record.status == 'cancelled' ||
                               event?.eventStatus == 'cancelled',
                         'Upcoming' =>
-                          event?.startAt?.isAfter(DateTime.now()) == true,
+                          event?.startAt?.isAfter(now) == true,
                         'Past' =>
-                          event?.endAt?.isBefore(DateTime.now()) == true,
+                          event?.endAt?.isBefore(now) == true,
                         _ => true,
                       };
                     }).toList();
-                    if (matching.isEmpty) {
+
+                    // Sort using the shared canonical chronology:
+                    //   ongoing → nearest future → later future
+                    //   → recent past → old past → undated
+                    // The helper resolves each record to its OrgEvent for the
+                    // rank/direction decisions, so we wrap each record in a
+                    // small adapter and unwrap after sorting.
+                    final sortedEvents = sortByChronology(
+                      matching
+                          .map((r) => model
+                              .registeredEvents[
+                                  '${r.organizationId}/${r.eventId}']
+                              ?.value)
+                          .whereType<OrgEvent>(),
+                      now: now,
+                    );
+                    // Map back to the original records in the sorted order.
+                    final eventKey = (OrgEvent e) =>
+                        '${e.organizationId}/${e.id}';
+                    final orderedRecords = [
+                      for (final e in sortedEvents)
+                        ...matching.where(
+                          (r) =>
+                              '${r.organizationId}/${r.eventId}' ==
+                              eventKey(e),
+                        ),
+                    ];
+                    // Records whose event hasn't loaded yet (no OrgEvent)
+                    // can't be ranked — keep them at the end, preserving
+                    // their original order.
+                    final unranked = matching
+                        .where((r) =>
+                            model.registeredEvents[
+                                '${r.organizationId}/${r.eventId}']
+                                ?.value ==
+                            null)
+                        .toList();
+                    final sortedMatching = [...orderedRecords, ...unranked];
+
+                    if (sortedMatching.isEmpty) {
                       return const AppEmptyView(
                         title: 'No Registrations Found',
                         message: 'No registrations match this view.',
@@ -152,7 +201,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (final record in matching)
+                        for (final record in sortedMatching)
                           Builder(
                             builder: (context) {
                               final key =

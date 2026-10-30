@@ -22,8 +22,9 @@ class StudentSearchRepository extends admin.FakeAdminRepository {
   Future<AdminPage<AdminAccount>> accounts(
     String field,
     String search,
-    Map<String, dynamic>? cursor,
-  ) async {
+    Map<String, dynamic>? cursor, {
+    bool refresh = false,
+  }) async {
     fieldUsed = field;
     searchUsed = search;
     return AdminPage([
@@ -157,7 +158,7 @@ void main() {
     },
   );
   testWidgets(
-    'admin cards/details use Student ID and exact ID search instead of UID',
+    'admin cards/details use Student ID and partial directory search instead of UID',
     (tester) async {
       final app = fixture.ProfileApp(), repo = StudentSearchRepository();
       addTearDown(() => app.close(tester));
@@ -168,16 +169,16 @@ void main() {
       expect(find.textContaining('UID: internal-uid'), findsNothing);
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Exact Student ID').last);
+      await tester.tap(find.text('Student ID').last);
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).first, '2026000001');
+      await tester.enterText(find.byType(TextField).first, ' 00001 ');
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Search').last);
       await tester.tap(find.widgetWithText(FilledButton, 'Search'));
       await tester.pumpAndSettle();
       expect(repo.fieldUsed, 'studentNumber');
-      expect(repo.searchUsed, '2026000001');
+      expect(repo.searchUsed, '00001');
       await tester.ensureVisible(find.text('Account Details'));
       await tester.tap(find.text('Account Details'));
       await tester.pumpAndSettle();

@@ -1,0 +1,50 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {membershipBackend} from '../src/memberships.js';
+import {RestFirestore,Timestamp} from '../src/firestore.js';
+import {createHandler} from '../src/index.js';
+import {tokenFixture} from './token-fixture.js';
+const require=createRequire(new URL('../../../firebase/tests/package.json',import.meta.url));
+const {initializeTestEnvironment,assertFails,assertSucceeds}=require('@firebase/rules-unit-testing');
+const {doc,getDoc,getDocs,collection,query,where,setDoc,updateDoc,serverTimestamp}=require('firebase/firestore');
+const host=process.env.FIRESTORE_EMULATOR_HOST;
+if(!/^(localhost|127\.0\.0\.1):\d+$/.test(host??''))throw Error('A loopback emulator is required; no live fallback.');
+test('real REST membership transactions: audit, concurrency, revocation, privacy and UID-preserving reapplication',async()=>{
+  const env=await initializeTestEnvironment({projectId:'orglink-dev',firestore:{rules:readFileSync(new URL('../../../firebase/firebase.rules',import.meta.url),'utf8')}});
+  const store=new RestFirestore(async()=>'owner',{origin:`http://${host}`}),api=membershipBackend(store);
+  const suffix=Date.now().toString(36),org=`membership-${suffix}`,manager=`manager-${suffix}`,student=`student-${suffix}`,member=`organizations/${org}/memberships/${student}`;
+  const profile=uid=>({uid,email:`${uid}@example.test`,fullName:'Demo Student',studentNumber:'2026000001',yearLevel:1,section:'A',accountStatus:'active',platformRole:'user'});
+  const client=uid=>env.authenticatedContext(uid).firestore(),as=data=>({auth:{uid:manager},data:{organizationId:org,participantUid:student,...data}});
+  const tokens=await tokenFixture(),handler=createHandler({fetchImpl:tokens.fetchKeys});
+  const http=async(operation,data,uid=manager)=>handler(new Request(`https://test.local/memberships/${operation}`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${await tokens.sign(uid,{platformRole:'platformAdmin'})}`},body:JSON.stringify({organizationId:org,participantUid:student,...data})}),{FIRESTORE_EMULATOR_HOST:host});
+  const version=async()=>(await api.preview(as({}))).version;
+  try{
+    await store.runTransaction(async t=>{
+      t.set(store.doc(`users/${manager}`),profile(manager));t.set(store.doc(`users/${student}`),profile(student));
+      t.set(store.doc(`organizations/${org}`),{organizationId:org,managerUid:manager,visibility:'public',status:'active',approvalSettings:{acceptsRequests:true}});
+      t.set(store.doc(member),{uid:student,organizationId:org,membershipRole:'officer',membershipStatus:'active',permissions:{viewRoster:true,manageEvents:true,manageAttendance:true},positionTitle:'President',applicantName:'Demo Student',requestedAt:Timestamp.fromMillis(1000),joinedAt:Timestamp.fromMillis(2000),updatedAt:Timestamp.fromMillis(2000),reviewedAt:Timestamp.fromMillis(2000),reviewedBy:manager});
+      t.set(store.doc(`organizations/${org}/events/history/registrations/${student}`),{uid:student,eventId:'history',organizationId:org,registrationStatus:'registered'});
+      t.set(store.doc(`organizations/${org}/events/history/attendance/${student}`),{uid:student,attendanceStatus:'present'});
+    });
+    await assertSucceeds(getDocs(query(collection(client(student),`organizations/${org}/memberships`),where('membershipStatus','==','active'))));
+    const previewResponse=await http('preview',{});assert.equal(previewResponse.status,200);assert.equal((await previewResponse.json()).result.membership.uid,student);
+    assert.equal((await http('preview',{},student)).status,403);
+    const v=await version(),base={operation:'role',role:'officer',positionTitle:'Secretary',version:v,requestId:'membership_race_0001'};
+    const results=await Promise.allSettled([api.mutate(as(base)),api.mutate(as({...base,positionTitle:'Treasurer',requestId:'membership_race_0002'}))]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+    const end={operation:'end',reason:'Completed service',version:await version(),requestId:'membership_end_00001'};
+    const endResponse=await http('mutate',end);assert.equal(endResponse.status,200);assert.equal((await endResponse.json()).result.saved,true);assert.equal((await api.mutate(as(end))).duplicate,true);
+    await assertFails(getDocs(query(collection(client(student),`organizations/${org}/memberships`),where('membershipStatus','==','active'))));
+    const former=(await getDoc(doc(client(student),member))).data();assert.equal(former.membershipStatus,'removed');assert.equal(former.endedBy,manager);assert.deepEqual(former.permissions,{});
+    await assertFails(updateDoc(doc(client(manager),member),{membershipRole:'officer',permissions:{manageEvents:true}}));
+    const audits=await assertSucceeds(getDocs(collection(client(manager),`organizations/${org}/membershipAudits`)));assert.equal(audits.size,2);assert.ok(audits.docs.every(d=>d.data().createdAt&&d.data().actorUid===manager));
+    await assertFails(getDocs(collection(client(student),`organizations/${org}/membershipAudits`)));
+    await assertFails(setDoc(doc(client(manager),`organizations/${org}/membershipAudits/forged`),{actorUid:manager}));
+    await assertFails(updateDoc(doc(client(student),member),{membershipStatus:'active'}));
+    await assertSucceeds(updateDoc(doc(client(student),member),{membershipStatus:'pending',membershipRole:'member',positionTitle:null,permissions:{},applicantName:'Demo Student',requestedAt:serverTimestamp(),joinedAt:null,updatedAt:serverTimestamp(),reviewedAt:null,reviewedBy:null}));
+    const reapplied=(await getDoc(doc(client(student),member))).data();assert.equal(reapplied.uid,student);assert.equal(reapplied.membershipRole,'member');assert.equal(reapplied.endedBy,manager);
+    const preserved=await store.runTransaction(async t=>t.getAll(store.doc(`organizations/${org}/events/history/registrations/${student}`),store.doc(`organizations/${org}/events/history/attendance/${student}`)));
+    assert.equal(preserved[0].data().registrationStatus,'registered');assert.equal(preserved[1].data().attendanceStatus,'present');
+  }finally{await env.cleanup();}
+});

@@ -49,8 +49,10 @@ class AppDependencies extends StatelessWidget {
         ),
         Provider(create: (_) => FirestoreService(FirebaseFirestore.instance)),
         Provider(
-          create: (context) =>
-              OrganizationService(context.read<FirestoreService>()),
+          create: (context) => OrganizationService(
+            context.read<FirestoreService>(),
+            api: context.read<WorkerApiService>(),
+          ),
         ),
         Provider<OrganizationRepository>(
           create: (context) => FirestoreOrganizationRepository(

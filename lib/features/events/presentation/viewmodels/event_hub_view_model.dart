@@ -23,7 +23,7 @@ class EventHubViewModel extends ChangeNotifier {
   final Set<String> refreshingNames = {};
   AppFailure? actionFailure;
   bool _disposed = false;
-  String search = '', period = 'Upcoming';
+  String search = '', period = 'All';
   String? organizationFilter;
   Map<String, Organization> get availableOrganizations => {
     for (final org in organizations.discovery.value ?? <Organization>[])

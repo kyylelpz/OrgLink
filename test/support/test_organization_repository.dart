@@ -51,9 +51,76 @@ class TestOrganizationRepository implements OrganizationRepository {
   final document = TestFeed<Organization?>(demoOrg);
   final own = TestFeed<Membership?>(null);
   final events = TestFeed<List<PublishedEvent>>([]);
-  int requestCalls = 0, reviewCalls = 0, discoverCalls = 0;
-  Completer<void>? requestGate, reviewGate;
-  Object? requestError, reviewError;
+  int requestCalls = 0, reviewCalls = 0, discoverCalls = 0, cancelCalls = 0;
+  Completer<void>? requestGate, reviewGate, cancelGate;
+  Object? requestError, reviewError, cancelError;
+  final managementCalls = <Map<String, dynamic>>[];
+  Object? managementError;
+  int membershipVersion = 1;
+  @override
+  Future<Map<String, dynamic>> membershipCommand(
+    String operation,
+    Map<String, dynamic> data,
+  ) async {
+    if (managementError case final error?) throw error;
+    final member = allMemberships.value.firstWhere(
+      (m) =>
+          m.uid == data['participantUid'] &&
+          m.organizationId == data['organizationId'],
+    );
+    if (operation == 'preview') {
+      final value = member.toMap();
+      for (final key in [
+        'requestedAt',
+        'joinedAt',
+        'updatedAt',
+        'reviewedAt',
+        'endedAt',
+      ]) {
+        value[key] = {
+          'requestedAt': member.requestedAt,
+          'joinedAt': member.joinedAt,
+          'updatedAt': member.updatedAt,
+          'reviewedAt': member.reviewedAt,
+          'endedAt': member.endedAt,
+        }[key]?.millisecondsSinceEpoch;
+      }
+      return {'version': 'v$membershipVersion', 'membership': value};
+    }
+    managementCalls.add(Map.from(data));
+    if (data['version'] != 'v$membershipVersion') {
+      throw const AppFailure('Membership changed.');
+    }
+    final changed = Membership.fromMap({
+      ...member.toMap(),
+      if (data['operation'] == 'end') ...{
+        'membershipStatus': 'removed',
+        'permissions': <String, dynamic>{},
+        'endedAt': DateTime.now(),
+        'endedBy': 'manager',
+        'endReason': data['reason'],
+      },
+      if (data['operation'] == 'role') ...{
+        'membershipRole': data['role'],
+        'positionTitle': data['positionTitle'],
+        'permissions': data['role'] == 'member'
+            ? <String, dynamic>{}
+            : member.permissions,
+      },
+      if (data['operation'] == 'permissions')
+        'permissions': data['permissions'],
+    });
+    membershipVersion++;
+    allMemberships.emit([
+      for (final m in allMemberships.value)
+        if (m.uid == member.uid && m.organizationId == member.organizationId)
+          changed
+        else
+          m,
+    ]);
+    return {'saved': true};
+  }
+
   @override
   Stream<List<Organization>> discover() {
     discoverCalls++;
@@ -97,7 +164,10 @@ class TestOrganizationRepository implements OrganizationRepository {
     await requestGate?.future;
     if (requestError case final error?) throw error;
     if (allMemberships.value.any(
-      (member) => member.uid == uid && member.organizationId == id,
+      (member) =>
+          member.uid == uid &&
+          member.organizationId == id &&
+          member.status != 'removed',
     )) {
       throw const AppFailure('Already requested');
     }
@@ -110,7 +180,31 @@ class TestOrganizationRepository implements OrganizationRepository {
       requestedAt: DateTime(2026, 10, 26),
     );
     own.emit(member);
-    allMemberships.emit([...allMemberships.value, member]);
+    allMemberships.emit([
+      ...allMemberships.value.where(
+        (m) => m.uid != uid || m.organizationId != id,
+      ),
+      member,
+    ]);
+  }
+
+  @override
+  Future<void> cancelMembershipRequest(String id, String uid) async {
+    cancelCalls++;
+    await cancelGate?.future;
+    if (cancelError case final error?) throw error;
+    final matches = allMemberships.value.where(
+      (member) => member.uid == uid && member.organizationId == id,
+    );
+    if (matches.isEmpty) return;
+    if (matches.single.status != 'pending' || matches.single.role != 'member') {
+      throw const AppFailure('This request is no longer pending.');
+    }
+    allMemberships.emit([
+      for (final member in allMemberships.value)
+        if (member.uid != uid || member.organizationId != id) member,
+    ]);
+    own.emit(null);
   }
 
   @override

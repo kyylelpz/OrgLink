@@ -10,6 +10,7 @@ import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:orglink/app/app.dart';
 import 'package:orglink/core/constants/app_routes.dart';
+import 'package:orglink/core/widgets/app_components.dart';
 import 'package:orglink/features/admin/data/models/admin_models.dart';
 import 'package:orglink/features/admin/data/repositories/admin_repository.dart';
 import 'package:orglink/features/admin/data/services/admin_service.dart';
@@ -24,10 +25,12 @@ class FakeAdminRepository implements AdminRepository {
   int reads = 0;
   final mutations = <Map<String, dynamic>>[];
   final queries = <Map<String, dynamic>?>[];
+  final searchRequests = <Map<String, dynamic>>[];
   Completer<void>? gate, readGate;
   bool empty = false;
   AdminFailure? failure;
   List<AdminAccount>? accountItems;
+  List<AdminOrganization>? organizationItems;
   @override
   Future<AdminManager> manager(String studentId) async => AdminManager.fromMap({
     'studentId': studentId,
@@ -49,9 +52,16 @@ class FakeAdminRepository implements AdminRepository {
   Future<AdminPage<AdminAccount>> accounts(
     String field,
     String search,
-    Map<String, dynamic>? cursor,
-  ) async {
+    Map<String, dynamic>? cursor, {
+    bool refresh = false,
+  }) async {
     reads++;
+    searchRequests.add({
+      'field': field,
+      'search': search,
+      'cursor': cursor,
+      'refresh': refresh,
+    });
     await readGate?.future;
     queries.add(cursor);
     if (failure == null && accountItems != null) {
@@ -76,11 +86,19 @@ class FakeAdminRepository implements AdminRepository {
   Future<AdminPage<AdminOrganization>> organizations(
     String field,
     String search,
-    Map<String, dynamic>? cursor,
-  ) async {
+    Map<String, dynamic>? cursor, {
+    bool refresh = false,
+  }) async {
     reads++;
+    searchRequests.add({
+      'field': field,
+      'search': search,
+      'cursor': cursor,
+      'refresh': refresh,
+    });
     await readGate?.future;
     if (failure != null) throw failure!;
+    if (organizationItems != null) return AdminPage(organizationItems!, null);
     return AdminPage([
       AdminOrganization.fromMap({
         'id': 'org',
@@ -174,6 +192,110 @@ void main() {
       'MaterialIcons',
     )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
   });
+  for (final accounts in [true, false]) {
+    testWidgets(
+      'admin ${accounts ? 'account' : 'organization'} search stays manual through typing, keyboard, Clear and Refresh',
+      (tester) async {
+        final app = fixture.ProfileApp(), repo = FakeAdminRepository();
+        addTearDown(() => app.close(tester));
+        await mount(tester, app, repo);
+        app.router.go(
+          accounts ? AppRoutes.adminAccounts : AppRoutes.adminOrganizations,
+        );
+        await tester.pumpAndSettle();
+        final before = repo.reads,
+            oldName = accounts
+                ? 'A Long Student Name McDonald de la Cruz Dela Peña IEEE iOS Research'
+                : 'IEEE iOS Research Organization With a Long Name';
+        expect(find.text(oldName), findsOneWidget);
+        if (accounts) {
+          repo.accountItems = [
+            AdminAccount.fromMap({
+              'id': 'match',
+              'version': 'v2',
+              'fullName': 'Matched Cruz Student',
+              'email': 'match@example.test',
+              'platformRole': 'user',
+              'accountStatus': 'pending',
+            }),
+          ];
+        } else {
+          repo.organizationItems = [
+            AdminOrganization.fromMap({
+              'id': 'match-org',
+              'organizationId': 'match-org',
+              'version': 'v2',
+              'name': 'Matched Robotics Guild',
+              'managerUid': 'existing-manager',
+              'visibility': 'public',
+              'status': 'active',
+            }),
+          ];
+        }
+        final input = find.byType(TextField).first;
+        expect(
+          tester.widget<TextField>(input).textInputAction,
+          TextInputAction.search,
+        );
+        await tester.enterText(input, '  cRuZ  ');
+        await tester.pump(const Duration(seconds: 2));
+        expect(repo.reads, before);
+        expect(find.text(oldName), findsOneWidget);
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        expect(repo.reads, before + 1);
+        expect(repo.searchRequests.last['search'], 'cRuZ');
+        expect(
+          find.text(
+            accounts ? 'Matched Cruz Student' : 'Matched Robotics Guild',
+          ),
+          findsOneWidget,
+        );
+        await tester.enterText(input, 'not submitted');
+        await tester.pumpAndSettle();
+        expect(repo.reads, before + 1);
+        final refresh = find.widgetWithText(AppActionButton, 'Refresh');
+        await tester.ensureVisible(refresh);
+        await tester.tap(refresh);
+        await tester.pumpAndSettle();
+        expect(repo.searchRequests.last['search'], 'cRuZ');
+        expect(repo.searchRequests.last['refresh'], true);
+        final searchButton = find.widgetWithText(AppActionButton, 'Search');
+        await tester.ensureVisible(searchButton);
+        await tester.tap(searchButton);
+        await tester.pumpAndSettle();
+        expect(repo.searchRequests.last['search'], 'not submitted');
+        final clear = find.widgetWithText(AppActionButton, 'Clear');
+        await tester.ensureVisible(clear);
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(repo.searchRequests.last['search'], '');
+        expect(repo.searchRequests.last['cursor'], isNull);
+        expect(tester.widget<TextField>(input).controller!.text, '');
+      },
+    );
+  }
+  test(
+    'partial Student ID search trims whitespace and pagination retains the submitted field/query',
+    () async {
+      final repo = FakeAdminRepository();
+      final model = AdminViewModel(repo, AdminSection.accounts);
+      addTearDown(model.dispose);
+      await model.find('studentNumber', ' 00012 ');
+      expect(model.search, '00012');
+      expect(model.field, 'studentNumber');
+      await model.next();
+      expect(repo.searchRequests.last['search'], '00012');
+      expect(repo.searchRequests.last['field'], 'studentNumber');
+      expect(model.page, 2);
+      await model.previous();
+      expect(model.page, 1);
+      await model.find('studentNumber', '   ');
+      expect(model.search, '');
+      expect(model.field, 'fullName');
+      expect(model.hasPrevious, false);
+    },
+  );
   test(
     'VM guards duplicate submissions and reuses operation ID after ambiguous failure',
     () async {

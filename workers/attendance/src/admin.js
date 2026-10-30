@@ -1,3 +1,4 @@
+import {createDirectorySearchCache,normalizeSearch,substringPage} from './admin_search.js';
 import { validStudentId, resolveStudentId } from './student_ids.js';
 // Platform operations use the existing trusted Firestore transport, never client role claims.
 import { AttendanceError } from './attendance.js';
@@ -71,7 +72,7 @@ function canonical(value) {
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(k => [k,canonical(value[k])]));
   return value;
 }
-export function adminBackend(db, clock = Date.now) {
+export function adminBackend(db, clock = Date.now, searchCache = createDirectorySearchCache(clock), cacheNamespace = 'default') {
   const userPath = uid => db.doc(`users/${uid}`);
   async function read(uid, action) {
     return db.runTransaction(async t => {
@@ -94,34 +95,25 @@ export function adminBackend(db, clock = Date.now) {
         version:matched.version,registryVersion:matched.registryVersion};
     }),
     list: ({auth,data}) => read(auth.uid, async t => {
-      fields(data,['collection','field','search','cursor']);
+      fields(data,['collection','field','search','cursor','refresh']);
       const collection = data.collection;
       const allowed = collection === 'users' ? ['fullName','email','studentNumber','__name__'] : collection === 'organizations' ? ['name','__name__'] : [];
-      const field = data.field ?? allowed[0], search = data.search ?? '';
-      if (!allowed.includes(field) || typeof search !== 'string' || search.length > 128) invalid();
+      const requestedField = data.field ?? allowed[0], rawSearch = data.search ?? '';
+      if (!allowed.includes(requestedField) || typeof rawSearch !== 'string' || rawSearch.length > 128 || data.refresh !== undefined && typeof data.refresh !== 'boolean') invalid();
+      const search=normalizeSearch(rawSearch),cacheKey=`${cacheNamespace}:${collection}`;
+      const field=search ? requestedField : allowed[0];
+      if(data.refresh)searchCache.invalidate(cacheKey);
+      if(data.cursor){
+        fields(data.cursor,['id','value']);
+        if(!validId(data.cursor.id)||typeof data.cursor.value!=='string'||data.cursor.value.length>320)invalid();
+      }
       const query = {from:[{collectionId:collection}],orderBy:[{field:{fieldPath:field},direction:'ASCENDING'}],limit:26};
       if (field !== '__name__') query.orderBy.push({field:{fieldPath:'__name__'},direction:'ASCENDING'});
-      if (search) {
-        if (field === '__name__') {
-          if (!validId(search)) invalid();
-          query.where = {fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{referenceValue:db.doc(`${collection}/${search}`)}}};
-        } else if (field === 'email' || field === 'studentNumber') {
-          if(field==='studentNumber' && !validStudentId(search)) fail('invalid-argument','Enter exactly 10 numeric digits for Student ID search.');
-          query.where = {fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:search}}};
-        } else {
-          query.where = {compositeFilter:{op:'AND',filters:[
-            {fieldFilter:{field:{fieldPath:field},op:'GREATER_THAN_OR_EQUAL',value:{stringValue:search}}},
-            {fieldFilter:{field:{fieldPath:field},op:'LESS_THAN',value:{stringValue:search+'\uf8ff'}}},
-          ]}};
-        }
-      }
-      if (data.cursor) {
-        fields(data.cursor,['id','value']);
-        if (!validId(data.cursor.id) || typeof data.cursor.value !== 'string' || data.cursor.value.length > 320) invalid();
-        query.startAt = {before:false,values:[...(field === '__name__' ? [] : [{stringValue:data.cursor.value}]),
-          {referenceValue:db.doc(`${collection}/${data.cursor.id}`)}]};
-      }
-      const records = await t.query(query);
+      if (data.cursor) query.startAt = {before:false,values:[...(field === '__name__' ? [] : [{stringValue:data.cursor.value}]),
+        {referenceValue:db.doc(`${collection}/${data.cursor.id}`)}]};
+      const records = search
+        ? await substringPage({t,cache:searchCache,key:cacheKey,collection,field,search,cursor:data.cursor})
+        : await t.query(query);
       const managers=collection==='organizations' && records.length ? await t.getAll(...records.slice(0,25).map(r=>userPath(r.managerUid))) : [];
       const items = records.slice(0,25).map((record,index) => {
         const result = {id:record.id,version:record.version};
@@ -147,7 +139,7 @@ export function adminBackend(db, clock = Date.now) {
       const targetPath = `${account ? 'users' : 'organizations'}/${data.targetId}`;
       const request = canonical({...data,...(patch ? {changes:patch} : {})});
       const auditPath = db.doc(`activityLogs/admin-${auth.uid}-${data.requestId}`);
-      return db.runTransaction(async t => {
+      const result = await db.runTransaction(async t => {
         const [actor,target,audit] = await t.getAll(userPath(auth.uid),db.doc(targetPath),auditPath);
         admin(actor.data(),auth.uid);
         if (audit.data()) {
@@ -204,6 +196,8 @@ export function adminBackend(db, clock = Date.now) {
           request,before,after:changes,createdAt:now},{serverTimestampFields:['createdAt']});
         return {id:data.targetId,duplicate:false};
       });
+      searchCache.invalidate(`${cacheNamespace}:${account ? 'users' : 'organizations'}`);
+      return result;
     },
   };
 }

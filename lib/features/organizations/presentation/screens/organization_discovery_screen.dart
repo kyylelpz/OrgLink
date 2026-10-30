@@ -20,6 +20,16 @@ class OrganizationDiscoveryScreen extends StatefulWidget {
 class _OrganizationDiscoveryScreenState
     extends State<OrganizationDiscoveryScreen> {
   final _search = TextEditingController();
+  
+  @override
+  void initState() {
+    super.initState();
+    // Default to Discover when the screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<OrganizationHubViewModel>().browse(OrganizationBrowseFilter.discover);
+    });
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -56,10 +66,7 @@ class _OrganizationDiscoveryScreenState
       ),
       child: Scaffold(
         backgroundColor: AppColors.brandMist,
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [OrganizationNavigation(0)],
-        ),
+        bottomNavigationBar: OrganizationNavigation(0), // Simplified here
         body: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -91,7 +98,7 @@ class _OrganizationDiscoveryScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Organizations',
+                              'Discover Organizations',
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
                                     color: AppColors.white,
@@ -141,7 +148,7 @@ class _OrganizationDiscoveryScreenState
                 ),
               ),
 
-              // MAIN CONTENT
+              // MAIN CONTENT (Filters removed)
               Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
@@ -154,35 +161,9 @@ class _OrganizationDiscoveryScreenState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: AppSpacing.md),
-                        Theme(
-                          data: Theme.of(context).copyWith(
-                            chipTheme: Theme.of(context).chipTheme.copyWith(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 14,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              for (final filter
-                                  in OrganizationBrowseFilter.values) ...[
-                                if (filter !=
-                                    OrganizationBrowseFilter.values.first)
-                                  const SizedBox(width: 6),
-                                Expanded(
-                                  child: AppFilterChip(
-                                    expanded: true,
-                                    label: displayIdentifier(filter.name),
-                                    selected: model.browseFilter == filter,
-                                    onSelected: (_) => model.browse(filter),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
+                        
+                        // The chips are completely removed here.
+                        
                         if (failure != null)
                           AppErrorView(
                             message: failure.message,
@@ -196,7 +177,7 @@ class _OrganizationDiscoveryScreenState
                           const AppEmptyView(
                             title: 'No Organizations Found',
                             message:
-                                'Try another search or filter. Membership requests remain available above.',
+                                'Try another search or check back later for new organizations.',
                           )
                         else
                           for (final org in model.browseResults)

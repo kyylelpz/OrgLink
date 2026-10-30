@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../../events/data/models/event.dart';
@@ -10,15 +11,19 @@ class HomeViewModel extends ChangeNotifier {
     : _now = now ?? DateTime.now {
     hub.addListener(notifyListeners);
   }
+
   final EventHubViewModel hub;
   final DateTime Function() _now;
+  final Random _shuffle = Random();
   String search = '';
+
   bool get loading =>
       hub.organizations.discovery.loading ||
       hub.organizations.mine.loading ||
       hub.organizations.managed.loading ||
       hub.organizations.associated.values.any((q) => q.loading) ||
       hub.catalog.values.any((q) => q.loading);
+
   AppFailure? get failure {
     final orgs = hub.organizations;
     for (final error in [
@@ -59,6 +64,7 @@ class HomeViewModel extends ChangeNotifier {
 
   List<OrgEvent> get upcoming =>
       _events.where((e) => e.startAt?.isAfter(_now()) == true).take(2).toList();
+
   List<OrgEvent> get ongoing => _events.where((e) {
     final start = e.startAt;
     final end = e.endAt;
@@ -66,9 +72,11 @@ class HomeViewModel extends ChangeNotifier {
     final now = _now();
     return !start.isAfter(now) && end.isAfter(now);
   }).toList();
+
   List<OrgEvent> get matchingEvents => _events
       .where((e) => e.title.toLowerCase().contains(search.trim().toLowerCase()))
       .toList();
+
   List<Organization> get matchingOrganizations =>
       hub.availableOrganizations.values
           .where(
@@ -76,6 +84,40 @@ class HomeViewModel extends ChangeNotifier {
           )
           .toList()
         ..sort((a, b) => a.name.compareTo(b.name));
+
+  // ─── Suggested organizations ─────────────────────────────────────────────
+
+  List<Organization>? _suggested;
+
+  /// Organizations the user has not joined yet, shuffled once per VM
+  /// instance. Returns an empty list while the joined-orgs query is still
+  /// loading so we never cache a list built against an unknown membership set.
+  List<Organization> get suggestedOrganizations {
+    final mine = hub.organizations.mine;
+    if (mine.loading || mine.value == null) return const [];
+    return _suggested ??= _buildSuggestions();
+  }
+
+  List<Organization> _buildSuggestions() {
+    final joined = hub.organizations.mine.value
+            ?.map((m) => m.organizationId)
+            .toSet() ??
+        const <String>{};
+    return hub.availableOrganizations.values
+        .where((o) => !joined.contains(o.id))
+        .toList()
+      ..shuffle(_shuffle);
+  }
+
+  /// Call after a join/leave action so the suggested list is recomputed on
+  /// the next read.
+  void invalidateSuggestions() {
+    _suggested = null;
+    notifyListeners();
+  }
+
+  // ─── Mutations ───────────────────────────────────────────────────────────
+
   void searchFor(String value) {
     search = value;
     notifyListeners();
@@ -92,5 +134,12 @@ class HomeViewModel extends ChangeNotifier {
   void dispose() {
     hub.removeListener(notifyListeners);
     super.dispose();
+  }
+
+  Future<void> refresh() async {
+    retry();
+    // Give the stream restarts a tick to register, so the indicator
+    // dismisses after the rebuild starts rather than instantly.
+    await Future<void>.delayed(Duration.zero);
   }
 }

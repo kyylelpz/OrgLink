@@ -15,6 +15,18 @@ The PDF is a source document, not an implemented-feature inventory.
 
 ## Implemented workflow
 
+Eligible students can use **Cancel Request** on Organization Details for their own
+pending ordinary membership, including after reopening the screen. Cancellation
+deletes only the unreviewed request in a Firestore transaction; it introduces no
+new membership status or audit record. Manager review and cancellation compete
+atomically: an approved/rejected membership cannot be deleted by the applicant.
+Successful cancellation removes the request from personal/manager lists and
+allows a fresh application if the organization still accepts requests. Errors
+retain the request and allow retry; duplicate taps are blocked while busy.
+Other users, managers and officers cannot cancel someone else's request. These
+Rules changes require an approved manual deployment; local implementation alone
+does not update the live policy.
+
 An active account with a completed student profile can discover public active
 organizations, search their names locally, open details, request membership,
 and track pending/active/rejected/removed records. Firestore streams update the
@@ -44,6 +56,141 @@ active roster; officers do not automatically receive this permission. Managers
 always have roster access. Client assignment of roles or permissions is denied.
 
 ## Architecture and files
+
+### Manager Roster Membership and Role Management
+
+The existing Member Roster now provides **Active**, **Officers**, and
+manager-only **Former Members** views. Search matches loaded names, UID,
+position, role and status. Existing active roster readers keep read-only access;
+they do not gain former-roster access or action menus.
+
+Assigned managers of active organizations get a three-dot menu per roster entry:
+View Details, Assign/Change Role, Manage Permissions (officers only), and End
+Membership. Self and manager-labelled records expose details only. Former members
+are read-only. Existing responsive cards and Material 3 dialogs are reused.
+
+- **End Membership** is an explicit confirmation with an optional reason up to
+  1000 characters. It updates the existing UID document to `membershipStatus:
+  removed`, clears permissions, and adds `endedAt`, `endedBy`, `endReason`.
+  Role/position and previous request/join/review metadata are retained. It does
+  not delete the membership, event registrations, attendance or child records.
+- **Assign/Change Role** supports `member` and `officer`, with common positions
+  (President, Vice President, Secretary, Treasurer, etc.), configured organization
+  positions and any existing stored position. Positions remain labels. Promotion
+  starts with no capabilities; reassignment of an existing officer preserves
+  supported capabilities. Demotion clears permissions and position.
+- **Manage Permissions** configures only `manageEvents`, `manageAttendance`,
+  and `viewRoster`. Event authority remains limited to the officer's own events;
+  attendance authority is independent. No organization role grants Platform Admin
+  or manager assignment. Unsupported historical permission keys are not granted.
+- `organization.managerUid` is never changed. The actor's own record, the assigned
+  manager and any manager-labelled record cannot be terminated/demoted here; this
+  protects the sole authoritative manager and preserves administrative assignment.
+- Membership termination and permission/role changes affect authoritative checks
+  immediately on subsequent server requests. Offline cached UI cannot guarantee
+  instant visual revocation. Existing registration-based participation rules are
+  unchanged; retaining a registration does not retain officer/roster privileges.
+
+#### Trusted API and Audit
+
+The existing Worker adds authenticated POST JSON routes:
+
+| Endpoint | Fields | Result |
+| --- | --- | --- |
+| `/memberships/preview` | `organizationId`, `participantUid` | Fresh membership display fields and opaque Firestore `version` |
+| `/memberships/mutate` | Same IDs, `operation`, `version`, stable `requestId` | `{saved: true, duplicate: boolean}` |
+
+Mutation operation fields: `end` takes optional `reason`; `role` takes
+`role: member|officer` and `positionTitle` (null for member, nonempty up to 100
+characters for officer); `permissions` takes a map of supported boolean flags.
+Unknown fields/roles/capabilities are rejected. The existing `ATTENDANCE_API_URL`,
+Firebase ID-token verifier, service-account binding, REST transactions and error
+envelope are reused; no new credentials, indexes or dependencies are required.
+
+Every request rereads the manager profile (active and complete), active
+organization, assigned manager UID and target membership. Mutations require an
+active target and matching preview version. Concurrent decisions have one winner;
+stale dialogs must be closed and reopened to review fresh values. Ambiguous retry
+uses the same immutable command/request ID; dialog fields lock after the first
+submission. Identical committed retries return success without duplicate audit;
+reusing an ID with different content fails. A manager transfer/revocation also
+blocks the former actor's retries.
+
+Target update and audit creation commit atomically at
+`organizations/{orgId}/membershipAudits/{actorUid}-{requestId}`. Audit fields are
+organization/participant IDs, actor UID, operation, request ID, validated request,
+trusted timestamp `createdAt`, and relevant before/after role/status/position,
+permissions, request/join/review/end values. Audit failure prevents the change.
+Only the currently assigned eligible manager can read these records through Rules;
+all client audit writes are denied. No general audit-history browser is added;
+View Details shows membership details and the most recent termination metadata.
+Organization `publicOfficers` remains separately published, non-authoritative
+information; role changes do not guess identities by matching published names.
+
+#### Reapplication and History
+
+An ended (`removed`) member may submit a fresh request to an accepting public,
+active organization, reusing `memberships/{uid}` without duplicates. The new
+request resets role to member, empties permissions/position, records current name
+and request time, and clears current join/review metadata. Latest termination
+metadata is preserved; immutable audits retain prior-cycle join/role/permission
+history. Approval remains the existing manager review workflow. Rejected members
+still cannot reapply. Cancellation of an unreviewed new request remains available;
+its deletion does not delete the separate management audits.
+
+Direct client role/permission/termination/history edits remain denied, including
+for managers. The sole added self-update is the tightly constrained
+`removed → pending` reapplication; clients cannot self-activate or erase audit/end
+metadata. Existing private/closed organization and account eligibility rules apply.
+
+#### Validation and Deployment
+
+Local commands (never live data):
+
+```powershell
+flutter test test/member_management_test.dart test/organization_view_models_test.dart test/organization_workflow_test.dart test/phase4_organizations_ui_test.dart
+npm.cmd test --prefix workers/attendance
+firebase.cmd emulators:exec --project orglink-dev --only firestore "node --test --test-concurrency=1 firebase/tests/organization.rules.test.mjs workers/attendance/test/memberships.emulator.test.js"
+```
+
+Coverage includes manager-only access, forged roles/fields, self/manager
+protection, audit rollback/idempotence, concurrent/stale writes, real REST
+transactions, access revocation, former-roster/audit privacy, retained participation,
+UID-preserving reapplication, and dialogs at 320 dp with 100%/200% text.
+
+Deploy only after explicit approval: from repository root,
+`firebase deploy --only firestore:rules --project orglink-dev`; then from
+`workers/attendance`, `npx wrangler deploy`; rebuild/install the compatible app.
+No deployment, live role change or live Firebase write was performed for this
+implementation. Do not use manual client writes as a workaround for an old Worker.
+
+Local results for this implementation: full Flutter suite **293 passed**;
+focused roster/organization Flutter suite **28 passed**; Worker unit/runtime
+suite **95 passed**; organization Rules plus real membership REST integration
+**42 passed**. Analysis retains four existing warnings and one existing style
+hint, with no introduced errors or warnings. Source formatting and diff checks
+were run. These results do not establish deployed acceptance.
+
+Affected files:
+
+- `lib/features/memberships/data/models/membership.dart`
+- `lib/features/memberships/presentation/screens/member_list_screen.dart`
+- `lib/features/memberships/presentation/screens/member_management_dialog.dart`
+- `lib/features/memberships/presentation/viewmodels/member_list_view_model.dart`
+- `lib/features/organizations/data/repositories/organization_repository.dart`
+- `lib/features/organizations/data/repositories/firestore_organization_repository.dart`
+- `lib/features/organizations/data/services/organization_service.dart`
+- `lib/features/organizations/presentation/viewmodels/organization_details_view_model.dart`
+- `lib/features/organizations/presentation/screens/organization_details_screen.dart`
+- `lib/core/services/worker_api_service.dart`, `lib/app/dependency_injection.dart`
+- `workers/attendance/src/memberships.js`, `workers/attendance/src/index.js`
+- `workers/attendance/package.json`
+- `firebase/firebase.rules`, `firebase/tests/organization.rules.test.mjs`
+- `workers/attendance/test/memberships.test.js`
+- `workers/attendance/test/memberships.emulator.test.js`
+- `test/member_management_test.dart`, `test/organization_view_models_test.dart`
+- `test/support/test_organization_repository.dart`
+- `docs/module2.md`
 
 The feature folders follow View -> ChangeNotifier ViewModel -> Repository ->
 Service -> typed Model, using the existing Provider composition and Firebase
@@ -145,7 +292,7 @@ Do not place private contact or student records in these documents.
 | Field | Type / meaning |
 | --- | --- |
 | uid, organizationId | strings matching identity/path |
-| membershipRole | member on student requests; manager/officer only through trusted provisioning |
+| membershipRole | member on student requests; officer via trusted manager Worker; manager assignment remains administrative |
 | membershipStatus | pending, active, rejected or removed |
 | positionTitle | nullable string, separate from authorization |
 | permissions | map; empty on student requests; viewRoster=true is an explicit delegated read permission |
@@ -154,15 +301,17 @@ Do not place private contact or student records in these documents.
 | applicantName | additional field: full-name snapshot, equal to own profile on creation |
 | requestedAt | additional field: server timestamp at request creation |
 | reviewedAt, reviewedBy | additional fields: decision server timestamp and manager UID |
+| endedAt, endedBy, endReason | optional trusted termination metadata; latest values retained on reapplication |
 
 A UID document path prevents duplicate records. Creation always requires
 member/pending, null position/join/review values, empty permissions and exact
 identity/timestamps. Managers may perform only pending -> active or pending ->
 rejected. Review metadata is mandatory; all other fields are preserved.
 The transaction rereads current state, so a second competing decision fails.
-No client can delete/reset a membership, edit roles, self-approve, or reapply
-following rejection/removal. Requested and decision timestamps are retained;
-there is no separate unbounded audit-log collection in this module.
+Clients may cancel their own unreviewed pending request or reapply from removed
+under the narrow Rules above. They cannot edit roles, self-approve, erase end
+metadata or reapply after rejection. Trusted management records before/after
+history in the manager-private membership audit collection.
 
 ### Existing event summaries
 
@@ -195,7 +344,8 @@ owner membership reads and own-UID collection-group queries, validated pending
 creation, narrowly constrained manager decisions and active-roster permission
 checks. Broad organization queries, unrelated student memberships, private user
 profiles, unauthorized organization creation/manager changes, self-promotion,
-role assignment and deletion remain denied. Other collections remain denied.
+direct role assignment and deletion of reviewed memberships remain denied.
+Trusted management and tightly constrained self-reapplication are described above.
 
 Discovery queries filter both public and active. The My Organizations query uses
 collectionGroup('memberships').where('uid', isEqualTo: current UID); its rules
@@ -314,20 +464,22 @@ were not performed automatically.
 
 ## Explicit boundaries
 
-- No public organization creation, officer assignment UI, manager-transfer UI,
-  removal UI, invitation workflow or platform administration is included.
-  Existing removed statuses are displayed; permission/role provisioning remains
-  an authorized administrative operation.
+- Member Roster includes trusted officer/permission management and membership
+  termination. Manager assignment and organization administration remain separate
+  Platform Admin operations; no public creation or invitation workflow is added.
 - Requests are limited to public, active, accepting organizations and eligible
   accounts. Custom membership requirement strings are informational, not a
   programmable enrollment-verification policy. Private organizations can be
   opened by provisioned active members/managers; students cannot request them.
-- Reapplication is deliberately unavailable. There is no automatic status reset.
+- Reapplication after rejection remains unavailable. Ended members reapply as
+  ordinary pending members at the same UID path; cancelling an unreviewed request
+  permits a fresh application without granting any permissions.
 - Search filters the loaded discovery list. Full-text search and pagination are
   deferred for the small academic dataset.
 - Positions/public officers are optional publication-safe extensions. No private
   roster is exposed as a public officer directory.
 - Firestore server connectivity is required for initial data and transactions.
   Previously received status changes cannot be revoked instantly while offline.
-- Event summaries require existing published/approved records. Event creation,
-  registration, attendance, badges and ratings remain unimplemented and denied.
+- Event summaries require published/approved records. Modules 3/4 own the existing
+  event/registration and attendance workflows; this change does not alter them.
+  Badges and ratings remain outside the implementation.

@@ -1,12 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/errors/app_failure.dart';
+import '../../../../core/services/worker_api_service.dart';
 import '../models/organization.dart';
 import '../../../memberships/data/models/membership.dart';
 
 class OrganizationService {
-  OrganizationService(this._store);
+  OrganizationService(this._store, {this.api});
   final FirestoreService _store;
+  final WorkerApiService? api;
+  Future<Map<String, dynamic>> membershipCommand(
+    String operation,
+    Map<String, dynamic> data,
+  ) {
+    if (api == null || !['preview', 'mutate'].contains(operation)) {
+      throw const AppFailure('Membership management is not configured.');
+    }
+    return api!.call('/memberships/$operation', data);
+  }
+
   CollectionReference<Map<String, dynamic>> _collection(String path) =>
       _store.collection<Map<String, dynamic>>(
         path,
@@ -100,7 +112,7 @@ class OrganizationService {
   ) => _store.runTransaction((transaction) async {
     final reference = _members(id).doc(uid);
     final existing = await transaction.get(reference);
-    if (existing.exists) {
+    if (existing.exists && existing.data()?['membershipStatus'] != 'removed') {
       throw const AppFailure(
         'A membership record already exists. Reapplication is not available.',
       );
@@ -130,7 +142,26 @@ class OrganizationService {
       'updatedAt': FieldValue.serverTimestamp(),
       'reviewedAt': null,
       'reviewedBy': null,
-    });
+    }, SetOptions(merge: true));
+  });
+
+  Future<void> cancelMembershipRequest(
+    String id,
+    String uid,
+  ) => _store.runTransaction((transaction) async {
+    final reference = _members(id).doc(uid);
+    final record = await transaction.get(reference);
+    if (!record.exists) return;
+    final data = record.data()!;
+    if (data['uid'] != uid ||
+        data['organizationId'] != id ||
+        data['membershipStatus'] != 'pending' ||
+        data['membershipRole'] != 'member') {
+      throw const AppFailure(
+        'This request is no longer pending. Refresh your membership status.',
+      );
+    }
+    transaction.delete(reference);
   });
 
   Future<void> reviewMembership(

@@ -1,3 +1,5 @@
+import { createDirectorySearchCache } from './admin_search.js';
+import { membershipBackend } from './memberships.js';
 import { imageBackend } from './images.js';
 import { profileBackend } from "./student_ids.js";
 import { adminBackend } from "./admin.js";
@@ -72,9 +74,10 @@ export function createHandler({
 } = {}) {
   const verify = firebaseVerifier({ fetchImpl, clock, returnClaims: true }),
     oauth = googleAccessToken({ fetchImpl, clock });
+  const searchCache = createDirectorySearchCache(clock);
   return async (request, env) => {
     const path = new URL(request.url).pathname;
-    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate", "/admin/manager", "/profile/save", "/images/sign", "/images/upload", "/images/finalize", "/images/remove"].includes(path))
+    if (!["/issue", "/redeem", "/correct", "/admin/stats", "/admin/list", "/admin/mutate", "/admin/manager", "/profile/save", "/images/sign", "/images/upload", "/images/finalize", "/images/remove", "/memberships/preview", "/memberships/mutate"].includes(path))
       return response(
         { error: { code: "not-found", message: "Endpoint not found." } },
         404,
@@ -112,9 +115,10 @@ export function createHandler({
       const isAdmin = path.startsWith("/admin/");
       const isProfile = path.startsWith("/profile/");
       const isImage = path.startsWith("/images/");
-      const backend = isImage ? imageBackend(db, env, clock, fetchImpl) : isAdmin ? adminBackend(db, clock) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
-      const operation = isImage ? path.slice(8) : isAdmin ? path.slice(7) : isProfile ? path.slice(9) : path.slice(1);
-      stage = `${isImage ? "images" : isAdmin ? "platform-admin" : isProfile ? "profile" : "attendance"}.${operation}`;
+      const isMembership = path.startsWith("/memberships/");
+      const backend = isMembership ? membershipBackend(db, clock) : isImage ? imageBackend(db, env, clock, fetchImpl) : isAdmin ? adminBackend(db, clock, searchCache, origin) : isProfile ? profileBackend(db, clock) : attendanceBackend(db, clock);
+      const operation = isMembership ? path.slice(13) : isImage ? path.slice(8) : isAdmin ? path.slice(7) : isProfile ? path.slice(9) : path.slice(1);
+      stage = `${isMembership ? "memberships" : isImage ? "images" : isAdmin ? "platform-admin" : isProfile ? "profile" : "attendance"}.${operation}`;
       const result = await backend[operation]({
         auth: { uid, email: identity.email, photoURL: identity.picture },
         data,
@@ -129,7 +133,7 @@ export function createHandler({
         );
       // Never return upstream Google errors, token contents or service-account details.
       const diagnostic = {
-        event: path.startsWith("/images/") ? "image_backend_failure" : path.startsWith("/admin/") ? "platform_admin_backend_failure" : path.startsWith("/profile/") ? "profile_backend_failure" : "attendance_backend_failure",
+        event: path.startsWith("/memberships/") ? "membership_backend_failure" : path.startsWith("/images/") ? "image_backend_failure" : path.startsWith("/admin/") ? "platform_admin_backend_failure" : path.startsWith("/profile/") ? "profile_backend_failure" : "attendance_backend_failure",
         endpoint: path.slice(1),
         stage: error instanceof BackendError ? error.stage : stage,
         code: "unavailable",
@@ -156,7 +160,7 @@ export function createHandler({
           error: {
             code: "unavailable",
             message:
-              path.startsWith("/images/") ? "The image operation could not be confirmed. Refresh before retrying." : path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : path.startsWith("/profile/") ? "Your profile save could not be confirmed. Refresh your profile before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
+              path.startsWith("/memberships/") ? "The membership change could not be confirmed. Refresh before retrying." : path.startsWith("/images/") ? "The image operation could not be confirmed. Refresh before retrying." : path.startsWith("/admin/") ? "The administration operation could not be confirmed. Refresh records before retrying." : path.startsWith("/profile/") ? "Your profile save could not be confirmed. Refresh your profile before retrying." : "Verification could not be confirmed. Check attendance status before retrying.",
           },
         },
         503,

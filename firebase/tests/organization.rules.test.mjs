@@ -137,12 +137,69 @@ test('active members can open private details but outsiders cannot',async()=>{
   await assertSucceeds(getDoc(doc(db(),'organizations/private')));
   await assertFails(getDoc(doc(db('officer'),'organizations/private')));
 });
-test('no client can create organizations, assign managers, grant roles or delete memberships',async()=>{
+test('no client can create organizations, assign managers, grant roles or delete another membership',async()=>{
   for(const uid of ['student','manager']) {
     await assertFails(setDoc(doc(db(uid),'organizations/new'),organization('new')));
     await assertFails(updateDoc(doc(db(uid),'organizations/public'),{managerUid:uid}));
     await assertFails(updateDoc(doc(db(uid),'organizations/public'),{description:'Edited'}));
     await assertFails(deleteDoc(ref(db(uid),'officer')));
+  }
+});
+
+test('owner can cancel a pending request and submit a fresh request',async()=>{
+  await assertSucceeds(setDoc(ref(db()),request()));
+  await assertSucceeds(deleteDoc(ref(db())));
+  assert.equal((await getDoc(ref(db()))).exists(),false);
+  await assertSucceeds(setDoc(ref(db()),request()));
+  assert.equal((await getDoc(ref(db()))).data().membershipStatus,'pending');
+});
+test('other students, managers, officers and anonymous users cannot cancel another request',async()=>{
+  await setDoc(ref(db()),request());
+  for(const uid of ['other','manager','officer'])await assertFails(deleteDoc(ref(db(uid))));
+  await assertFails(deleteDoc(ref(env.unauthenticatedContext().firestore())));
+  assert.equal((await getDoc(ref(db()))).data().membershipStatus,'pending');
+});
+for(const status of ['active','rejected','removed']) {
+  test(`owner cannot delete a ${status} membership`,async()=>{
+    await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:status});
+    await assertFails(deleteDoc(ref(db())));
+  });
+}
+test('ineligible and unverified owners cannot cancel pending requests',async()=>{
+  await adminWrite('organizations/public/memberships/suspended',request('suspended'));
+  await assertFails(deleteDoc(ref(db('suspended'),'suspended')));
+  await adminWrite('organizations/public/memberships/student',request());
+  const unverified=env.authenticatedContext('student',{email:'student@example.test',email_verified:false,firebase:{sign_in_provider:'password'}}).firestore();
+  await assertFails(deleteDoc(ref(unverified)));
+});
+test('cancellation cannot delete privileged or reviewed pending records',async()=>{
+  for(const patch of [{membershipRole:'officer'},{permissions:{manageEvents:true}},{joinedAt:Timestamp.now()},{reviewedAt:Timestamp.now()},{reviewedBy:'manager'},{uid:'other'},{organizationId:'other'}]) {
+    await adminWrite('organizations/public/memberships/student',{...request(),...patch});
+    await assertFails(deleteDoc(ref(db())));
+  }
+});
+test('owner may cancel even after the organization stops accepting requests',async()=>{
+  await setDoc(ref(db()),request());
+  await adminWrite('organizations/public',organization('public',{approvalSettings:{acceptsRequests:false}}));
+  await assertSucceeds(deleteDoc(ref(db())));
+});
+test('concurrent manager review and cancellation never delete an approved membership',async()=>{
+  await setDoc(ref(db()),request());
+  const cancel=()=>runTransaction(db(),async t=>{
+    const snapshot=await t.get(ref(db()));
+    if(!snapshot.exists())return;
+    if(snapshot.data().membershipStatus!=='pending')throw Error('No longer pending');
+    t.delete(ref(db()));
+  });
+  const [cancelled,reviewed]=await Promise.allSettled([cancel(),updateDoc(ref(db('manager')),decision('active'))]);
+  const final=await getDoc(ref(db()));
+  if(final.exists()) {
+    assert.equal(final.data().membershipStatus,'active');
+    assert.equal(reviewed.status,'fulfilled');
+    assert.equal(cancelled.status,'rejected');
+  } else {
+    assert.equal(cancelled.status,'fulfilled');
+    assert.equal(reviewed.status,'rejected');
   }
 });
 test('published event summaries remain readable; malformed event and registration writes are denied',async()=>{
@@ -152,4 +209,41 @@ test('published event summaries remain readable; malformed event and registratio
   await assertFails(getDoc(doc(db(),'organizations/public/events/draft')));
   await assertFails(setDoc(doc(db('manager'),'organizations/public/events/new'),{title:'Event'}));
   await assertFails(setDoc(doc(db(),'organizations/public/events/live/registrations/student'),{uid:'student'}));
+});
+
+test('role, permission and termination writes require the trusted membership backend',async()=>{
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'active'});
+  for(const uid of ['student','manager','officer'])for(const changes of [
+    {membershipRole:'officer',positionTitle:'President'},
+    {permissions:{manageEvents:true,manageAttendance:true,viewRoster:true}},
+    {membershipStatus:'removed',endedBy:uid,endedAt:serverTimestamp()},
+  ])await assertFails(updateDoc(ref(db(uid)),changes));
+});
+const reapply=()=>({membershipStatus:'pending',membershipRole:'member',positionTitle:null,permissions:{},applicantName:'Demo student',requestedAt:serverTimestamp(),joinedAt:null,updatedAt:serverTimestamp(),reviewedAt:null,reviewedBy:null});
+test('ended membership reuses its UID document for a permission-free request and preserves end metadata',async()=>{
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed',membershipRole:'officer',permissions:{manageEvents:true},positionTitle:'President',endedBy:'manager',endReason:'Completed service',endedAt:Timestamp.fromMillis(1000)});
+  await assertSucceeds(updateDoc(ref(db()),reapply()));
+  const value=(await getDoc(ref(db()))).data();assert.equal(value.membershipRole,'member');assert.deepEqual(value.permissions,{});assert.equal(value.endedBy,'manager');assert.equal(value.endReason,'Completed service');
+  await assertSucceeds(updateDoc(ref(db('manager')),decision('active')));
+  assert.equal((await getDoc(ref(db()))).data().membershipStatus,'active');
+});
+test('reapplication cannot forge role, history, identity or skip pending approval',async()=>{
+  for(const changes of [{membershipStatus:'active'},{membershipRole:'officer'},{permissions:{viewRoster:true}},{uid:'other'},{endedBy:'student'},{endReason:'forged'},{reviewedBy:'manager'}]){
+    await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed',endedBy:'manager',endReason:'original'});
+    await assertFails(updateDoc(ref(db()),{...reapply(),...changes}));
+  }
+  for(const status of ['active','pending','rejected']){
+    await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:status});
+    await assertFails(updateDoc(ref(db()),reapply()));
+  }
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed'});
+  await assertFails(updateDoc(ref(db('other')),reapply()));
+});
+test('former roster is manager-only; active roster permission does not expose former members',async()=>{
+  await adminWrite('organizations/public/memberships/student',{...request(),membershipStatus:'removed'});
+  await adminWrite('organizations/public/memberships/officer',{...request('officer'),membershipStatus:'active',permissions:{viewRoster:true}});
+  const former=database=>query(collection(database,'organizations/public/memberships'),where('membershipStatus','==','removed'));
+  assert.equal((await assertSucceeds(getDocs(former(db('manager'))))).size,1);
+  await assertFails(getDocs(former(db('officer'))));
+  await assertSucceeds(getDoc(ref(db())));
 });

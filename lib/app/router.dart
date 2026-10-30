@@ -204,7 +204,7 @@ GoRouter _createTimedRouter(AuthViewModel auth, SplashGate gate) => GoRouter(
                 organizationId: state.pathParameters['organizationId']!,
                 eventId: state.pathParameters['eventId']!,
                 child: const AttendanceScope(
-                  child: AttendanceScreen(report: true),
+                  child: AttendanceScreen(),
                 ),
               ),
             ),
@@ -261,7 +261,7 @@ GoRouter _createTimedRouter(AuthViewModel auth, SplashGate gate) => GoRouter(
             GoRoute(
               path: AppRoutes.membershipRequests,
               builder: (_, _) =>
-                  const MyOrganizationsScreen(requestsOnly: true),
+                  const MyOrganizationsScreen(),
             ),
             GoRoute(
               path: '/organizations/:organizationId',

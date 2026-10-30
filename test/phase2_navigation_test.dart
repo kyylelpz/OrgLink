@@ -391,7 +391,7 @@ void main() {
     },
   );
   testWidgets(
-    'Home search navigates real results and organization filter chips remain functional',
+    'Home search navigates real results and organization navigation separates joined from discover',
     (tester) async {
       final app = _App();
       addTearDown(() => app.close(tester));
@@ -420,11 +420,15 @@ void main() {
         ),
       ]);
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilterChip, 'Joined'));
+      expect(find.text('Demo Creative'), findsOneWidget);
+      expect(find.text('Demo Robotics'), findsNothing);
+      await tester.tap(find.widgetWithText(FilterChip, 'My Organizations'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilterChip, 'Active'));
       await tester.pumpAndSettle();
       expect(find.text('Demo Robotics'), findsOneWidget);
       expect(find.text('Demo Creative'), findsNothing);
-      await tester.tap(find.widgetWithText(FilterChip, 'Discover').first);
+      await tester.tap(find.widgetWithText(FilterChip, 'Discover'));
       await tester.pumpAndSettle();
       expect(find.text('Demo Creative'), findsOneWidget);
       expect(find.text('Demo Robotics'), findsNothing);
@@ -501,7 +505,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }
-    await tester.tap(find.text('Edit Student Profile'));
+    final edit = find.text('Edit Student Profile');
+    await tester.ensureVisible(edit);
+    await tester.pumpAndSettle();
+    expect(edit.hitTestable(), findsOneWidget);
+    await tester.tap(edit);
     await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Save Student Profile'),
@@ -776,13 +784,13 @@ void main() {
       app.orgs.document.emit(managed);
       app.orgs.organizations.emit([managed, otherOrg]);
       await tester.pumpAndSettle();
-      expect(find.text('Manage Events'), findsOneWidget);
-      await tester.ensureVisible(find.text('Manage Events'));
+      expect(find.text('Manage'), findsOneWidget);
+      await tester.ensureVisible(find.text('Manage'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Manage Events'));
+      await tester.tap(find.text('Manage'));
       await tester.pumpAndSettle();
       expect(
-        find.widgetWithText(AppBar, 'Organization Event Management'),
+        find.widgetWithText(AppBar, 'Organization Details'),
         findsOneWidget,
       );
       expect(
