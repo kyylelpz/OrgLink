@@ -244,7 +244,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   validator: StudentDetails.validateStudentNumber,
                   decoration: const InputDecoration(
                     labelText: 'Student ID',
-                    helperText: 'BulSU-assigned ID: YYYYNNNNNN',
+                    helperText: 'ID: YYYYNNNNNN',
                     helperMaxLines: 2,
                   ),
                 ),
@@ -347,7 +347,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 const Text(
-                  'You can update permitted profile fields later. Roles are never selected during sign-up.',
+                  'You can update permitted profile fields later.',
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 if (auth.failure != null)

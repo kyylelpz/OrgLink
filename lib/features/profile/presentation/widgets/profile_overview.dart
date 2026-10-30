@@ -88,12 +88,6 @@ class ProfileOverview extends StatelessWidget {
                           ?.copyWith(color: AppColors.brandMidnight),
                     ),
                     Text(
-                      'Year ${details.yearLevel} · Section ${details.section}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                    ),
-                    Text(
                       details.studentNumber,
                       style: Theme.of(
                         context,
@@ -127,26 +121,7 @@ class ProfileOverview extends StatelessWidget {
               },
             ),
             const SizedBox(height: AppSpacing.lg),
-            AppActionButton(
-              label: 'Edit Student Profile',
-              onPressed: auth.isBusy ? null : onEdit,
-              style: AppActionStyle.outlined,
-            ),
-            if (auth.user?.providers.contains('google.com') == true &&
-                auth.user?.providers.contains('password') != true)
-              AppActionButton(
-                label: 'Link Password',
-                style: AppActionStyle.outlined,
-                onPressed: () => context.push(AppRoutes.linkPassword),
-              ),
-            if (auth.profile?.isPlatformAdmin == true)
-              AppActionButton(
-                label: 'Platform Administration',
-                icon: Icons.admin_panel_settings_outlined,
-                style: AppActionStyle.outlined,
-                onPressed: () => context.push(AppRoutes.admin),
-              ),
-            const SizedBox(height: AppSpacing.xl),
+
             AppSurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,19 +139,26 @@ class ProfileOverview extends StatelessWidget {
                 ],
               ),
             ),
-            // AppSurfaceCard(
-            //   child: Column(
-            //     crossAxisAlignment: CrossAxisAlignment.start,
-            //     children: [
-            //       const AppSectionHeading(
-            //         title: 'Google Email',
-            //       ),
-            //       const SizedBox(height: AppSpacing.sm),
-            //       SelectableText(auth.user?.email ?? auth.profile!.email),
-            //     ],
-            //   ),
-            // ),
-            const SizedBox(height: AppSpacing.lg),
+
+            AppActionButton(
+              label: 'Edit Student Profile',
+              onPressed: auth.isBusy ? null : onEdit,
+              style: AppActionStyle.outlined,
+            ),
+
+            if (auth.profile?.isPlatformAdmin == true) ...[
+              const SizedBox(height: AppSpacing.sm),
+              FilledButton.icon(
+                onPressed: () => context.push(AppRoutes.admin),
+                icon: const Icon(Icons.admin_panel_settings_outlined),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+                label: const Text('Platform Administration'),
+              ),
+            ],
+
+            const SizedBox(height: AppSpacing.xl),
 
             // NEW CARD STYLE LINKS
             const AppSectionHeading(title: 'Your Communities'),
@@ -224,7 +206,6 @@ class ProfileOverview extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
             AppSurfaceCard(
               onTap: () => context.push(AppRoutes.myEvents),
               child: Row(
@@ -249,11 +230,24 @@ class ProfileOverview extends StatelessWidget {
             ),
 
             const SizedBox(height: AppSpacing.xl),
+
+            if (auth.user?.providers.contains('google.com') == true &&
+                auth.user?.providers.contains('password') != true) ...[
+              const SizedBox(height: AppSpacing.xs),
+              AppActionButton(
+                label: 'Link Password',
+                style: AppActionStyle.outlined,
+                onPressed: () => context.push(AppRoutes.linkPassword),
+              ),
+            ],
+
             if (auth.failure != null)
               Text(
                 auth.failure!.message,
                 style: const TextStyle(color: AppColors.error),
               ),
+            
+            const SizedBox(height: AppSpacing.md),
             const SignOutButton(),
             const SizedBox(height: AppSpacing.xl), // Bottom padding
           ],
