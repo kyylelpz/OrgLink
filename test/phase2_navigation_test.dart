@@ -505,7 +505,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }
-    await tester.tap(find.text('Edit Student Profile'));
+    final edit = find.text('Edit Student Profile');
+    await tester.ensureVisible(edit);
+    await tester.pumpAndSettle();
+    expect(edit.hitTestable(), findsOneWidget);
+    await tester.tap(edit);
     await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Save Student Profile'),
