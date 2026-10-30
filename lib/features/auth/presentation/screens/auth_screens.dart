@@ -1187,10 +1187,15 @@ class AccountStatusScreen extends StatelessWidget {
                         ? null
                         : () => context.go(AppRoutes.completeProfile),
                   ),
+                  const SizedBox(height: AppSpacing.md),
                   TextButton(
                     onPressed: auth.isBusy ? null : auth.retry,
+                    style: TextButton.styleFrom(
+                      backgroundColor: AppColors.tonal,
+                    ),
                     child: const Text('Refresh Status'),
                   ),
+                  const SizedBox(height: AppSpacing.md),
                   const SignOutButton(),
                 ],
               ),
