@@ -8,14 +8,14 @@ OrgLink is a Flutter Android student organization application using Firebase Aut
 
 | Area | Implemented scope | Guide |
 | --- | --- | --- |
-| Identity | Google and email/password authentication, verification, reset/link password, profile and Student ID reservation, account approval gate | [Module 1](module1.md) |
-| Organizations | Discovery, membership requests/cancellation/review, roster, officer assignment, capability management, termination/reapplication | [Module 2](module2.md) |
-| Events | Draft/review/publication lifecycle, posters, discovery, atomic registration/withdrawal, participant projections | [Module 3](module3.md) |
-| Attendance | Manual marking, short-lived QR, scanning, corrections and audit, reports, own history | [Module 4](module4.md) |
-| Administration | Account decisions, organization management, exact Student ID manager lookup, audited/versioned mutations | [Platform Administration](platform-admin.md) |
-| Infrastructure | Authenticated Worker transactions and authorized Cloudinary image lifecycle | [Architecture](architecture.md), [Security](security.md), [Deployment](deployment.md) |
+| Identity | Google and email/password authentication, verification, reset/link password, profile and Student ID reservation, account approval gate | [Module 1](docs\new\module1.md) |
+| Organizations | Discovery, membership requests/cancellation/review, roster, officer assignment, capability management, termination/reapplication | [Module 2](docs\new\module2.md) |
+| Events | Draft/review/publication lifecycle, posters, discovery, atomic registration/withdrawal, participant projections | [Module 3](docs\new\module3.md) |
+| Attendance | Manual marking, short-lived QR, scanning, corrections and audit, reports, own history | [Module 4](docs\new\module4.md) |
+| Administration | Account decisions, organization management, exact Student ID manager lookup, audited/versioned mutations | [Platform Administration](docs\new\platform-admin.md) |
+| Infrastructure | Authenticated Worker transactions and authorized Cloudinary image lifecycle | [Architecture](docs\new\architecture.md), [Security](docs\new\security.md), [Deployment](docs\new\deployment.md) |
 
-Calendar and Notifications are explicit Coming Soon destinations. Badges, ratings, announcement publishing, manager-transfer requests and account removal are absent. Direct administrator manager replacement is implemented; it does not satisfy the transfer-request specification. [Compliance](requirements-compliance.md) preserves these gaps.
+Calendar and Notifications are explicit Coming Soon destinations. Badges, ratings, announcement publishing, manager-transfer requests and account removal are absent. Direct administrator manager replacement is implemented; it does not satisfy the transfer-request specification. [Compliance](docs\new\requirements-compliance.md) preserves these gaps.
 
 ## Architecture and Setup
 
